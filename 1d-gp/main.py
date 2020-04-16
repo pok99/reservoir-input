@@ -8,7 +8,7 @@ from sklearn.gaussian_process import GaussianProcessRegressor as gpr
 def main():
     x = np.arange(0, 20, 0.1)
     x_list = [[i] for i in x]
-    fx = np.sin(x) + 1.3*np.cos(1.1*x+1) - 2.3 * np.sin(.7*x - 1.4)
+    fx = np.sin(x) + 1.3*np.cos(1.1*x+1) - 2.3 * np.sin(.7*x - 1.4) - 30
 
 
     interval = 30
@@ -28,7 +28,7 @@ def main():
 
 
 
-    print(gp.get_params())
+    print(gp.get_params(deep=True))
 
     
 
