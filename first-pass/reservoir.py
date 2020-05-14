@@ -45,8 +45,9 @@ class Network(nn.Module):
         self.reservoir = Reservoir(args)
 
         self.W_f = nn.Parameter(torch.randn(args.D, args.O))
+        self.b = nn.Parameter(torch.zeros(args.D, 1))
 
-        self.f = lambda x: self.W_f @ x
+        self.f = lambda x: self.W_f @ x + self.b
 
         self.W_ro = nn.Parameter(torch.randn(2, args.N))
 
@@ -55,7 +56,7 @@ class Network(nn.Module):
         u = self.f(o.reshape(-1, 1))
         x = self.reservoir(u)
         z = self.W_ro @ x
-        return z
+        return z, u
 
     def reset(self):
         self.reservoir.reset()
