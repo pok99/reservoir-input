@@ -7,6 +7,7 @@ import os
 import argparse
 import pdb
 import sys
+import pickle
 
 from dataset import load_dataset
 from reservoir import Network, Reservoir
@@ -22,9 +23,11 @@ def parse_args():
     parser.add_argument('-D', type=int, default=5, help='')
     parser.add_argument('--res_init_type', default='gaussian', help='')
     parser.add_argument('--res_init_gaussian_std', default=1.5)
+    parser.add_argument('--no_log', action='store_true')
+    parser.add_argument('--dataset', default='data/rsg_tl300.pkl')
 
-    parser.add_argument('--lr', type=float, default=0.001, help='learning rate')
-    parser.add_argument('--n_epochs', type=int, default=1)
+    parser.add_argument('--lr', type=float, default=1e-4, help='learning rate')
+    parser.add_argument('-E', '--n_epochs', type=int, default=1)
 
     # todo: arguments for res init parameters
 
@@ -42,11 +45,15 @@ def parse_args():
 def main():
     args = parse_args()
 
-    dset = load_dataset('data/rsg_tl10.pkl')
+    if not args.no_log:
+        log = log_this(args, 'logs', None, False)
+
+    dset = load_dataset(args.dataset)
 
     net = Network(args)
 
-    criterion = nn.CrossEntropyLoss(weight=torch.tensor([1, 10],dtype=torch.float), reduction='sum')
+    # criterion = nn.CrossEntropyLoss(weight=torch.tensor([1, 10],dtype=torch.float), reduction='sum')
+    criterion = nn.MSELoss()
     
     # don't train the reservoir
     # at the moment, trains W_f and W_o
@@ -56,54 +63,83 @@ def main():
             train_params.append(q[1])
 
     optimizer = optim.Adam(train_params, lr=args.lr)
+    #optimizer = optim.SGD(train_params, lr=args.lr)
+
+    # set up logging
+    if not args.no_log:
+        csv_path = open(os.path.join(log.log_dir, 'losses.csv'), 'a')
+        writer = csv.writer(csv_path, delimiter = ',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
+        writer.writerow(['ix','avg_loss'])
 
     ix = 0
     losses = []
+    vis_samples = []
     for e in range(args.n_epochs):
         np.random.shuffle(dset)
         for trial in dset:
             ix += 1
             # next data sample
-            x, y = torch.from_numpy(trial[0]).float(), torch.from_numpy(trial[1]).long()
+            x = torch.from_numpy(trial[0]).float()
+            y = torch.from_numpy(trial[1]).float()
 
             net.reset()
             optimizer.zero_grad()
 
             outs = []
+            # the intermediate representation right before reservoir
             thals = []
+            ress = []
             sublosses = []
             total_loss = torch.tensor(0.)
             # for all the steps in this trial
             for j in range(x.shape[0]):
                 # run the step
                 net_in = x[j].unsqueeze(0)
-                net_out, thal = net(net_in)
+                net_out, val_thal, val_res = net(net_in)
+
                 # this is the desired output
                 net_target = y[j].unsqueeze(0)
-                outs.append(net_out)
-                thals.append(list(thal.detach().numpy().squeeze()))
+                outs.append(net_out.item())
+                thals.append(list(val_thal.detach().numpy().squeeze()))
+                ress.append(list(val_res.detach().numpy().squeeze()))
+
                 # this is the loss from the step
-                step_loss = criterion(net_out.transpose(0,1), net_target)
+                step_loss = criterion(net_out.view(1), net_target)
+                if np.isnan(step_loss.item()):
+                    print('is nan')
+                    pdb.set_trace()
                 sublosses.append(step_loss.item())
                 total_loss += step_loss
 
+                # print(j, ress[-1])
+                # pdb.set_trace()
+
             total_loss.backward()
+            
+            # print(net.W_f, net.W_f.grad)
+            # print(net.W_ro, net.W_ro.grad)
+            # print(net.b, net.b.grad)
             optimizer.step()
+            # pdb.set_trace()
+
             losses.append(total_loss.item())
 
             if ix % log_interval == 0:
+                z = np.stack(outs).squeeze()
                 # avg of the last 50 trials
-                print(f'iteration {ix + len(dset) * e}; loss ', sum(losses[-log_interval:]) / log_interval)
-                print('input:  ', (x.long() + y).numpy())
-                print('output: ', torch.stack(outs).squeeze().max(1)[1].detach().numpy().flatten())
-                # print('output: ', torch.stack(outs).squeeze().detach().numpy())
-                # print('thals: ', thals)
-                #print('outs ', [list(i.detach().numpy().squeeze()) for i in outs])
-                #print(sublosses)
-                #pdb.set_trace()
+                avg_loss = sum(losses[-log_interval:]) / log_interval
+                print(f'iteration {ix}; loss ', avg_loss)
 
-            # if ix % (log_interval * 5) == 0:
-            #     pdb.set_trace()
+                # logging output
+                if not args.no_log:
+                    writer.writerow([ix, avg_loss])
+                    vis_samples.append([ix, x.numpy(), y.numpy(), z, total_loss.item(), avg_loss])                
+
+
+    with open(os.path.join(log.log_dir, 'checkpoints.pkl'), 'wb') as f:
+        pickle.dump(vis_samples, f)
+
+    csv_path.close()
 
 
 

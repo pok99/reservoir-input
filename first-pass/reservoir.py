@@ -49,14 +49,14 @@ class Network(nn.Module):
 
         self.f = lambda x: self.W_f @ x + self.b
 
-        self.W_ro = nn.Parameter(torch.randn(2, args.N))
+        self.W_ro = nn.Parameter(torch.randn(1, args.N))
 
 
     def forward(self, o):
         u = self.f(o.reshape(-1, 1))
         x = self.reservoir(u)
         z = self.W_ro @ x
-        return z, u
+        return z, u, x
 
     def reset(self):
         self.reservoir.reset()
