@@ -33,6 +33,10 @@ def parse_args():
 
     parser.add_argument('-O', default=1, help='')
 
+    parser.add_argument('--name', type=str, default=None)
+    parser.add_argument('--param_path', type=str, default=None)
+    parser.add_argument('--slurm_id', type=int, default=None)
+
 
     args = parser.parse_args()
     args.res_init_params = {}
@@ -41,12 +45,11 @@ def parse_args():
     return args
 
 
-
-def main():
-    args = parse_args()
+def train(args):
+    
 
     if not args.no_log:
-        log = log_this(args, 'logs', None, False)
+        log = log_this(args, 'logs', args.name, False)
 
     dset = load_dataset(args.dataset)
 
@@ -91,6 +94,7 @@ def main():
             ress = []
             sublosses = []
             total_loss = torch.tensor(0.)
+            ending = False
             # for all the steps in this trial
             for j in range(x.shape[0]):
                 # run the step
@@ -106,21 +110,16 @@ def main():
                 # this is the loss from the step
                 step_loss = criterion(net_out.view(1), net_target)
                 if np.isnan(step_loss.item()):
-                    print('is nan')
-                    pdb.set_trace()
+                    print('is nan. ending')
+                    ending = True
                 sublosses.append(step_loss.item())
                 total_loss += step_loss
 
-                # print(j, ress[-1])
-                # pdb.set_trace()
+            if ending:
+                break
 
             total_loss.backward()
-            
-            # print(net.W_f, net.W_f.grad)
-            # print(net.W_ro, net.W_ro.grad)
-            # print(net.b, net.b.grad)
             optimizer.step()
-            # pdb.set_trace()
 
             losses.append(total_loss.item())
 
@@ -140,8 +139,16 @@ def main():
         pickle.dump(vis_samples, f)
 
     csv_path.close()
+    
 
 
 
 if __name__ == '__main__':
-    main()
+    args = parse_args()
+
+    if args.slurm_id is not None:
+        from parameters import apply_parameters
+        args = apply_parameters(param_path, args)
+
+    train(args)
+
