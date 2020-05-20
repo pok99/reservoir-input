@@ -2,5 +2,7 @@ playground/
 data/
 logs/
 
+**slurm**
+
 __pycache__/
 sshfs_ri/

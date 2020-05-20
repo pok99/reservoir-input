@@ -16,27 +16,22 @@ def create_dataset(args):
     t_type = args.trial_type
     n_trials = args.n_trials
     t_len = args.trial_len
+    trial_args = args.trial_args
 
     trials = []
-
-
-    if t_type == 'rsg':
-        if 'single' in args.trial_args:
-
-
 
     if t_type == 'rsg':
 
         # check if we just want one interval in entire dataset
-        if 'single' in args.trial_args:
-            single_idx = args.trial_args.index('single')
-            single_num = trial_args[single_idx + 1]
+        if 'single' in trial_args:
+            single_idx = trial_args.index('single')
+            single_num = int(trial_args[single_idx + 1])
             assert single_num < t_len / 2
             t_p = np.random.randint(single_num, t_len - single_num)
 
         for n in range(n_trials):
 
-            if 'single' not in args.trial_args:
+            if 'single' not in trial_args:
                 # amount of time in between ready and set cues
                 t_p = np.random.randint(2, t_len // 2 - 1)
 
@@ -45,7 +40,7 @@ def create_dataset(args):
             go_time = set_time + t_p
 
             # output 0s and 1s instead of pdf, use with CrossEntropyLoss
-            if 'delta' in args.trial_args:
+            if 'delta' in trial_args:
                 trial_x = np.zeros((t_len))
                 trial_y = np.zeros((t_len))
                 
@@ -54,8 +49,8 @@ def create_dataset(args):
                 trial_y[go_time] = 1
             else:
                 # check if width of gaussian is changed from default
-                if 'scale' in args.trial_args:
-                    scale_idx = args.trial_args.index('scale')
+                if 'scale' in trial_args:
+                    scale_idx = trial_args.index('scale')
                     scale = trial_args[scale_idx + 1]
                 else:
                     scale = 2
@@ -99,7 +94,7 @@ if __name__ == '__main__':
     parser.add_argument('mode', default='load')
     parser.add_argument('name')
     parser.add_argument('--trial_type', default='rsg')
-    parser.add_argument('--trial_args', nargs='?', help='terms to specify parameters of trial type')
+    parser.add_argument('--trial_args', nargs='*', help='terms to specify parameters of trial type')
     parser.add_argument('--trial_len', type=int, default=100)
     parser.add_argument('--n_trials', type=int, default=1000)
     args = parser.parse_args()

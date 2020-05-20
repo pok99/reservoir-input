@@ -8,6 +8,7 @@ import argparse
 import pdb
 import sys
 import pickle
+import logging
 
 from dataset import load_dataset
 from reservoir import Network, Reservoir
@@ -27,7 +28,7 @@ def parse_args():
     parser.add_argument('--dataset', default='data/rsg_tl300.pkl')
 
     parser.add_argument('--lr', type=float, default=1e-4, help='learning rate')
-    parser.add_argument('-E', '--n_epochs', type=int, default=1)
+    parser.add_argument('-E', '--n_epochs', type=int, default=10)
 
     # todo: arguments for res init parameters
 
@@ -46,10 +47,6 @@ def parse_args():
 
 
 def train(args):
-    
-
-    if not args.no_log:
-        log = log_this(args, 'logs', args.name, False)
 
     dset = load_dataset(args.dataset)
 
@@ -110,7 +107,7 @@ def train(args):
                 # this is the loss from the step
                 step_loss = criterion(net_out.view(1), net_target)
                 if np.isnan(step_loss.item()):
-                    print('is nan. ending')
+                    logging.info('is nan. ending')
                     ending = True
                 sublosses.append(step_loss.item())
                 total_loss += step_loss
@@ -127,7 +124,7 @@ def train(args):
                 z = np.stack(outs).squeeze()
                 # avg of the last 50 trials
                 avg_loss = sum(losses[-log_interval:]) / log_interval
-                print(f'iteration {ix}; loss ', avg_loss)
+                logging.info(f'iteration {ix}; loss {avg_loss}')
 
                 # logging output
                 if not args.no_log:
@@ -139,16 +136,39 @@ def train(args):
         pickle.dump(vis_samples, f)
 
     csv_path.close()
-    
 
+    return avg_loss
+    
 
 
 if __name__ == '__main__':
     args = parse_args()
 
+    if not args.no_log:
+        log = log_this(args, 'logs', args.name, False)
+
+        logging.basicConfig(format='%(message)s', filename=log.run_log, level=logging.DEBUG)
+        console = logging.StreamHandler()
+        console.setLevel(logging.DEBUG)
+        logging.getLogger('').addHandler(console)
+
     if args.slurm_id is not None:
         from parameters import apply_parameters
-        args = apply_parameters(param_path, args)
+        args = apply_parameters(args.param_path, args)
 
-    train(args)
+    final_loss = train(args)
+
+    if args.slurm_id is not None:
+        # if running many jobs, then we gonna put the results into a csv
+        csv_path = os.path.join('logs', args.name.split('_')[0] + '.csv')
+        csv_exists = os.path.exists(csv_path)
+        with open(csv_path, 'a') as f:
+            writer = csv.writer(f, delimiter = ',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
+            if not csv_exists:
+                writer.writerow(['slurm_id','N', 'D', 'O', 'epochs', 'lr', 'dset', 'loss'])
+            writer.writerow([args.slurm_id, args.N, args.D, args.O, args.n_epochs, args.lr, args.dataset, final_loss])
+
+    logging.shutdown()
+
+
 
