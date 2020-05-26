@@ -27,7 +27,7 @@ def create_dataset(args):
             single_idx = trial_args.index('single')
             single_num = int(trial_args[single_idx + 1])
             assert single_num < t_len / 2
-            t_p = np.random.randint(single_num, t_len - single_num)
+            t_p = single_num
 
         for n in range(n_trials):
 
@@ -56,9 +56,9 @@ def create_dataset(args):
                     scale = 2
 
                 trial_range = np.arange(t_len)
-                trial_x = norm.pdf(trial_range, loc=ready_time, scale=scale)
-                trial_x += norm.pdf(trial_range, loc=set_time, scale=scale)
-                trial_y = 4 * norm.pdf(trial_range, loc=go_time, scale=scale)
+                trial_x = 2 * norm.pdf(trial_range, loc=ready_time, scale=scale)
+                trial_x += 2 * norm.pdf(trial_range, loc=set_time, scale=scale)
+                trial_y = 8 * norm.pdf(trial_range, loc=go_time, scale=scale)
 
 
             trials.append((trial_x, trial_y))
@@ -82,13 +82,6 @@ def load_dataset(fpath):
 
 
 if __name__ == '__main__':
-
-    DEFAULT_ARGS = {
-        'name': 'default',
-        'trial_type': 'ready-set-go',
-        'n_trials': 1000,
-        'trial_len': 40
-    }
 
     parser = argparse.ArgumentParser()
     parser.add_argument('mode', default='load')

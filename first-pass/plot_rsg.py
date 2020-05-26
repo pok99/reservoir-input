@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+import random
 import pickle
 
 
@@ -13,12 +14,11 @@ args = parser.parse_args()
 with open(args.file, 'rb') as f:
     data = pickle.load(f)
 
-interval = len(data) // 12
-data_intervals = [0]
-for i in range(11):
-    data_intervals.append(data_intervals[-1] + interval)
+data_idx = [0]
+data_idx += random.sample(range(1, len(data) - 1))
+data_idx += [len(data)]
 
-data = [data[i] for i in data_intervals]
+data = [data[i] for i in data_idx]
 
 fig, ax = plt.subplots(3,4,sharex=True, sharey=True, figsize=(12,7))
 

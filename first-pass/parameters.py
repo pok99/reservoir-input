@@ -13,7 +13,8 @@ def create_parameters(name):
 
     trial_lens = [100]
     singles = [10, 20, 30]
-    lrs = [1e-2, 1e-3, 1e-4, 1e-5, 1e-6]
+    lrs = [1e-2, 1e-3]
+    n_epochs = 20
 
     n_commands = len(Ds) * len(Ns) * len(trial_lens) * len(singles) * len(lrs)
 
@@ -23,6 +24,7 @@ def create_parameters(name):
         run_params['D'] = nD
         run_params['N'] = nN
         run_params['lr'] = lr
+        run_params['n_epochs'] = n_epochs
 
         mapping[ix] = run_params
         ix += 1

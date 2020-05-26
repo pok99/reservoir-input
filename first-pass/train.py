@@ -27,8 +27,9 @@ def parse_args():
     parser.add_argument('--no_log', action='store_true')
     parser.add_argument('--dataset', default='data/rsg_tl300.pkl')
 
-    parser.add_argument('--lr', type=float, default=1e-4, help='learning rate')
+    parser.add_argument('--lr', type=float, default=1e-3, help='learning rate')
     parser.add_argument('-E', '--n_epochs', type=int, default=10)
+    parser.add_argument('--patience', type=int, default=1000, help='stop training if loss doesn\'t decrease')
 
     # todo: arguments for res init parameters
 
@@ -74,6 +75,9 @@ def train(args):
     ix = 0
     losses = []
     vis_samples = []
+    running_min_error = float('inf')
+    running_no_min = 0
+
     for e in range(args.n_epochs):
         np.random.shuffle(dset)
         for trial in dset:
@@ -107,7 +111,7 @@ def train(args):
                 # this is the loss from the step
                 step_loss = criterion(net_out.view(1), net_target)
                 if np.isnan(step_loss.item()):
-                    logging.info('is nan. ending')
+                    logging.info(f'iteration {ix}; is nan. ending')
                     ending = True
                 sublosses.append(step_loss.item())
                 total_loss += step_loss
@@ -120,6 +124,16 @@ def train(args):
 
             losses.append(total_loss.item())
 
+            if total_loss.item() < running_min_error:
+                running_no_min = 0
+                running_min_error = total_loss.item()
+            else:
+                running_no_min += 1
+
+            if running_no_min > args.patience:
+                logging.info(f'iteration {ix}; no min for {args.patience} samples. ending')
+                break
+
             if ix % log_interval == 0:
                 z = np.stack(outs).squeeze()
                 # avg of the last 50 trials
@@ -129,8 +143,12 @@ def train(args):
                 # logging output
                 if not args.no_log:
                     writer.writerow([ix, avg_loss])
-                    vis_samples.append([ix, x.numpy(), y.numpy(), z, total_loss.item(), avg_loss])                
+                    vis_samples.append([ix, x.numpy(), y.numpy(), z, total_loss.item(), avg_loss])
 
+        if running_no_min > args.patience:
+            break
+
+    logging.info(f'END | iterations: {(ix // log_interval) * log_interval} | loss: {avg_loss}')
 
     with open(os.path.join(log.log_dir, 'checkpoints.pkl'), 'wb') as f:
         pickle.dump(vis_samples, f)
