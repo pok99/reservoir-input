@@ -12,6 +12,8 @@ import pdb
 class Reservoir(nn.Module):
     def __init__(self, args):
         super().__init__()
+        self.args = args
+        
         self.J = nn.Parameter(torch.empty((args.N, args.N)))
         self.W_u = nn.Parameter(torch.empty((args.N, args.D)))
         self.activation = torch.tanh
@@ -26,8 +28,8 @@ class Reservoir(nn.Module):
 
     def _init_J(self, init_type, init_params):
         if init_type == 'gaussian':
-            self.J.data = torch.normal(0, init_params['std'], self.J.shape)
-            self.W_u.data = torch.normal(0, init_params['std'], self.W_u.shape)
+            self.J.data = torch.normal(0, init_params['std'], self.J.shape) / np.sqrt(self.args.N)
+            self.W_u.data = torch.normal(0, init_params['std'], self.W_u.shape) / np.sqrt(self.args.N)
 
     def forward(self, u):
         g = self.activation(self.J @ self.x + self.W_u @ u)
@@ -44,12 +46,12 @@ class Network(nn.Module):
         super().__init__()
         self.reservoir = Reservoir(args)
 
-        self.W_f = nn.Parameter(torch.randn(args.D, args.O))
+        self.W_f = nn.Parameter(torch.randn(args.D, args.O) / np.sqrt(args.O))
         self.b = nn.Parameter(torch.zeros(args.D, 1))
 
         self.f = lambda x: self.W_f @ x + self.b
 
-        self.W_ro = nn.Parameter(torch.randn(1, args.N))
+        self.W_ro = nn.Parameter(torch.randn(1, args.N) / np.sqrt(args.N))
 
 
     def forward(self, o):

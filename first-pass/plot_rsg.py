@@ -15,8 +15,11 @@ with open(args.file, 'rb') as f:
     data = pickle.load(f)
 
 data_idx = [0]
-data_idx += random.sample(range(1, len(data) - 1))
-data_idx += [len(data)]
+data_idx += sorted(random.sample(range(1, len(data) - 1), 10))
+data_idx += [len(data) - 1]
+
+print(data_idx)
+print(len(data))
 
 data = [data[i] for i in data_idx]
 
@@ -41,6 +44,7 @@ for i, ax in enumerate(fig.axes):
     ax.tick_params(axis='both', color='white')
 
     ax.set_title(f'step {ix}, avg loss {round(avg_loss, 1)}', size='small')
+    ax.set_ylim([-2,2])
 
 fig.text(0.5, 0.04, 'timestep', ha='center', va='center')
 fig.text(0.06, 0.5, 'value', ha='center', va='center', rotation='vertical')
