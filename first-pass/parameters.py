@@ -12,7 +12,7 @@ def create_parameters(name):
     Ns = [100, 250, 500]
 
     trial_lens = [100]
-    singles = [20]
+    singles = [0] # doesn't matter
     lrs = [1e-2, 1e-3, 1e-4]
     n_epochs = 200
 
@@ -26,7 +26,7 @@ def create_parameters(name):
         if nD > nN:
             continue
         run_params = {}
-        run_params['dataset'] = f'data/rsg_tl100_s{s}.pkl'
+        run_params['dataset'] = f'data/rsg_tl100.pkl'
         run_params['D'] = nD
         run_params['N'] = nN
         run_params['lr'] = lr

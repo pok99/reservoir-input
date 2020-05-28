@@ -34,6 +34,9 @@ def parse_args():
     parser.add_argument('--patience', type=int, default=1000, help='stop training if loss doesn\'t decrease')
     parser.add_argument('--grad_threshold', type=float, default=1e-4, help='stop training if grad is less than certain amount')
 
+    parser.add_argument('--seed', type=int, help='seed for most of network')
+    parser.add_argument('--reservoir_seed', type=int, help='seed for reservoir')
+
     # todo: arguments for res init parameters
 
     parser.add_argument('-O', default=1, help='')
@@ -203,6 +206,15 @@ def train(args):
 
 if __name__ == '__main__':
     args = parse_args()
+
+    if args.seed is None:
+        args.seed = random.randint(1e9)
+    if args.reservoir_seed is None:
+        args.reservoir_seed = random.randint(1e9)
+
+    torch.manual_seed(args.seed)
+    np.random.seed(args.seed)
+    random.seed(args.seed)
 
     if args.slurm_id is not None:
         from parameters import apply_parameters

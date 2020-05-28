@@ -13,7 +13,7 @@ class Reservoir(nn.Module):
     def __init__(self, args):
         super().__init__()
         self.args = args
-        
+
         self.J = nn.Parameter(torch.empty((args.N, args.N)))
         self.W_u = nn.Parameter(torch.empty((args.N, args.D)))
         self.activation = torch.tanh
@@ -24,11 +24,12 @@ class Reservoir(nn.Module):
 
         self.tau_x = 10
 
-        self.args = args
-
     def _init_J(self, init_type, init_params):
         if init_type == 'gaussian':
+            rng_tmp = torch.get_rng_state()
+            torch.manual_seed = self.args.reservoir_seed
             self.J.data = torch.normal(0, init_params['std'], self.J.shape) / np.sqrt(self.args.N)
+            torch.set_rng_state(rng_tmp)
             self.W_u.data = torch.normal(0, init_params['std'], self.W_u.shape) / np.sqrt(self.args.N)
 
     def forward(self, u):

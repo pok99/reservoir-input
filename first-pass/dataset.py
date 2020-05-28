@@ -92,6 +92,9 @@ if __name__ == '__main__':
     parser.add_argument('--n_trials', type=int, default=1000)
     args = parser.parse_args()
 
+    if args.trial_args is None:
+        args.trial_args = []
+
     if args.mode == 'create':
         dset = create_dataset(args)
         save_dataset(dset, args.name, args=args)
