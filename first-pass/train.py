@@ -38,8 +38,6 @@ def parse_args():
     parser.add_argument('--seed', type=int, help='seed for most of network')
     parser.add_argument('--reservoir_seed', type=int, help='seed for reservoir')
 
-    # todo: arguments for res init parameters
-
     parser.add_argument('-O', default=1, help='')
 
     parser.add_argument('--name', type=str, default=None)
@@ -68,7 +66,6 @@ def train(args):
 
     net = Network(args)
 
-    # criterion = nn.CrossEntropyLoss(weight=torch.tensor([1, 10],dtype=torch.float), reduction='sum')
     criterion = nn.MSELoss()
     
     # don't train the reservoir
@@ -79,14 +76,12 @@ def train(args):
             train_params.append(q[1])
 
     optimizer = optim.Adam(train_params, lr=args.lr)
-    #optimizer = optim.SGD(train_params, lr=args.lr)
 
     # set up logging
     if not args.no_log:
         csv_path = open(os.path.join(log.log_dir, 'losses.csv'), 'a')
         writer = csv.writer(csv_path, delimiter = ',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
         writer.writerow(['ix','avg_loss'])
-
         plot_checkpoint_path = os.path.join(log.log_dir, 'checkpoints.pkl')
 
     ix = 0

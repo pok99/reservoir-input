@@ -32,7 +32,7 @@ def add_yaml_args(args, config_file):
 
 
 # produce run id and create log directory
-def log_this(config, log_dir, log_name=None, checkpoints=True):
+def log_this(config, log_dir, log_name=None, checkpoints=True, use_id=True):
     run_id = str(int(time.time() * 100))[-7:]
     print('\n=== Logging ===', flush=True)
     
@@ -44,7 +44,7 @@ def log_this(config, log_dir, log_name=None, checkpoints=True):
     os.makedirs(run_dir, exist_ok=True)
     print(f'Log folder: {run_dir}', flush=True)
 
-    log_path = os.path.join(run_dir, f'log-{run_id}.log')
+    log_path = os.path.join(run_dir, f'log_{run_id}.log')
     print(f'Log file: {log_path}', flush=True)
 
     if checkpoints:
