@@ -11,4 +11,7 @@ results = pd.read_csv(f'logs/{args.id}.csv')
 
 results = results.sort_values('loss')
 
-print(results)
+#print(results)
+
+with pd.option_context('display.max_rows', None, 'display.max_columns', None):  # more options can be specified also
+    print(results)

@@ -9,6 +9,7 @@ import pdb
 import sys
 import pickle
 import logging
+import random
 
 from dataset import load_dataset
 from reservoir import Network, Reservoir
@@ -25,7 +26,7 @@ def parse_args():
     parser.add_argument('--res_init_type', default='gaussian', help='')
     parser.add_argument('--res_init_gaussian_std', default=1.5)
     parser.add_argument('--no_log', action='store_true')
-    parser.add_argument('--dataset', default='data/rsg_tl300.pkl')
+    parser.add_argument('--dataset', default='data/rsg_tl100.pkl')
 
     parser.add_argument('--lr', type=float, default=1e-3, help='learning rate')
     parser.add_argument('-E', '--n_epochs', type=int, default=10)
@@ -208,9 +209,9 @@ if __name__ == '__main__':
     args = parse_args()
 
     if args.seed is None:
-        args.seed = random.randint(1e9)
+        args.seed = random.randrange(1e6)
     if args.reservoir_seed is None:
-        args.reservoir_seed = random.randint(1e9)
+        args.reservoir_seed = random.randrange(1e6)
 
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
@@ -240,8 +241,8 @@ if __name__ == '__main__':
         with open(csv_path, 'a') as f:
             writer = csv.writer(f, delimiter = ',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
             if not csv_exists:
-                writer.writerow(['slurm_id','N', 'D', 'O', 'epochs', 'lr', 'dset', 'loss'])
-            writer.writerow([args.slurm_id, args.N, args.D, args.O, args.n_epochs, args.lr, args.dataset, final_loss])
+                writer.writerow(['slurm_id','N', 'D', 'O', 'seed', 'rseed', 'epochs', 'lr', 'dset', 'loss'])
+            writer.writerow([args.slurm_id, args.N, args.D, args.O, args.seed, args.reservoir_seed, args.n_epochs, args.lr, args.dataset, final_loss])
 
     logging.shutdown()
 

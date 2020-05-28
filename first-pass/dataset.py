@@ -5,6 +5,7 @@ import os
 import sys
 import json
 import pdb
+import random
 
 import matplotlib.pyplot as plt
 
@@ -24,16 +25,25 @@ def create_dataset(args):
 
         # check if we just want one interval in entire dataset
         if 'single' in trial_args:
-            single_idx = trial_args.index('single')
-            single_num = int(trial_args[single_idx + 1])
-            assert single_num < t_len / 2
-            t_p = single_num
+            idx = trial_args.index('single')
+            num = int(trial_args[idx + 1])
+            assert num < t_len / 2
+            t_p = num
 
         for n in range(n_trials):
 
             if 'single' not in trial_args:
                 # amount of time in between ready and set cues
-                t_p = np.random.randint(2, t_len // 2 - 1)
+                if 'gt' in trial_args:
+                    idx = trial_args.index('gt')
+                    num = int(trial_args[idx + 1])
+                    t_p = np.random.randint(num, t_len // 2 - 1)
+                elif 'lt' in trial_args:
+                    idx = trial_args.index('lt')
+                    num = int(trial_args[idx + 1])
+                    t_p = np.random.randint(2, num)
+                else:
+                    t_p = np.random.randint(2, t_len // 2 - 1)
 
             ready_time = np.random.randint(0, t_len - t_p * 2)
             set_time = ready_time + t_p
@@ -50,8 +60,8 @@ def create_dataset(args):
             else:
                 # check if width of gaussian is changed from default
                 if 'scale' in trial_args:
-                    scale_idx = trial_args.index('scale')
-                    scale = trial_args[scale_idx + 1]
+                    idx = trial_args.index('scale')
+                    scale = float(trial_args[idx + 1])
                 else:
                     scale = 2
 
@@ -101,6 +111,17 @@ if __name__ == '__main__':
     elif args.mode == 'load':
         dset = load_dataset(args.name)
 
+        dset_len = len(dset)
+        sample = random.sample(dset, 12)
+        dset_range = range(len(sample[0][0]))
+        fig, ax = plt.subplots(3,4,sharex=True, sharey=True, figsize=(12,7))
+        for i, ax in enumerate(fig.axes):
+            ax.plot(dset_range, sample[i][0], color='coral', label='ready/set', lw=2)
+            ax.plot(dset_range, sample[i][1], color='dodgerblue', label='go', lw=2)
+
+        handles, labels = ax.get_legend_handles_labels()
+        fig.legend(handles, labels, loc='lower center')
+        plt.show()
     # confirm ready set go works
     # for i in range(5):
     #     np.random.shuffle(dset)

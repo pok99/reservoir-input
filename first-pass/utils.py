@@ -44,7 +44,7 @@ def log_this(config, log_dir, log_name=None, checkpoints=True):
     os.makedirs(run_dir, exist_ok=True)
     print(f'Log folder: {run_dir}', flush=True)
 
-    log_path = os.path.join(run_dir, f'{run_id}.log')
+    log_path = os.path.join(run_dir, f'log-{run_id}.log')
     print(f'Log file: {log_path}', flush=True)
 
     if checkpoints:
