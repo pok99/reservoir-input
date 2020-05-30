@@ -8,13 +8,13 @@ def create_parameters(name):
     mapping = {}
     ix = 1
 
-    Ds = [10, 50, 100, 250]
+    Ds = [5, 10, 50, 100, 250]
     Ns = [50, 100, 250]
 
     trial_lens = [100]
     singles = [10]
     lrs = [1e-2, 1e-3]
-    n_epochs = 100
+    n_epochs = 50
 
     patience = 4000
 
@@ -27,7 +27,7 @@ def create_parameters(name):
         if nD > nN:
             continue
         run_params = {}
-        run_params['dataset'] = f'data/rsg_tl100_l25_sc1.pkl'
+        run_params['dataset'] = f'data/rsg_tl100_sc1_l25.pkl'
         run_params['D'] = nD
         run_params['N'] = nN
         run_params['lr'] = lr

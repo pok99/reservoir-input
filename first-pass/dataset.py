@@ -34,16 +34,16 @@ def create_dataset(args):
 
             if 'single' not in trial_args:
                 # amount of time in between ready and set cues
+                min_t = 7
+                max_t = t_len // 2 - 7
                 if 'gt' in trial_args:
                     idx = trial_args.index('gt')
-                    num = int(trial_args[idx + 1])
-                    t_p = np.random.randint(num, t_len // 2 - 1)
+                    min_t = int(trial_args[idx + 1])
                 elif 'lt' in trial_args:
                     idx = trial_args.index('lt')
-                    num = int(trial_args[idx + 1])
-                    t_p = np.random.randint(2, num)
-                else:
-                    t_p = np.random.randint(2, t_len // 2 - 1)
+                    max_t = int(trial_args[idx + 1])
+                
+                t_p = np.random.randint(min_t, max_t)
 
             ready_time = np.random.randint(0, t_len - t_p * 2)
             set_time = ready_time + t_p
@@ -63,15 +63,16 @@ def create_dataset(args):
                     idx = trial_args.index('scale')
                     scale = float(trial_args[idx + 1])
                 else:
-                    scale = 2
+                    scale = 1
 
                 trial_range = np.arange(t_len)
-                trial_x = 2 * norm.pdf(trial_range, loc=ready_time, scale=scale)
-                trial_x += 2 * norm.pdf(trial_range, loc=set_time, scale=scale)
-                trial_y = 8 * norm.pdf(trial_range, loc=go_time, scale=scale)
+                trial_x = norm.pdf(trial_range, loc=ready_time, scale=scale)
+                trial_x += norm.pdf(trial_range, loc=set_time, scale=scale)
+                trial_y = 4 * norm.pdf(trial_range, loc=go_time, scale=scale)
 
+            info = (ready_time, set_time, go_time)
 
-            trials.append((trial_x, trial_y))
+            trials.append((trial_x, trial_y, info))
 
     return trials
 
@@ -118,6 +119,7 @@ if __name__ == '__main__':
         for i, ax in enumerate(fig.axes):
             ax.plot(dset_range, sample[i][0], color='coral', label='ready/set', lw=2)
             ax.plot(dset_range, sample[i][1], color='dodgerblue', label='go', lw=2)
+            ax.set_title(sample[i][2])
 
         handles, labels = ax.get_legend_handles_labels()
         fig.legend(handles, labels, loc='lower center')

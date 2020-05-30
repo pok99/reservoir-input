@@ -20,6 +20,7 @@ args = parser.parse_args()
 with open(args.file, 'rb') as f:
     model = torch.load(f)
 
+run_id = '/'.join(args.file.split('/')[-4:-2])
 
 args.N = model['reservoir.J'].shape[0]
 args.D = model['reservoir.W_u'].shape[1]
@@ -28,8 +29,6 @@ args.O = model['W_f'].shape[1]
 args.res_init_type = 'gaussian'
 args.res_init_params = {'std': 1.5}
 args.reservoir_seed = 0
-
-
 
 net = Network(args)
 net.load_state_dict(model)
@@ -76,9 +75,7 @@ for ix in range(12):
 
     z = np.stack(outs).squeeze()
     zs.append(z)
-
     losses.append(total_loss.item())
-    print(f'Finished evaluating trial {ix}')
 
 data = list(zip(dset_idx, xs, ys, zs, losses))
 
@@ -109,6 +106,7 @@ fig.text(0.5, 0.04, 'timestep', ha='center', va='center')
 fig.text(0.06, 0.5, 'value', ha='center', va='center', rotation='vertical')
 
 handles, labels = ax.get_legend_handles_labels()
+fig.suptitle(f'Final performance: {run_id}')
 fig.legend(handles, labels, loc='center right')
 
 plt.show()
