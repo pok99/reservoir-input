@@ -21,6 +21,6 @@ for f in folders:
 
     plt.plot(pd_data.ix, pd_data.avg_loss, lw=0.5)
 
-plt.ylim([10, 15])
+plt.ylim([2, 5])
 
 plt.show()

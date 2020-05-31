@@ -7,6 +7,8 @@ import os
 import pickle
 import pdb
 
+from utils import Bunch
+
 
 # reservoir network. shouldn't be trained
 class Reservoir(nn.Module):
@@ -14,13 +16,13 @@ class Reservoir(nn.Module):
         super().__init__()
         self.args = args
 
-        self.J = nn.Parameter(torch.empty((args.N, args.N)))
-        self.W_u = nn.Parameter(torch.empty((args.N, args.D)))
+        self.J = nn.Linear(args.N, args.N, bias=False)
+        self.W_u = nn.Linear(args.D, args.N, bias=False)
         self.activation = torch.tanh
 
         self._init_J(args.res_init_type, args.res_init_params)
 
-        self.x = torch.zeros((args.N, 1))
+        self.x = torch.zeros((1, args.N))
 
         self.tau_x = 10
 
@@ -28,18 +30,18 @@ class Reservoir(nn.Module):
         if init_type == 'gaussian':
             rng_pt = torch.get_rng_state()
             torch.manual_seed(self.args.reservoir_seed)
-            self.J.data = torch.normal(0, init_params['std'], self.J.shape) / np.sqrt(self.args.N)
-            self.W_u.data = torch.normal(0, init_params['std'], self.W_u.shape) / np.sqrt(self.args.N)
+            self.J.weight.data = torch.normal(0, init_params['std'], self.J.weight.shape) / np.sqrt(self.args.N)
+            self.W_u.weight.data = torch.normal(0, init_params['std'], self.W_u.weight.shape) / np.sqrt(self.args.N)
             torch.set_rng_state(rng_pt)
 
     def forward(self, u):
-        g = self.activation(self.J @ self.x + self.W_u @ u)
+        g = self.activation(self.J(self.x) + self.W_u(u))
         delta_x = (-self.x + g) / self.tau_x
         self.x = self.x + delta_x
         return self.x
 
     def reset(self):
-        self.x = torch.zeros((self.args.N, 1))
+        self.x = torch.zeros((1, self.args.N))
 
 
 class Network(nn.Module):
@@ -47,18 +49,13 @@ class Network(nn.Module):
         super().__init__()
         self.reservoir = Reservoir(args)
 
-        self.W_f = nn.Parameter(torch.randn(args.D, args.O) / np.sqrt(args.O))
-        self.b = nn.Parameter(torch.zeros(args.D, 1))
-
-        self.f = lambda x: self.W_f @ x + self.b
-
-        self.W_ro = nn.Parameter(torch.randn(1, args.N) / np.sqrt(args.N))
-
+        self.W_f = nn.Linear(args.O, args.D, bias=False)
+        self.W_ro = nn.Linear(args.N, 1, bias=False)
 
     def forward(self, o):
-        u = self.f(o.reshape(-1, 1))
+        u = self.W_f(o.reshape(-1, 1))
         x = self.reservoir(u)
-        z = self.W_ro @ x
+        z = self.W_ro(x)
         return z, u, x
 
     def reset(self):

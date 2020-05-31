@@ -62,7 +62,7 @@ def log_this(config, log_dir, log_name=None, checkpoints=True, use_id=True):
 
     log = LogObject()
     log.checkpoint_dir = checkpoint_dir
-    log.log_dir = run_dir
+    log.run_dir = run_dir
     log.run_log = log_path
     log.run_id = run_id
 
@@ -71,3 +71,7 @@ def log_this(config, log_dir, log_name=None, checkpoints=True, use_id=True):
     return log
 
 
+# https://code.activestate.com/recipes/52308-the-simple-but-handy-collector-of-a-bunch-of-named/?in=user-97991
+class Bunch:
+    def __init__(self, **kwds):
+        self.__dict__.update(kwds)

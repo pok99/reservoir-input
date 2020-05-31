@@ -18,7 +18,6 @@ from utils import *
 
 log_interval = 50
 
-
 def parse_args():
     parser = argparse.ArgumentParser(description='')
     parser.add_argument('-N', type=int, default=20, help='')
@@ -26,7 +25,7 @@ def parse_args():
     parser.add_argument('--res_init_type', default='gaussian', help='')
     parser.add_argument('--res_init_gaussian_std', default=1.5)
     parser.add_argument('--no_log', action='store_true')
-    parser.add_argument('--dataset', default='data/rsg_tl100.pkl')
+    parser.add_argument('--dataset', default='data/rsg_tl100_sc1.pkl')
 
     parser.add_argument('--lr', type=float, default=1e-3, help='learning rate')
     parser.add_argument('-E', '--n_epochs', type=int, default=10)
@@ -40,7 +39,7 @@ def parse_args():
 
     parser.add_argument('-O', default=1, help='')
 
-    parser.add_argument('--name', type=str, default=None)
+    parser.add_argument('--name', type=str, default='test')
     parser.add_argument('--param_path', type=str, default=None)
     parser.add_argument('--slurm_id', type=int, default=None)
 
@@ -79,10 +78,11 @@ def train(args):
 
     # set up logging
     if not args.no_log:
-        csv_path = open(os.path.join(log.log_dir, 'losses.csv'), 'a')
+        csv_path = open(os.path.join(log.run_dir, 'losses.csv'), 'a')
         writer = csv.writer(csv_path, delimiter = ',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
         writer.writerow(['ix','avg_loss'])
-        plot_checkpoint_path = os.path.join(log.log_dir, 'checkpoints.pkl')
+        plot_checkpoint_path = os.path.join(log.run_dir, 'checkpoints.pkl')
+        model_path = os.path.join(log.run_dir, 'model.pth')
 
     ix = 0
     losses = []
@@ -165,7 +165,6 @@ def train(args):
                     writer.writerow([ix, avg_loss])
                     vis_samples.append([ix, x.numpy(), y.numpy(), z, total_loss.item(), avg_loss])
                     # saving the model takes too much space so we just save one
-                    model_path = os.path.join(log.checkpoint_dir, 'model.pth')
                     if os.path.exists(model_path):
                         os.remove(model_path)
                     torch.save(net.state_dict(), model_path)
@@ -191,7 +190,7 @@ def train(args):
 
     logging.info(f'END | iterations: {(ix // log_interval) * log_interval} | loss: {avg_loss}')
 
-    with open(os.path.join(log.log_dir, 'checkpoints.pkl'), 'wb') as f:
+    with open(os.path.join(log.run_dir, 'checkpoints.pkl'), 'wb') as f:
         pickle.dump(vis_samples, f)
 
     csv_path.close()
@@ -218,9 +217,9 @@ if __name__ == '__main__':
 
     if not args.no_log:
         if args.slurm_id is not None:
-            log = log_this(args, 'logs', os.path.join(args.name.split('_')[0], args.name.split('_')[1]), True)
+            log = log_this(args, 'logs', os.path.join(args.name.split('_')[0], args.name.split('_')[1]), checkpoints=False)
         else:
-            log = log_this(args, 'logs', args.name, True)
+            log = log_this(args, 'logs', args.name, checkpoints=False)
 
         logging.basicConfig(format='%(message)s', filename=log.run_log, level=logging.DEBUG)
         console = logging.StreamHandler()
