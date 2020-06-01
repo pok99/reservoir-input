@@ -27,7 +27,7 @@ def create_parameters(name):
         if nD > nN:
             continue
         run_params = {}
-        run_params['dataset'] = f'data/rsg_tl100_sc1.pkl'
+        run_params['dataset'] = f'data/rsg_tl100_sc1_l25.pkl'
         run_params['D'] = nD
         run_params['N'] = nN
         run_params['lr'] = lr

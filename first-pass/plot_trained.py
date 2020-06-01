@@ -9,6 +9,7 @@ import argparse
 import pdb
 
 from dataset import load_dataset
+from helpers import test_model
 from reservoir import Network, Reservoir
 
 parser = argparse.ArgumentParser()
@@ -20,64 +21,11 @@ args = parser.parse_args()
 with open(args.file, 'rb') as f:
     model = torch.load(f)
 
+dset = load_dataset(args.dataset)
+data = test_model(model, dset, n_tests=12)
+
 run_id = '/'.join(args.file.split('/')[-4:-2])
 
-args.N = model['reservoir.J'].shape[0]
-args.D = model['reservoir.W_u'].shape[1]
-args.O = model['W_f'].shape[1]
-
-args.res_init_type = 'gaussian'
-args.res_init_params = {'std': 1.5}
-args.reservoir_seed = 0
-
-net = Network(args)
-net.load_state_dict(model)
-net.eval()
-
-criterion = nn.MSELoss()
-
-dset = load_dataset(args.dataset)
-
-dset_idx = sorted(random.sample(range(len(dset)), 12))
-
-xs = []
-ys = []
-zs = []
-losses = []
-
-ix = 0
-for ix in range(12):
-    trial = dset[dset_idx[ix]]
-    # next data sample
-    x = torch.from_numpy(trial[0]).float()
-    y = torch.from_numpy(trial[1]).float()
-    xs.append(x)
-    ys.append(y)
-
-    net.reset()
-
-    outs = []
-
-    total_loss = torch.tensor(0.)
-    for j in range(x.shape[0]):
-        # run the step
-        net_in = x[j].unsqueeze(0)
-        net_out, val_thal, val_res = net(net_in)
-
-        # this is the desired output
-        net_target = y[j].unsqueeze(0)
-        outs.append(net_out.item())
-
-        # this is the loss from the step
-        step_loss = criterion(net_out.view(1), net_target)
-
-        total_loss += step_loss
-
-    z = np.stack(outs).squeeze()
-    zs.append(z)
-    losses.append(total_loss.item())
-
-data = list(zip(dset_idx, xs, ys, zs, losses))
 
 fig, ax = plt.subplots(3,4,sharex=True, sharey=True, figsize=(12,7))
 
