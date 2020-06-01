@@ -26,9 +26,41 @@ with open(args.file, 'rb') as f:
 
 dset = load_dataset(args.dataset)
 
-net = nn.Linear(5, 5)
-pdb.set_trace()
+data = test_model(model, dset, 1000)
+
+distr = {}
+
+for i in range(len(data)):
+
+    dset_idx, x, y, z, _ = data[i]
+    r, s, g = dset[dset_idx][2]
+
+    peak = np.argmax(z)
+    dif = peak - g
+
+    interval = s - r
+    if interval not in distr:
+        distr[interval] = [dif]
+    else:
+        distr[interval].append(dif)
+
+intervals = []
+for k,v in distr.items():
+    v_avg = np.mean(v)
+    v_max = np.max(v)
+    v_min = np.min(v)
+    intervals.append((k,v_avg, v_min, v_max))
+
+intervals.sort(key=lambda x: x[0])
+intervals, offsets, mins, maxs = list(zip(*intervals))
+
+plt.plot(intervals, offsets, lw=3, marker='o', color='tomato', ms=6)
+plt.fill_between(intervals, mins, offsets, color='coral', alpha=.5)
+plt.fill_between(intervals, maxs, offsets, color='coral', alpha=.5)
+plt.xlabel('interval length')
+plt.ylabel('average peak offset')
+
+plt.xlim([0,50])
 
 
-data = test_model(model, dset, 0)
-pdb.set_trace()
+plt.show()

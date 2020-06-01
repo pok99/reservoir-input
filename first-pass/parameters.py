@@ -11,28 +11,34 @@ def create_parameters(name):
     Ds = [5, 10, 50, 100, 250]
     Ns = [50, 100, 250]
 
-    trial_lens = [100]
-    singles = [10]
     lrs = [1e-3]
     n_epochs = 50
-
     patience = 4000
 
     n_seeds = 4
     n_rseeds = 2
 
+    datasets = [
+        'data/rsg_tl100_sc1.pkl',
+        'data/rsg_tl100_sc1_s10.pkl',
+        'data/rsg_tl100_sc1_s20.pkl',
+        'data/rsg_tl100_sc1_s30.pkl',
+        'data/rsg_tl100_sc1_s40.pkl',
+    ]
+
     #n_commands = len(Ds) * len(Ns) * len(trial_lens) * len(singles) * len(lrs) * n_seeds
 
-    for (nD, nN, tl, s, lr, seed, rseed) in product(Ds, Ns, trial_lens, singles, lrs, range(n_seeds), range(n_rseeds)):
+    for (nD, nN, d, seed, rseed) in product(Ds, Ns, datasets, range(n_seeds), range(n_rseeds)):
         if nD > nN:
             continue
         run_params = {}
-        run_params['dataset'] = f'data/rsg_tl100_sc1_l25.pkl'
+        run_params['dataset'] = d
         run_params['D'] = nD
         run_params['N'] = nN
-        run_params['lr'] = lr
-        run_params['n_epochs'] = n_epochs
-        run_params['patience'] = patience
+        # run_params['lr'] = lr
+        # run_params['n_epochs'] = n_epochs
+        # run_params['patience'] = patience
+        run_params['optimizer'] = 'lbfgs-scipy'
 
         run_params['reservoir_seed'] = rseed
 

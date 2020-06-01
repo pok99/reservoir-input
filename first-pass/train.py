@@ -19,41 +19,6 @@ from reservoir import Network, Reservoir
 from utils import log_this
 from helpers import get_optimizer
 
-def parse_args():
-    parser = argparse.ArgumentParser(description='')
-    parser.add_argument('-N', type=int, default=20, help='')
-    parser.add_argument('-D', type=int, default=5, help='')
-    parser.add_argument('--res_init_type', default='gaussian', help='')
-    parser.add_argument('--res_init_gaussian_std', default=1.5)
-    parser.add_argument('--no_log', action='store_true')
-    parser.add_argument('--log_interval', type=int, default=50)
-    parser.add_argument('--dataset', default='data/rsg_tl100_sc1.pkl')
-
-    parser.add_argument('--optimizer', default='adam')
-    parser.add_argument('--lr', type=float, default=1e-3, help='learning rate')
-    parser.add_argument('-E', '--n_epochs', type=int, default=10)
-
-    parser.add_argument('--conv_type', type=str, choices=['patience', 'grad'], default='grad')
-    parser.add_argument('--patience', type=int, default=1000, help='stop training if loss doesn\'t decrease')
-    parser.add_argument('--grad_threshold', type=float, default=1e-4, help='stop training if grad is less than certain amount')
-
-    parser.add_argument('--seed', type=int, help='seed for most of network')
-    parser.add_argument('--reservoir_seed', type=int, help='seed for reservoir')
-
-    parser.add_argument('-O', default=1, help='')
-
-    parser.add_argument('--name', type=str, default='test')
-    parser.add_argument('--param_path', type=str, default=None)
-    parser.add_argument('--slurm_id', type=int, default=None)
-
-
-    args = parser.parse_args()
-    args.res_init_params = {}
-    if args.res_init_type == 'gaussian':
-        args.res_init_params['std'] = args.res_init_gaussian_std
-    return args
-
-
 class Trainer:
     def __init__(self, args):
         super().__init__()
@@ -84,7 +49,7 @@ class Trainer:
     def optimize_lbfgs(self, mode):
         if mode == 'pytorch':
             best_loss = float('inf')
-            best_loss_params = None   
+            best_loss_params = None
             for i in range(50):
                 #dset = np.asarray([x[:-1] for x in self.dset[i * 100:(i+1) * 100]])
                 np.random.shuffle(self.dset)
@@ -183,14 +148,18 @@ class Trainer:
                         total_loss += step_loss
 
                     z = np.stack(outs).squeeze()
-
                     self.log_checkpoint(self.scipy_ix, xs.numpy(), ys.numpy(), z, total_loss.item(), total_loss.item())
+                    logging.info(f'iteration {self.scipy_ix}\t| loss {total_loss.item():.3f}')
 
 
             init_Wf = np.random.randn(self.args.D, self.args.O) / np.sqrt(self.args.O)  # random initialization of input weights
             init_Wro = np.random.randn(1, self.args.N) / np.sqrt(self.args.N)
             init = np.concatenate((init_Wf.reshape(-1), init_Wro.reshape(-1)))
-            optim = minimize(closure, init, method='L-BFGS-B', jac=True, callback=callback, options={'iprint': 50})
+            optim_options = {
+                'iprint': self.log_interval,
+                'maxiter': self.args.maxiter
+            }
+            optim = minimize(closure, init, method='L-BFGS-B', jac=True, callback=callback, options=optim_options)
 
             W_f_final, W_ro_final = vec_to_param(optim.x)
             error_final = optim.fun
@@ -328,6 +297,39 @@ class Trainer:
 
         return avg_loss
 
+def parse_args():
+    parser = argparse.ArgumentParser(description='')
+    parser.add_argument('-N', type=int, default=20, help='')
+    parser.add_argument('-D', type=int, default=5, help='')
+    parser.add_argument('-O', default=1, help='')
+    parser.add_argument('--res_init_type', default='gaussian', help='')
+    parser.add_argument('--res_init_gaussian_std', default=1.5)
+    parser.add_argument('--dataset', default='data/rsg_tl100_sc1.pkl')
+
+    parser.add_argument('--optimizer', choices=['adam', 'lbfgs-scipy', 'lbfgs-pytorch'], default='adam')
+    parser.add_argument('--lr', type=float, default=1e-3, help='learning rate. adam only')
+    parser.add_argument('-E', '--n_epochs', type=int, default=10, help='number of epochs to train for. adam only')
+    parser.add_argument('--maxiter', type=int, default=5000, help='limit to # iterations. lbfgs-scipy only')
+
+    parser.add_argument('--conv_type', type=str, choices=['patience', 'grad'], default='grad', help='how to determine convergence. adam only')
+    parser.add_argument('--patience', type=int, default=1000, help='stop training if loss doesn\'t decrease')
+    parser.add_argument('--grad_threshold', type=float, default=1e-4, help='stop training if grad is less than certain amount')
+
+    parser.add_argument('--seed', type=int, help='seed for most of network')
+    parser.add_argument('--reservoir_seed', type=int, help='seed for reservoir')
+
+    parser.add_argument('--no_log', action='store_true')
+    parser.add_argument('--log_interval', type=int, default=50)
+
+    parser.add_argument('--name', type=str, default='test')
+    parser.add_argument('--param_path', type=str, default=None)
+    parser.add_argument('--slurm_id', type=int, default=None)
+
+    args = parser.parse_args()
+    args.res_init_params = {}
+    if args.res_init_type == 'gaussian':
+        args.res_init_params['std'] = args.res_init_gaussian_std
+    return args
 
 if __name__ == '__main__':
     args = parse_args()
@@ -364,7 +366,7 @@ if __name__ == '__main__':
         final_loss = trainer.optimize_lbfgs('scipy')
     elif args.optimizer == 'lbfgs-pytorch':
         final_loss = trainer.optimize_lbfgs('pytorch')
-    else:
+    elif args.optimizer == 'adam':
         final_loss = trainer.train()
 
     if args.slurm_id is not None:
@@ -373,9 +375,14 @@ if __name__ == '__main__':
         csv_exists = os.path.exists(csv_path)
         with open(csv_path, 'a') as f:
             writer = csv.writer(f, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
-            if not csv_exists:
-                writer.writerow(['slurm_id','N', 'D', 'O', 'seed', 'rseed', 'epochs', 'lr', 'dset', 'loss'])
-            writer.writerow([args.slurm_id, args.N, args.D, args.O, args.seed, args.reservoir_seed, args.n_epochs, args.lr, args.dataset, final_loss])
+            if args.optimizer == 'adam':
+                if not csv_exists:
+                    writer.writerow(['slurm_id','N', 'D', 'O', 'seed', 'rseed', 'epochs', 'lr', 'dset', 'loss'])
+                writer.writerow([args.slurm_id, args.N, args.D, args.O, args.seed, args.reservoir_seed, args.n_epochs, args.lr, args.dataset, final_loss])
+            elif args.optimizer == 'lbfgs-scipy':
+                if not csv_exists:
+                    writer.writerow(['slurm_id','N', 'D', 'O', 'seed', 'rseed', 'dset', 'loss'])
+                writer.writerow([args.slurm_id, args.N, args.D, args.O, args.seed, args.reservoir_seed, args.dataset, final_loss])
 
     logging.shutdown()
 
