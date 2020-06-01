@@ -12,20 +12,29 @@ from dataset import load_dataset
 from helpers import test_model
 from reservoir import Network, Reservoir
 
-parser = argparse.ArgumentParser()
-parser.add_argument('file')
-parser.add_argument('dataset')
+# parser = argparse.ArgumentParser()
+# parser.add_argument('model')
+# parser.add_argument('dataset')
+# args = parser.parse_args()
 
+# with open(args.model, 'rb') as f:
+#     model = torch.load(f)
+
+# dset = load_dataset(args.dataset)
+# data = test_model(model, dset, n_tests=12)
+
+# run_id = '/'.join(args.file.split('/')[-4:-2])
+
+parser = argparse.ArgumentParser()
+parser.add_argument('data')
 args = parser.parse_args()
 
-with open(args.file, 'rb') as f:
-    model = torch.load(f)
+with open(args.data, 'rb') as f:
+    data_pre = pickle.load(f)
+    dset_idx = sorted(random.sample(range(len(data_pre)), 12))
+    data = [data_pre[ix] for ix in dset_idx]
 
-dset = load_dataset(args.dataset)
-data = test_model(model, dset, n_tests=12)
-
-run_id = '/'.join(args.file.split('/')[-4:-2])
-
+    run_id = 0
 
 fig, ax = plt.subplots(3,4,sharex=True, sharey=True, figsize=(12,7))
 
@@ -58,3 +67,5 @@ fig.suptitle(f'Final performance: {run_id}')
 fig.legend(handles, labels, loc='center right')
 
 plt.show()
+
+

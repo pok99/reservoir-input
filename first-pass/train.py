@@ -11,14 +11,13 @@ import sys
 import pickle
 import logging
 import random
+import csv
 
 from dataset import load_dataset
 from reservoir import Network, Reservoir
 
-from utils import *
+from utils import log_this
 from helpers import get_optimizer
-
-log_interval = 50
 
 def parse_args():
     parser = argparse.ArgumentParser(description='')
@@ -75,12 +74,147 @@ class Trainer:
         self.log_interval = self.args.log_interval
         if not self.args.no_log:
             self.log = self.args.log
+            self.vis_samples = []
             self.csv_path = open(os.path.join(self.log.run_dir, 'losses.csv'), 'a')
-            self.writer = csv.writer(self.csv_path, delimiter = ',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
-            self.writer.writerow(['ix','avg_loss'])
+            self.writer = csv.writer(self.csv_path, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
+            self.writer.writerow(['ix', 'avg_loss'])
             self.plot_checkpoint_path = os.path.join(self.log.run_dir, 'checkpoints.pkl')
             self.model_path = os.path.join(log.run_dir, 'model.pth')
 
+    def optimize_lbfgs(self, mode):
+        if mode == 'pytorch':
+            best_loss = float('inf')
+            best_loss_params = None   
+            for i in range(50):
+                #dset = np.asarray([x[:-1] for x in self.dset[i * 100:(i+1) * 100]])
+                np.random.shuffle(self.dset)
+                dset = np.asarray([x[:-1] for x in self.dset[:500]])
+                x = torch.from_numpy(dset[:,0,:]).float()
+                y = torch.from_numpy(dset[:,1,:]).float()
+
+                def closure():
+                    self.net.reset()
+                    self.optimizer.zero_grad()
+                    total_loss = torch.tensor(0.)
+                    for j in range(x.shape[1]):
+                        net_in = x[:,j]
+                        net_out, val_thal, val_res = self.net(net_in)
+                        net_target = y[:,j].reshape(-1, 1)
+
+                        step_loss = self.criterion(net_out, net_target)
+                        total_loss += step_loss
+
+                    total_loss.backward()
+                    return total_loss
+
+                self.optimizer.step(closure)
+                loss = closure()
+                
+                if loss < best_loss:
+                    print(i, loss.item(), 'new best loss')
+                    best_loss = loss
+                    best_loss_params = self.net.state_dict()
+                else:
+                    print(i, loss.item(), 'nope')
+                    self.net.load_state_dict(best_loss_params)
+
+        elif mode == 'scipy':
+            W_f_total = self.args.O * self.args.D
+            W_ro_total = self.args.N
+            dset = np.asarray([x[:-1] for x in self.dset])
+            x = torch.from_numpy(dset[:,0,:]).float()
+            y = torch.from_numpy(dset[:,1,:]).float()
+
+            # so that the callback for scipy.optimize.minimize knows what step it is on
+            self.scipy_ix = 0
+            vis_samples = []
+
+            def vec_to_param(v):
+                assert len(v) == W_f_total + W_ro_total
+                W_f = v[:W_f_total].reshape(self.args.D, self.args.O)
+                W_ro = v[W_f_total:].reshape(1, self.args.N)
+                return W_f, W_ro
+
+            def closure(v):
+                W_f, W_ro = vec_to_param(v)
+                self.net.W_f.weight = nn.Parameter(torch.from_numpy(W_f).float())
+                self.net.W_ro.weight = nn.Parameter(torch.from_numpy(W_ro).float())
+
+                self.net.reset()
+                self.net.zero_grad()
+                total_loss = torch.tensor(0.)
+                for j in range(x.shape[1]):
+                    net_in = x[:,j].reshape(-1, 1)
+                    net_out, val_thal, val_res = self.net(net_in)
+                    net_target = y[:,j].reshape(-1, 1)
+
+                    step_loss = self.criterion(net_out, net_target)
+                    total_loss += step_loss
+
+                total_loss.backward()
+
+                Wf = self.net.W_f.weight.grad.detach().numpy().reshape(-1)
+                Wro = self.net.W_ro.weight.grad.detach().numpy().reshape(-1)
+                vec = np.concatenate((Wf, Wro))
+                post = np.float64(vec)
+
+                return total_loss.item(), post
+
+            def callback(xk):
+                if self.args.no_log:
+                    return
+                self.scipy_ix += 1
+                if self.scipy_ix % self.log_interval == 0:
+                    W_f, W_ro = vec_to_param(xk)
+                    sample_n = random.randrange(len(dset))
+
+                    self.net.reset()
+                    self.net.zero_grad()
+                    outs = []
+                    total_loss = torch.tensor(0.)
+                    xs = x[sample_n,:]
+                    ys = y[sample_n,:]
+                    for j in range(xs.shape[0]):
+                        net_in = xs[j].reshape(-1,1)
+                        net_out, val_thal, val_res = self.net(net_in)
+                        outs.append(net_out.item())
+                        net_target = ys[j].reshape(-1,1)
+                        step_loss = self.criterion(net_out, net_target)
+                        total_loss += step_loss
+
+                    z = np.stack(outs).squeeze()
+
+                    self.log_checkpoint(self.scipy_ix, xs.numpy(), ys.numpy(), z, total_loss.item(), total_loss.item())
+
+
+            init_Wf = np.random.randn(self.args.D, self.args.O) / np.sqrt(self.args.O)  # random initialization of input weights
+            init_Wro = np.random.randn(1, self.args.N) / np.sqrt(self.args.N)
+            init = np.concatenate((init_Wf.reshape(-1), init_Wro.reshape(-1)))
+            optim = minimize(closure, init, method='L-BFGS-B', jac=True, callback=callback, options={'iprint': 50})
+
+            W_f_final, W_ro_final = vec_to_param(optim.x)
+            error_final = optim.fun
+
+            if not self.args.no_log:
+                with open(os.path.join(self.log.run_dir, 'checkpoints.pkl'), 'wb') as f:
+                    pickle.dump(self.vis_samples, f)
+                self.csv_path.close()
+
+            return error_final
+
+
+    def log_checkpoint(self, ix, x, y, z, total_loss, avg_loss):
+        self.writer.writerow([ix, avg_loss])
+        # saving all checkpoints takes too much space so we just save one
+        if os.path.exists(self.model_path):
+            os.remove(self.model_path)
+        torch.save(self.net.state_dict(), self.model_path)
+
+        self.vis_samples.append([ix, x, y, z, total_loss, total_loss])
+        if os.path.exists(self.plot_checkpoint_path):
+            os.remove(self.plot_checkpoint_path)
+        with open(self.plot_checkpoint_path, 'wb') as f:
+            pickle.dump(self.vis_samples, f)
 
     def iteration(self, x, y):
         self.net.reset()
@@ -112,119 +246,13 @@ class Trainer:
 
         total_loss.backward()
 
-        return total_loss, (outs, thals, ress, sublosses)
-
-    def optimize_lbfgs(self, mode):
-        if mode == 'pytorch':
-            best_loss = float('inf')
-            best_loss_params = None   
-            for i in range(50):
-                #dset = np.asarray([x[:-1] for x in self.dset[i * 100:(i+1) * 100]])
-                np.random.shuffle(self.dset)
-                dset = np.asarray([x[:-1] for x in self.dset[:500]])
-                x = torch.from_numpy(dset[:,0,:]).float()
-                y = torch.from_numpy(dset[:,1,:]).float()
-
-                def closure():
-                    self.net.reset()
-                    self.optimizer.zero_grad()
-                    total_loss = torch.tensor(0.)
-                    for j in range(x.shape[1]):
-                        # run the step
-                        net_in = x[:,j]
-                        net_out, val_thal, val_res = self.net(net_in)
-                        net_target = y[:,j].reshape(-1, 1)
-
-                        # outs.append(net_out.item())
-                        # thals.append(list(val_thal.detach().numpy().squeeze()))
-                        # ress.append(list(val_res.detach().numpy().squeeze()))
-
-                        step_loss = self.criterion(net_out, net_target)
-                        # if np.isnan(step_loss.item()):
-                        #     return -1, (outs, thals, ress, sublosses)
-                        # sublosses.append(step_loss.item())
-                        total_loss += step_loss
-
-                    total_loss.backward()
-                    return total_loss
-
-                self.optimizer.step(closure)
-                loss = closure()
-                
-                if loss < best_loss:
-                    print(i, loss.item(), 'new best loss')
-                    best_loss = loss
-                    best_loss_params = self.net.state_dict()
-                else:
-                    print(i, loss.item(), 'nope')
-                    self.net.load_state_dict(best_loss_params)
-
-        elif mode == 'scipy':
-            W_f_total = self.args.O * self.args.D
-            W_ro_total = self.args.N
-            dset = np.asarray([x[:-1] for x in self.dset])
-            x = torch.from_numpy(dset[:,0,:]).float()
-            y = torch.from_numpy(dset[:,1,:]).float()
-            def closure():
-                self.net.reset()
-                self.net.zero_grad()
-                total_loss = torch.tensor(0.)
-                for j in range(x.shape[1]):
-                    # run the step
-                    net_in = x[:,j]
-                    net_out, val_thal, val_res = self.net(net_in)
-                    net_target = y[:,j].reshape(-1, 1)
-
-                    # outs.append(net_out.item())
-                    # thals.append(list(val_thal.detach().numpy().squeeze()))
-                    # ress.append(list(val_res.detach().numpy().squeeze()))
-
-                    step_loss = self.criterion(net_out, net_target)
-                    # if np.isnan(step_loss.item()):
-                    #     return -1, (outs, thals, ress, sublosses)
-                    # sublosses.append(step_loss.item())
-                    total_loss += step_loss
-
-                total_loss.backward()
-                return total_loss
-
-            def closure2(params):
-                
-                assert len(params) == W_f_total + W_ro_total
-                W_f = params[:W_f_total].reshape(self.args.D, self.args.O)
-                W_ro = params[W_f_total:].reshape(1, self.args.N)
-
-                self.net.W_f.weight = nn.Parameter(torch.from_numpy(W_f).float())
-                self.net.W_ro.weight = nn.Parameter(torch.from_numpy(W_ro).float())
-
-                loss = closure()
-                post_Wf = self.net.W_f.weight.grad.detach().numpy().reshape(-1)
-                post_Wro = self.net.W_ro.weight.grad.detach().numpy().reshape(-1)
-                post = np.concatenate((post_Wf, post_Wro))
-
-                post = np.float64(post)
-                
-                return loss.item(), post
-
-            init_Wf = np.random.randn(self.args.D, self.args.O) / np.sqrt(self.args.O)  # random initialization of input weights
-            init_Wro = np.random.randn(1, self.args.N) / np.sqrt(self.args.N)
-            init = np.concatenate((init_Wf.reshape(-1), init_Wro.reshape(-1)))
-            optim = minimize(closure2, init, method='L-BFGS-B', jac=True, options={'iprint': 50})
-
-            final = optim.x
-            W_f_final = optim.x[:W_f_total].reshape(self.args.D, self.args.O)
-            W_ro_final = optim.x[W_f_total:].reshape(1, self.args.N)
-            error_final = optim.fun
-
-            pdb.set_trace()
-
+        return total_loss, (x, y, outs, thals, ress, sublosses)
 
     def train(self):
         ix = 0
 
         # for convergence testing
         max_abs_grads = []
-        vis_samples = []
         running_min_error = float('inf')
         running_no_min = 0
 
@@ -246,11 +274,6 @@ class Trainer:
                 if self.args.optimizer == 'adam':
                     loss, etc = self.iteration(x, y)
                     self.optimizer.step()
-                elif self.args.optimizer == 'lbfgs':
-                    self.optimizer.step(closure)
-                    loss, etc = self.iteration(x, y)
-                    init = np.random.randn(args.N, args.D) / np.sqrt(d)  # random initialization of input weights
-                    #optim = minimize(loss, init.reshape(-1), method='L-BFGS-B', jac=True, options={'iprint': 10})  # the last argument just tells it to print stuff every 10 
 
                 if loss == -1:
                     logging.info(f'iteration {ix}: is nan. ending')
@@ -262,7 +285,7 @@ class Trainer:
                 running_mag += mag             
 
                 if ix % self.log_interval == 0:
-                    outs = etc[0]
+                    outs = etc[2]
                     z = np.stack(outs).squeeze()
                     # avg of the last 50 trials
                     avg_loss = running_loss / self.log_interval
@@ -272,17 +295,7 @@ class Trainer:
                     logging.info(f'iteration {ix}\t| loss {avg_loss:.3f}\t| max abs grad {avg_max_grad:.3f}')
 
                     if not self.args.no_log:
-                        self.writer.writerow([ix, avg_loss])
-                        # saving all checkpoints takes too much space so we just save one
-                        if os.path.exists(self.model_path):
-                            os.remove(self.model_path)
-                        torch.save(self.net.state_dict(), self.model_path)
-
-                        vis_samples.append([ix, x.numpy(), y.numpy(), z, total_loss.item(), avg_loss])
-                        if os.path.exists(self.plot_checkpoint_path):
-                            os.remove(self.plot_checkpoint_path)
-                        with open(self.plot_checkpoint_path, 'wb') as f:
-                            pickle.dump(vis_samples, f)
+                        self.log_checkpoint(ix, etc[0].numpy(), etc[1].numpy(), z, running_loss, avg_loss)
 
                     # convergence based on no avg loss decrease after patience samples
                     if self.args.conv_type == 'patience':
@@ -309,7 +322,7 @@ class Trainer:
         if not self.args.no_log:
             # for later visualization of outputs over timesteps
             with open(os.path.join(self.log.run_dir, 'checkpoints.pkl'), 'wb') as f:
-                pickle.dump(vis_samples, f)
+                pickle.dump(self.vis_samples, f)
 
             self.csv_path.close()
 
@@ -359,7 +372,7 @@ if __name__ == '__main__':
         csv_path = os.path.join('logs', args.name.split('_')[0] + '.csv')
         csv_exists = os.path.exists(csv_path)
         with open(csv_path, 'a') as f:
-            writer = csv.writer(f, delimiter = ',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
+            writer = csv.writer(f, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
             if not csv_exists:
                 writer.writerow(['slurm_id','N', 'D', 'O', 'seed', 'rseed', 'epochs', 'lr', 'dset', 'loss'])
             writer.writerow([args.slurm_id, args.N, args.D, args.O, args.seed, args.reservoir_seed, args.n_epochs, args.lr, args.dataset, final_loss])
