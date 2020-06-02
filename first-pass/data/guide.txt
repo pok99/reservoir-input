@@ -43,5 +43,11 @@ rsg_delta_s30
 rsg_delta_s40
 @rsg_delta, interval=40
 
-rsg_s10+15+20+25
+rsg_s10-5-25
 250 trials each of rsg_s(10, 15, 20, 25)
+
+rsg_s25-5-40
+250 trials each of rsg_s(25, 30, 35, 40)
+
+rsg_s10-5-40
+143 trials each of rsg_s(10, 15 ... 40) with 1 trial removed (to make 1000)

@@ -305,7 +305,7 @@ def parse_args():
     parser.add_argument('-O', default=1, help='')
     parser.add_argument('--res_init_type', default='gaussian', help='')
     parser.add_argument('--res_init_gaussian_std', default=1.5)
-    parser.add_argument('--dataset', default='data/rsg_tl100_sc1.pkl')
+    parser.add_argument('--dataset', default='data/rsg.pkl')
 
     parser.add_argument('--optimizer', choices=['adam', 'lbfgs-scipy', 'lbfgs-pytorch'], default='adam')
     parser.add_argument('--loss', type=str, default='mse')

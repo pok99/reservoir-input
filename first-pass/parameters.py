@@ -19,11 +19,9 @@ def create_parameters(name):
     n_rseeds = 2
 
     datasets = [
-        'data/rsg_tl100_sc1.pkl',
-        'data/rsg_tl100_sc1_s10.pkl',
-        'data/rsg_tl100_sc1_s20.pkl',
-        'data/rsg_tl100_sc1_s30.pkl',
-        'data/rsg_tl100_sc1_s40.pkl',
+        'data/rsg_s10-5-25.pkl',
+        'data/rsg_s25-5-40.pkl',
+        'data/rsg_s10-5-40.pkl',
     ]
 
     #n_commands = len(Ds) * len(Ns) * len(trial_lens) * len(singles) * len(lrs) * n_seeds
