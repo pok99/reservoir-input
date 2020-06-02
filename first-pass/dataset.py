@@ -80,11 +80,11 @@ def save_dataset(dset, name, args=None):
     fname = name + '.pkl'
     with open(os.path.join('data', fname), 'wb') as f:
         pickle.dump(dset, f)
-    gname = name + '.json'
-    if args is not None:
-        args = vars(args)
-        with open(os.path.join('data', gname), 'w') as f:
-            json.dump(args, f)
+    # gname = name + '.json'
+    # if args is not None:
+    #     args = vars(args)
+    #     with open(os.path.join('data', gname), 'w') as f:
+    #         json.dump(args, f)
 
 def load_dataset(fpath):
     with open(fpath, 'rb') as f:

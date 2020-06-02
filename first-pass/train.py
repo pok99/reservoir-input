@@ -12,12 +12,15 @@ import pickle
 import logging
 import random
 import csv
+import math
 
 from dataset import load_dataset
 from reservoir import Network, Reservoir
 
 from utils import log_this
-from helpers import get_optimizer
+from helpers import get_optimizer, get_criterion
+
+sigmoid = lambda x: 1 / (1 + np.exp(-x))
 
 class Trainer:
     def __init__(self, args):
@@ -26,7 +29,7 @@ class Trainer:
         self.args = args
 
         self.net = Network(self.args)
-        self.criterion = nn.MSELoss()
+        self.criterion = get_criterion(self.args)
 
         self.train_params = []
         for q in self.net.named_parameters():
@@ -179,7 +182,10 @@ class Trainer:
             os.remove(self.model_path)
         torch.save(self.net.state_dict(), self.model_path)
 
-        self.vis_samples.append([ix, x, y, z, total_loss, total_loss])
+        if self.args.loss == 'bce':
+            z = sigmoid(z)
+
+        self.vis_samples.append([ix, x, y, z, total_loss, avg_loss])
         if os.path.exists(self.plot_checkpoint_path):
             os.remove(self.plot_checkpoint_path)
         with open(self.plot_checkpoint_path, 'wb') as f:
@@ -236,13 +242,8 @@ class Trainer:
                 x = torch.from_numpy(trial[0]).float()
                 y = torch.from_numpy(trial[1]).float()
 
-                def closure():
-                    loss, etc = self.iteration(x, y)
-                    return loss
-
-                if self.args.optimizer == 'adam':
-                    loss, etc = self.iteration(x, y)
-                    self.optimizer.step()
+                loss, etc = self.iteration(x, y)
+                self.optimizer.step()
 
                 if loss == -1:
                     logging.info(f'iteration {ix}: is nan. ending')
@@ -259,12 +260,12 @@ class Trainer:
                     # avg of the last 50 trials
                     avg_loss = running_loss / self.log_interval
                     avg_max_grad = running_mag / self.log_interval
-                    running_loss = 0.0
-                    running_mag = 0.0
                     logging.info(f'iteration {ix}\t| loss {avg_loss:.3f}\t| max abs grad {avg_max_grad:.3f}')
 
                     if not self.args.no_log:
                         self.log_checkpoint(ix, etc[0].numpy(), etc[1].numpy(), z, running_loss, avg_loss)
+                    running_loss = 0.0
+                    running_mag = 0.0
 
                     # convergence based on no avg loss decrease after patience samples
                     if self.args.conv_type == 'patience':
@@ -307,6 +308,7 @@ def parse_args():
     parser.add_argument('--dataset', default='data/rsg_tl100_sc1.pkl')
 
     parser.add_argument('--optimizer', choices=['adam', 'lbfgs-scipy', 'lbfgs-pytorch'], default='adam')
+    parser.add_argument('--loss', type=str, default='mse')
     parser.add_argument('--lr', type=float, default=1e-3, help='learning rate. adam only')
     parser.add_argument('-E', '--n_epochs', type=int, default=10, help='number of epochs to train for. adam only')
     parser.add_argument('--maxiter', type=int, default=5000, help='limit to # iterations. lbfgs-scipy only')

@@ -9,6 +9,8 @@ args = p.parse_args()
 
 results = pd.read_csv(f'logs/{args.id}.csv')
 
+results = results[results.dset != 'data/rsg_tl100_sc1.pkl']
+
 results = results.sort_values('loss')
 
 #print(results)

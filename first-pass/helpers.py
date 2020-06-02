@@ -79,3 +79,10 @@ def get_optimizer(args, train_params):
     elif args.optimizer == 'lbfgs-pytorch':
         optimizer = optim.LBFGS(train_params, lr=0.75)
     return optimizer
+
+def get_criterion(args):
+    if args.loss == 'mse':
+        criterion = nn.MSELoss()
+    elif args.loss == 'bce':
+        criterion = nn.BCEWithLogitsLoss()
+    return criterion

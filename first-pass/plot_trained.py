@@ -23,7 +23,7 @@ with open(args.model, 'rb') as f:
 dset = load_dataset(args.dataset)
 data = test_model(model, dset, n_tests=12)
 
-run_id = '/'.join(args.model.split('/')[-4:-2])
+run_id = '/'.join(args.model.split('/')[-3:-1])
 
 # parser = argparse.ArgumentParser()
 # parser.add_argument('data')
