@@ -33,9 +33,13 @@ def create_parameters(name):
         run_params['dataset'] = d
         run_params['D'] = nD
         run_params['N'] = nN
+
+        # these parameters only useful when training with SGD
         # run_params['lr'] = lr
         # run_params['n_epochs'] = n_epochs
         # run_params['patience'] = patience
+
+        # run with lbfgs instead - it's better
         run_params['optimizer'] = 'lbfgs-scipy'
 
         run_params['reservoir_seed'] = rseed

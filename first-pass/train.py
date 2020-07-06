@@ -51,6 +51,7 @@ class Trainer:
 
     def optimize_lbfgs(self, mode):
         if mode == 'pytorch':
+            # this doesn't work all that well
             best_loss = float('inf')
             best_loss_params = None
             for i in range(50):
@@ -97,12 +98,16 @@ class Trainer:
             self.scipy_ix = 0
             vis_samples = []
 
+            # turn a list into W_f (D x O) and W_ro (1 x N)
+            # need this because LBFGS only takes in a list of params
             def vec_to_param(v):
                 assert len(v) == W_f_total + W_ro_total
                 W_f = v[:W_f_total].reshape(self.args.D, self.args.O)
                 W_ro = v[W_f_total:].reshape(1, self.args.N)
                 return W_f, W_ro
 
+            # this is what happens every iteration
+            # run through all examples (x, y) and get loss, gradient
             def closure(v):
                 W_f, W_ro = vec_to_param(v)
                 self.net.W_f.weight = nn.Parameter(torch.from_numpy(W_f).float())
@@ -128,6 +133,7 @@ class Trainer:
 
                 return total_loss.item(), post
 
+            # callback just does logging
             def callback(xk):
                 if self.args.no_log:
                     return
@@ -154,8 +160,8 @@ class Trainer:
                     self.log_checkpoint(self.scipy_ix, xs.numpy(), ys.numpy(), z, total_loss.item(), total_loss.item())
                     logging.info(f'iteration {self.scipy_ix}\t| loss {total_loss.item():.3f}')
 
-
-            init_Wf = np.random.randn(self.args.D, self.args.O) / np.sqrt(self.args.O)  # random initialization of input weights
+            # random initialization of input weights
+            init_Wf = np.random.randn(self.args.D, self.args.O) / np.sqrt(self.args.O)
             init_Wro = np.random.randn(1, self.args.N) / np.sqrt(self.args.N)
             init = np.concatenate((init_Wf.reshape(-1), init_Wro.reshape(-1)))
             optim_options = {
