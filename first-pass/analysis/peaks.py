@@ -26,7 +26,7 @@ with open(args.file, 'rb') as f:
 
 dset = load_dataset(args.dataset)
 
-data = test_model(model, dset, 1000)
+data = test_model(model, dset, 500)
 
 distr = {}
 
