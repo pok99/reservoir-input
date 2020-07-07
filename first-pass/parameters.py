@@ -8,21 +8,18 @@ def create_parameters(name):
     mapping = {}
     ix = 1
 
-    Ds = [5, 10, 50, 100]
-    Ns = [50, 100]
-
-    Ds = [5]
-    Ns = [50]
+    Ds = [5, 10, 50, 100, 250]
+    Ns = [50, 100, 250]
 
     # lrs = [1e-3]
     # n_epochs = 50
     # patience = 4000
 
     n_seeds = 2
-    n_rseeds = 2
+    n_rseeds = 3
 
     datasets = [
-        'datasets/rsg.pkl',
+        'datasets/rsg.pkl'
     ]
 
     #n_commands = len(Ds) * len(Ns) * len(trial_lens) * len(singles) * len(lrs) * n_seeds

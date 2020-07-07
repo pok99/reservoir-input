@@ -10,10 +10,9 @@ import pdb
 from reservoir import Network
 from utils import Bunch
 
-# given a model and a dataset, see how well the model does on it
-# works with plot_trained.py
+
 # extracts the correct parameters N, D, O, etc. in order to properly create a net to load into
-def test_model(m_dict, dset, n_tests=0):
+def load_model(m_dict):
     bunch = Bunch()
     bunch.N = m_dict['reservoir.J.weight'].shape[0]
     bunch.D = m_dict['reservoir.W_u.weight'].shape[1]
@@ -27,8 +26,14 @@ def test_model(m_dict, dset, n_tests=0):
     net.load_state_dict(m_dict)
     net.eval()
 
-    criterion = nn.MSELoss()
+    return net
 
+# given a model and a dataset, see how well the model does on it
+# works with plot_trained.py
+def test_model(m_dict, dset, n_tests=0):
+    net = load_model(m_dict)
+
+    criterion = nn.MSELoss()
     dset_idx = range(len(dset))
     if n_tests != 0:
         dset_idx = sorted(random.sample(range(len(dset)), n_tests))
