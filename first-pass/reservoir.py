@@ -37,6 +37,7 @@ class Reservoir(nn.Module):
             g = self.activation(self.J(self.x))
             delta_x = (-self.x + g) / self.tau_x
             self.x = self.x + delta_x
+        self.x.detach_()
 
     def forward(self, u):
         g = self.activation(self.J(self.x) + self.W_u(u))
@@ -44,13 +45,16 @@ class Reservoir(nn.Module):
         self.x = self.x + delta_x
         return self.x
 
-    def reset(self, zero=False):
+    def reset(self, zero=False, res_state_seed=0):
         # don't use zero by default
         if zero:
             self.x = torch.zeros((1, self.args.N))
         else:
             # burn in only req'd for random init because no biases to make a difference
+            rng_pt = torch.get_rng_state()
+            torch.manual_seed(res_state_seed)
             self.x = torch.normal(0, 1, (1, self.args.N))
+            torch.set_rng_state(rng_pt)
             self.burn_in()
 
 
@@ -68,5 +72,5 @@ class Network(nn.Module):
         z = self.W_ro(x)
         return z, x, u
 
-    def reset(self):
-        self.reservoir.reset()
+    def reset(self, res_state_seed=0):
+        self.reservoir.reset(zero=False, res_state_seed=res_state_seed)

@@ -113,7 +113,9 @@ class Trainer:
                 self.net.W_f.weight = nn.Parameter(torch.from_numpy(W_f).float())
                 self.net.W_ro.weight = nn.Parameter(torch.from_numpy(W_ro).float())
 
-                self.net.reset()
+                # need to do this so that burn in works
+                # res state starting from same random seed for each iteration
+                self.net.reset(res_state_seed=self.scipy_ix)
                 self.net.zero_grad()
                 total_loss = torch.tensor(0.)
                 for j in range(x.shape[1]):
@@ -312,9 +314,9 @@ def parse_args():
     parser.add_argument('-O', default=1, help='')
     parser.add_argument('--res_init_type', default='gaussian', help='')
     parser.add_argument('--res_init_gaussian_std', default=1.5)
-    parser.add_argument('--dataset', default='data/rsg.pkl')
+    parser.add_argument('--dataset', default='datasets/rsg.pkl')
 
-    parser.add_argument('--optimizer', choices=['adam', 'lbfgs-scipy', 'lbfgs-pytorch'], default='adam')
+    parser.add_argument('--optimizer', choices=['adam', 'lbfgs-scipy', 'lbfgs-pytorch'], default='lbfgs-scipy')
     parser.add_argument('--loss', type=str, default='mse')
     parser.add_argument('--lr', type=float, default=1e-3, help='learning rate. adam only')
     parser.add_argument('-E', '--n_epochs', type=int, default=10, help='number of epochs to train for. adam only')
