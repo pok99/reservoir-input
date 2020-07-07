@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.stats import norm
 from sklearn.gaussian_process import GaussianProcessRegressor as gpr
+from sklearn.gaussian_process.kernels import RBF
 import pickle
 import os
 import sys
@@ -71,14 +72,16 @@ def create_dataset(args):
             trials.append((trial_x, trial_y, info))
 
 
-    if t_type == 'match':
+    elif t_type == 'copy':
         for n in range(n_trials):
             dim = 1
             x = np.arange(0, t_len)
             x_list = x[..., np.newaxis]
 
-            interval = get_args_val(trial_args, 'interval', 20)
+            interval = int(get_args_val(trial_args, 'interval', 10))
             scale = get_args_val(trial_args, 'scale', 1)
+            delay = int(get_args_val(trial_args, 'delay', 0))
+            rbf = RBF(length_scale=3)
 
             x_filter = x_list[::interval]
             n_pts = x_filter.squeeze().shape[0]
@@ -91,13 +94,18 @@ def create_dataset(args):
                 else:
                     y_filter[i] = np.random.multivariate_normal(np.zeros(dim), cov=scale*np.eye(dim))
 
-            gp = gpr(normalize_y=True).fit(x_filter, y_filter)
+            gp = gpr(kernel=rbf, normalize_y=True).fit(x_filter, y_filter)
             y_prediction, y_std = gp.predict(x_list, return_std=True)
 
-            pdb.set_trace()
+            y = y_prediction.reshape(-1)
 
-            return y_prediction
+            z = np.zeros_like(y)
+            if delay == 0:
+                z = y
+            else:
+                z[delay:] = y[:-delay]
 
+            trials.append((y, z, delay))
 
     return trials
 
