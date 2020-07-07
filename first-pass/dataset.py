@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.stats import norm
+from sklearn.gaussian_process import GaussianProcessRegressor as gpr
 import pickle
 import os
 import sys
@@ -10,6 +11,8 @@ import random
 import matplotlib.pyplot as plt
 
 import argparse
+
+eps = 1e-6
 
 # toy ready set go dataset
 def create_dataset(args):
@@ -22,14 +25,6 @@ def create_dataset(args):
     trials = []
 
     if t_type == 'rsg':
-
-        # check if we just want one interval in entire dataset
-        # if args.rsg_intervals is not None:
-        #     idx = trial_args.index('single')
-        #     num = int(trial_args[idx + 1])
-        #     assert num < t_len / 2
-        #     t_p = num
-
         for n in range(n_trials):
             if args.rsg_intervals is None:
                 # choose at random
@@ -64,11 +59,7 @@ def create_dataset(args):
                 trial_y[go_time] = 1
             else:
                 # check if width of gaussian is changed from default
-                if 'scale' in trial_args:
-                    idx = trial_args.index('scale')
-                    scale = float(trial_args[idx + 1])
-                else:
-                    scale = 1
+                scale = get_args_val(trial_args, 'scale', 1)
 
                 trial_range = np.arange(t_len)
                 trial_x = norm.pdf(trial_range, loc=ready_time, scale=scale)
@@ -79,7 +70,44 @@ def create_dataset(args):
 
             trials.append((trial_x, trial_y, info))
 
+
+    if t_type == 'match':
+        for n in range(n_trials):
+            dim = 1
+            x = np.arange(0, t_len)
+            x_list = x[..., np.newaxis]
+
+            interval = get_args_val(trial_args, 'interval', 20)
+            scale = get_args_val(trial_args, 'scale', 1)
+
+            x_filter = x_list[::interval]
+            n_pts = x_filter.squeeze().shape[0]
+
+            y_filter = np.zeros((n_pts, dim))
+            y_filter[0] = 0
+            for i in range(1, n_pts):
+                if 'smoothing' in trial_args:
+                    y_filter[i] = np.random.multivariate_normal(y_filter[i-1]/2, cov=scale*np.eye(dim))
+                else:
+                    y_filter[i] = np.random.multivariate_normal(np.zeros(dim), cov=scale*np.eye(dim))
+
+            gp = gpr(normalize_y=True).fit(x_filter, y_filter)
+            y_prediction, y_std = gp.predict(x_list, return_std=True)
+
+            pdb.set_trace()
+
+            return y_prediction
+
+
     return trials
+
+def get_args_val(args, name, default):
+    if name in args:
+        idx = args.index(name)
+        val = float(args[idx + 1])
+    else:
+        val = default
+    return val
 
 def save_dataset(dset, name, args=None):
     fname = name + '.pkl'

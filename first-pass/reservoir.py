@@ -20,6 +20,7 @@ class Reservoir(nn.Module):
         self.W_u = nn.Linear(args.D, args.N, bias=False)
         self.activation = torch.tanh
         self.tau_x = 10
+        self.zero_reset = False
 
         self._init_J(args.res_init_type, args.res_init_params)
         self.reset()
@@ -45,9 +46,9 @@ class Reservoir(nn.Module):
         self.x = self.x + delta_x
         return self.x
 
-    def reset(self, zero=False, res_state_seed=0):
+    def reset(self, res_state_seed=0):
         # don't use zero by default
-        if zero:
+        if self.zero_reset:
             self.x = torch.zeros((1, self.args.N))
         else:
             # burn in only req'd for random init because no biases to make a difference
@@ -73,4 +74,4 @@ class Network(nn.Module):
         return z, x, u
 
     def reset(self, res_state_seed=0):
-        self.reservoir.reset(zero=False, res_state_seed=res_state_seed)
+        self.reservoir.reset(res_state_seed=res_state_seed)

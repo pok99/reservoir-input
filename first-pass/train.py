@@ -318,7 +318,7 @@ def parse_args():
 
     parser.add_argument('--optimizer', choices=['adam', 'lbfgs-scipy', 'lbfgs-pytorch'], default='lbfgs-scipy')
     parser.add_argument('--loss', type=str, default='mse')
-    parser.add_argument('--lr', type=float, default=1e-3, help='learning rate. adam only')
+    parser.add_argument('--lr', type=float, default=1e-4, help='learning rate. adam only')
     parser.add_argument('-E', '--n_epochs', type=int, default=10, help='number of epochs to train for. adam only')
     parser.add_argument('--maxiter', type=int, default=5000, help='limit to # iterations. lbfgs-scipy only')
 

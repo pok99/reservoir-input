@@ -14,7 +14,7 @@ from utils import Bunch
 from reservoir import Network, Reservoir
 
 
-args = Bunch(N=10, D=3, O=1, res_init_type='gaussian', res_init_params={'std': 1.5}, reservoir_seed=0)
+args = Bunch(N=250, D=100, O=1, res_init_type='gaussian', res_init_params={'std': 2}, reservoir_seed=0)
 
 net = Network(args)
 
@@ -23,11 +23,12 @@ t = np.arange(trial_len)
 
 ins = []
 outs = []
+inps = torch.rand((12)) * 2 - 1
 for i in range(12):
     net.reset()
 
     #inp = torch.normal(torch.zeros(trial_len), 500*torch.ones(trial_len))
-    inp = -100000*torch.ones(trial_len)/4
+    inp = torch.ones(trial_len) * inps[i]
 
     out = []
     for j in inp:
