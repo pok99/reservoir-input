@@ -11,6 +11,9 @@ def create_parameters(name):
     Ds = [5, 10, 50, 100]
     Ns = [50, 100]
 
+    Ds = [5]
+    Ns = [50]
+
     # lrs = [1e-3]
     # n_epochs = 50
     # patience = 4000

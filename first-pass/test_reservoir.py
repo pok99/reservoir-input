@@ -37,16 +37,6 @@ for i in range(12):
     outs.append(out)
 
 
-
-# data_idx = [0]
-# data_idx += sorted(random.sample(range(1, len(data) - 1), 10))
-# data_idx += [len(data) - 1]
-
-# print(data_idx)
-# print(len(data))
-
-# data = [data[i] for i in data_idx]
-
 fig, ax = plt.subplots(3,4,sharex=True, sharey=True, figsize=(12,7))
 
 for i, ax in enumerate(fig.axes):

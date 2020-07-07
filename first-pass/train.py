@@ -115,7 +115,7 @@ class Trainer:
 
                 # need to do this so that burn in works
                 # res state starting from same random seed for each iteration
-                self.net.reset(res_state_seed=self.scipy_ix)
+                self.net.reset(res_state_seed=0)
                 self.net.zero_grad()
                 total_loss = torch.tensor(0.)
                 for j in range(x.shape[1]):
@@ -144,7 +144,7 @@ class Trainer:
                     W_f, W_ro = vec_to_param(xk)
                     sample_n = random.randrange(len(dset))
 
-                    self.net.reset()
+                    self.net.reset(res_state_seed=0)
                     self.net.zero_grad()
                     outs = []
                     total_loss = torch.tensor(0.)
