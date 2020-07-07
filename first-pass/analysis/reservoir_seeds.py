@@ -20,6 +20,7 @@ if not os.path.exists(cache_csv):
         folder_path = '../logs/'+i
         extra_data = []
         for slurm_id in os.listdir(folder_path):
+            # find config file for each job within the run
             for file in os.scandir(os.path.join(folder_path, slurm_id)):
                 if file.name.startswith('config'):
                     json_path = file.path
@@ -27,8 +28,10 @@ if not os.path.exists(cache_csv):
             with open(json_path, 'r') as f:
                 config = json.load(f)
 
+            # and then record the seed info
             extra_data.append((int(slurm_id), config['seed'], config['reservoir_seed']))
 
+        # turn that seed info into useful csvs
         df_extra = pd.DataFrame(extra_data, columns=['slurm_id', 'seed', 'reservoir_seed'])
         csv_data = pd.read_csv(csv_path)
 

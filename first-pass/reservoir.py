@@ -19,12 +19,10 @@ class Reservoir(nn.Module):
         self.J = nn.Linear(args.N, args.N, bias=False)
         self.W_u = nn.Linear(args.D, args.N, bias=False)
         self.activation = torch.tanh
+        self.tau_x = 10
 
         self._init_J(args.res_init_type, args.res_init_params)
-
-        self.x = torch.zeros((1, args.N))
-
-        self.tau_x = 10
+        self.reset()
 
     def _init_J(self, init_type, init_params):
         if init_type == 'gaussian':
@@ -34,14 +32,26 @@ class Reservoir(nn.Module):
             self.W_u.weight.data = torch.normal(0, init_params['std'], self.W_u.weight.shape) / np.sqrt(self.args.N)
             torch.set_rng_state(rng_pt)
 
+    def burn_in(self, steps=20):
+        for i in range(steps):
+            g = self.activation(self.J(self.x))
+            delta_x = (-self.x + g) / self.tau_x
+            self.x = self.x + delta_x
+
     def forward(self, u):
         g = self.activation(self.J(self.x) + self.W_u(u))
         delta_x = (-self.x + g) / self.tau_x
         self.x = self.x + delta_x
         return self.x
 
-    def reset(self):
-        self.x = torch.zeros((1, self.args.N))
+    def reset(self, zero=False):
+        # don't use zero by default
+        if zero:
+            self.x = torch.zeros((1, self.args.N))
+        else:
+            # burn in only req'd for random init because no biases to make a difference
+            self.x = torch.normal(0, 1, (1, self.args.N))
+            self.burn_in()
 
 
 class Network(nn.Module):
@@ -56,7 +66,7 @@ class Network(nn.Module):
         u = self.W_f(o.reshape(-1, 1))
         x = self.reservoir(u)
         z = self.W_ro(x)
-        return z, u, x
+        return z, x, u
 
     def reset(self):
         self.reservoir.reset()

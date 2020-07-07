@@ -24,15 +24,15 @@ def create_dataset(args):
     if t_type == 'rsg':
 
         # check if we just want one interval in entire dataset
-        if 'single' in trial_args:
-            idx = trial_args.index('single')
-            num = int(trial_args[idx + 1])
-            assert num < t_len / 2
-            t_p = num
+        # if args.rsg_intervals is not None:
+        #     idx = trial_args.index('single')
+        #     num = int(trial_args[idx + 1])
+        #     assert num < t_len / 2
+        #     t_p = num
 
         for n in range(n_trials):
-
-            if 'single' not in trial_args:
+            if args.rsg_intervals is None:
+                # choose at random
                 # amount of time in between ready and set cues
                 min_t = 7
                 max_t = t_len // 2 - 7
@@ -44,6 +44,11 @@ def create_dataset(args):
                     max_t = int(trial_args[idx + 1])
                 
                 t_p = np.random.randint(min_t, max_t)
+            else:
+                # use one of the intervals that we desire
+                num = random.choice(args.rsg_intervals)
+                assert num < t_len / 2
+                t_p = num
 
             ready_time = np.random.randint(0, t_len - t_p * 2)
             set_time = ready_time + t_p
@@ -78,7 +83,7 @@ def create_dataset(args):
 
 def save_dataset(dset, name, args=None):
     fname = name + '.pkl'
-    with open(os.path.join('data', fname), 'wb') as f:
+    with open(os.path.join('datasets', fname), 'wb') as f:
         pickle.dump(dset, f)
     # gname = name + '.json'
     # if args is not None:
@@ -98,6 +103,7 @@ if __name__ == '__main__':
     parser.add_argument('mode', default='load')
     parser.add_argument('name')
     parser.add_argument('--trial_type', default='rsg')
+    parser.add_argument('--rsg_intervals', nargs='*', type=int, default=None)
     parser.add_argument('--trial_args', nargs='*', help='terms to specify parameters of trial type')
     parser.add_argument('--trial_len', type=int, default=100)
     parser.add_argument('--n_trials', type=int, default=1000)

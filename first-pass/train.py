@@ -55,7 +55,7 @@ class Trainer:
             best_loss = float('inf')
             best_loss_params = None
             for i in range(50):
-                #dset = np.asarray([x[:-1] for x in self.dset[i * 100:(i+1) * 100]])
+                # just optimized based on a random 500 samples
                 np.random.shuffle(self.dset)
                 dset = np.asarray([x[:-1] for x in self.dset[:500]])
                 x = torch.from_numpy(dset[:,0,:]).float()
@@ -67,7 +67,7 @@ class Trainer:
                     total_loss = torch.tensor(0.)
                     for j in range(x.shape[1]):
                         net_in = x[:,j]
-                        net_out, val_thal, val_res = self.net(net_in)
+                        net_out, val_res, val_thal = self.net(net_in)
                         net_target = y[:,j].reshape(-1, 1)
 
                         step_loss = self.criterion(net_out, net_target)
@@ -118,7 +118,7 @@ class Trainer:
                 total_loss = torch.tensor(0.)
                 for j in range(x.shape[1]):
                     net_in = x[:,j].reshape(-1, 1)
-                    net_out, val_thal, val_res = self.net(net_in)
+                    net_out, val_res, val_thal = self.net(net_in)
                     net_target = y[:,j].reshape(-1, 1)
 
                     step_loss = self.criterion(net_out, net_target)
@@ -150,7 +150,7 @@ class Trainer:
                     ys = y[sample_n,:]
                     for j in range(xs.shape[0]):
                         net_in = xs[j].reshape(-1,1)
-                        net_out, val_thal, val_res = self.net(net_in)
+                        net_out, val_res, val_thal = self.net(net_in)
                         outs.append(net_out.item())
                         net_target = ys[j].reshape(-1,1)
                         step_loss = self.criterion(net_out, net_target)
@@ -183,6 +183,7 @@ class Trainer:
 
     def log_checkpoint(self, ix, x, y, z, total_loss, avg_loss):
         self.writer.writerow([ix, avg_loss])
+        self.csv_path.flush()
         # saving all checkpoints takes too much space so we just save one
         if os.path.exists(self.model_path):
             os.remove(self.model_path)
@@ -212,7 +213,7 @@ class Trainer:
         for j in range(x.shape[0]):
             # run the step
             net_in = x[j].unsqueeze(0)
-            net_out, val_thal, val_res = self.net(net_in)
+            net_out, val_res, val_thal = self.net(net_in)
             net_target = y[j].unsqueeze(0)
 
             outs.append(net_out.item())

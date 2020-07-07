@@ -10,6 +10,9 @@ import pdb
 from reservoir import Network
 from utils import Bunch
 
+# given a model and a dataset, see how well the model does on it
+# works with plot_trained.py
+# extracts the correct parameters N, D, O, etc. in order to properly create a net to load into
 def test_model(m_dict, dset, n_tests=0):
     bunch = Bunch()
     bunch.N = m_dict['reservoir.J.weight'].shape[0]
