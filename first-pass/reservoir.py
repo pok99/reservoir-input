@@ -58,7 +58,6 @@ class Reservoir(nn.Module):
             torch.set_rng_state(rng_pt)
             self.burn_in()
 
-
 class Network(nn.Module):
     def __init__(self, args):
         super().__init__()
@@ -67,11 +66,32 @@ class Network(nn.Module):
         self.W_f = nn.Linear(args.O, args.D, bias=False)
         self.W_ro = nn.Linear(args.N, 1, bias=False)
 
+        self.network_delay = 0
+        if hasattr(args, 'network_delay'):
+            self.network_delay = args.network_delay
+
+        self.reset()
+
     def forward(self, o):
         u = self.W_f(o.reshape(-1, 1))
         x = self.reservoir(u)
         z = self.W_ro(x)
-        return z, x, u
+        if self.network_delay == 0:
+            return z, x, u
+        else:
+            z2 = self.delay_output[self.delay_ind]
+            self.delay_output[self.delay_ind] = z
+            self.delay_ind = (self.delay_ind + 1) % self.network_delay
+
+            if z2 is None:
+                z2 = torch.zeros_like(z)
+
+            return z2, x, u
+
 
     def reset(self, res_state_seed=0):
         self.reservoir.reset(res_state_seed=res_state_seed)
+        if self.network_delay != 0:
+            self.delay_output = [None] * self.network_delay
+            self.delay_ind = 0
+
