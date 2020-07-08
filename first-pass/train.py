@@ -56,6 +56,7 @@ class Trainer:
             best_loss_params = None
             for i in range(50):
                 # just optimized based on a random 500 samples
+                # don't do this!
                 np.random.shuffle(self.dset)
                 dset = np.asarray([x[:-1] for x in self.dset[:500]])
                 x = torch.from_numpy(dset[:,0,:]).float()

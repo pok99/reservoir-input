@@ -41,8 +41,8 @@ for i, ax in enumerate(fig.axes):
     ax.spines['left'].set_visible(False)
     ax.spines['bottom'].set_visible(False)
 
-    ax.plot(xr, x, color='coral', alpha=0.5, lw=1, label='ready/set')
-    ax.plot(xr, y, color='coral', alpha=1, lw=1, label='go')
+    ax.plot(xr, x, color='coral', alpha=0.5, lw=1, label='input')
+    ax.plot(xr, y, color='coral', alpha=1, lw=1, label='target')
     ax.plot(xr, z, color='cornflowerblue', alpha=1, lw=1.5, label='response')
 
     ax.tick_params(axis='both', color='white')
