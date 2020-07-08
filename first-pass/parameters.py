@@ -19,9 +19,8 @@ def create_parameters(name):
     n_rseeds = 3
 
     datasets = [
-        'datasets/copy_d10.pkl',
-        'datasets/copy_d20.pkl',
-        'datasets/copy_d30.pkl'
+        'datasets/rsg_rs3_l25.pkl',
+        'datasets/rsg_rs3_g25.pkl'
     ]
 
     #n_commands = len(Ds) * len(Ns) * len(trial_lens) * len(singles) * len(lrs) * n_seeds

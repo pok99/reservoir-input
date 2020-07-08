@@ -17,8 +17,6 @@ args = parser.parse_args()
 csv_data = pd.read_csv(args.csv, index_col=0)
 
 
-
-
 dsets = ['datasets/copy_d10.pkl', 'datasets/copy_d20.pkl', 'datasets/copy_d30.pkl']
 i = 0
 for d in dsets:

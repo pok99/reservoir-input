@@ -63,9 +63,10 @@ def create_dataset(args):
                 scale = get_args_val(trial_args, 'scale', 1)
 
                 trial_range = np.arange(t_len)
-                trial_x = norm.pdf(trial_range, loc=ready_time, scale=scale)
-                trial_x += norm.pdf(trial_range, loc=set_time, scale=scale)
-                trial_y = 4 * norm.pdf(trial_range, loc=go_time, scale=scale)
+                trial_x = norm.pdf(trial_range, loc=ready_time, scale=1)
+                trial_x += norm.pdf(trial_range, loc=set_time, scale=1)
+                # scaling by `scale` so the height of the middle is always the same
+                trial_y = 4 * scale * norm.pdf(trial_range, loc=go_time, scale=scale)
 
             info = (ready_time, set_time, go_time)
 
