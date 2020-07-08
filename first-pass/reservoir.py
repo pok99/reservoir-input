@@ -58,6 +58,7 @@ class Reservoir(nn.Module):
             torch.set_rng_state(rng_pt)
             self.burn_in()
 
+
 class Network(nn.Module):
     def __init__(self, args):
         super().__init__()
@@ -91,6 +92,8 @@ class Network(nn.Module):
 
     def reset(self, res_state_seed=0):
         self.reservoir.reset(res_state_seed=res_state_seed)
+        # set up network delay mechanism. essentially a queue of length network_delay
+        # with a pointer to the current index
         if self.network_delay != 0:
             self.delay_output = [None] * self.network_delay
             self.delay_ind = 0

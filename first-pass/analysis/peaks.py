@@ -26,7 +26,7 @@ with open(args.file, 'rb') as f:
 
 dset = load_dataset(args.dataset)
 
-data = test_model(model, dset, 500)
+data = test_model(model, dset, 600)
 
 distr = {}
 
@@ -47,16 +47,17 @@ for i in range(len(data)):
 intervals = []
 for k,v in distr.items():
     v_avg = np.mean(v)
-    v_max = np.max(v)
-    v_min = np.min(v)
-    intervals.append((k,v_avg, v_min, v_max))
+    v_std = np.std(v)
+    intervals.append((k,v_avg, v_std))
 
 intervals.sort(key=lambda x: x[0])
-intervals, offsets, mins, maxs = list(zip(*intervals))
+intervals, offsets, stds = list(zip(*intervals))
+offsets = np.array(offsets)
+stds = np.array(stds)
 
 plt.plot(intervals, offsets, lw=3, marker='o', color='tomato', ms=6)
-plt.fill_between(intervals, mins, offsets, color='coral', alpha=.5)
-plt.fill_between(intervals, maxs, offsets, color='coral', alpha=.5)
+plt.fill_between(intervals, offsets - stds, offsets, color='coral', alpha=.5)
+plt.fill_between(intervals, offsets + stds, offsets, color='coral', alpha=.5)
 plt.xlabel('interval length')
 plt.ylabel('average peak offset')
 
