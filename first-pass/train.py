@@ -30,7 +30,7 @@ class Trainer:
 
         self.net = Network(self.args)
         self.criterion = get_criterion(self.args)
-
+        
         self.train_params = []
         for q in self.net.named_parameters():
             if q[0].split('.')[0] != 'reservoir':
@@ -315,6 +315,11 @@ def parse_args():
     parser.add_argument('-D', type=int, default=5, help='')
     parser.add_argument('-N', type=int, default=20, help='')
     parser.add_argument('-Z', type=int, default=1, help='')
+
+    parser.add_argument('--train_parts', type=str, nargs='+', choices=['reservoir', 'Wro', 'Wf'], default=['Wro', 'Wf'])
+    parser.add_argument('--Wro_path', type=str, default=None, help='saved Wf')
+    parser.add_argument('--Wf_path', type=str, default=None, help='saved Wf')
+    parser.add_argument('--reservoir_path', type=str, default=None, help='saved reservoir. should be saved with seed tho')
     
     parser.add_argument('--res_init_type', type=str, default='gaussian', help='')
     parser.add_argument('--res_init_gaussian_std', type=float, default=1.5)

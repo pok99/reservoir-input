@@ -7,6 +7,7 @@ import logging
 import time
 import json
 import csv
+import pickle
 # import pandas as pd
 
 
@@ -75,3 +76,8 @@ def log_this(config, log_dir, log_name=None, checkpoints=True, use_id=True):
 class Bunch:
     def __init__(self, **kwds):
         self.__dict__.update(kwds)
+
+def load_rb(path):
+    with open(path, 'rb') as f:
+        qs = pickle.load(f)
+    return qs

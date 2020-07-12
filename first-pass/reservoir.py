@@ -7,7 +7,7 @@ import os
 import pickle
 import pdb
 
-from utils import Bunch
+from utils import Bunch, load_rb
 
 
 # reservoir network. shouldn't be trained
@@ -24,7 +24,13 @@ class Reservoir(nn.Module):
         self.n_burn_in = args.reservoir_burn_steps
         self.reservoir_x_seed = args.reservoir_x_seed
 
-        self._init_J(args.res_init_type, args.res_init_params)
+        if hasattr(args, 'reservoir_path') and args.reservoir_path is not None:
+            J, W_u = load_rb(args.reservoir_path)
+            self.J.weight.data = J
+            self.W_u.weight.data = W_u
+        else:
+            self._init_J(args.res_init_type, args.res_init_params)
+
         self.reset()
 
     def _init_J(self, init_type, init_params):
@@ -70,6 +76,13 @@ class Network(nn.Module):
 
         self.W_f = nn.Linear(args.L, args.D, bias=False)
         self.W_ro = nn.Linear(args.N, args.Z, bias=False)
+
+        if hasattr(args, 'Wf_path') and args.Wf_path is not None:
+            W_f = load_rb(args.Wf_path)
+            self.W_f.weight.data = W_f
+        if hasattr(args, 'Wro_path') and args.Wro_path is not None:
+            W_ro = load_rb(args.Wro_path)
+            self.W_ro.weight.data = W_ro
 
         self.network_delay = args.network_delay
 
