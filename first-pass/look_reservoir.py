@@ -25,10 +25,10 @@ ins = []
 outs = []
 inps = torch.rand((12)) * 2 - 1
 for i in range(12):
-    net.reset()
+    net.reset(res_state_seed=np.random.randint(30))
 
     #inp = torch.normal(torch.zeros(trial_len), 500*torch.ones(trial_len))
-    inp = torch.ones(trial_len) * inps[i]
+    inp = torch.zeros(trial_len) * inps[i]
 
     out = []
     for j in inp:

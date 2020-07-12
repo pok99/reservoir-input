@@ -26,27 +26,44 @@ def create_dataset(args):
     trials = []
 
     if t_type == 'rsg':
+        '''
+        trial_args options:
+        - use_ints
+        - lt [x]
+        - gt [x]
+        - scale [x]
+
+        '''
+        # use_ints is overridden by rsg_intervals
+        use_ints = 'use_ints' in trial_args
+        if args.rsg_intervals is None:
+            # amount of time in between ready and set cues
+            min_t = 15
+            max_t = t_len // 2 - 15
+            if 'gt' in trial_args:
+                idx = trial_args.index('gt')
+                min_t = int(trial_args[idx + 1])
+            elif 'lt' in trial_args:
+                idx = trial_args.index('lt')
+                max_t = int(trial_args[idx + 1])
         for n in range(n_trials):
             if args.rsg_intervals is None:
-                # choose at random
-                # amount of time in between ready and set cues
-                min_t = 7
-                max_t = t_len // 2 - 7
-                if 'gt' in trial_args:
-                    idx = trial_args.index('gt')
-                    min_t = int(trial_args[idx + 1])
-                elif 'lt' in trial_args:
-                    idx = trial_args.index('lt')
-                    max_t = int(trial_args[idx + 1])
-                
-                t_p = np.random.randint(min_t, max_t)
+                if use_ints:
+                    t_p = np.random.randint(min_t, max_t)
+                else:
+                    t_p = np.round(np.random.uniform(min_t, max_t), 2)
             else:
                 # use one of the intervals that we desire
+                # overrides use_ints
                 num = random.choice(args.rsg_intervals)
                 assert num < t_len / 2
                 t_p = num
 
-            ready_time = np.random.randint(0, t_len - t_p * 2)
+            if use_ints:
+                ready_time = np.random.randint(5, t_len - t_p * 2 - 10)
+            else:
+                ready_time = np.round(np.random.uniform(5, t_len - t_p * 2 - 10), 2)
+                
             set_time = ready_time + t_p
             go_time = set_time + t_p
 
@@ -55,9 +72,9 @@ def create_dataset(args):
                 trial_x = np.zeros((t_len))
                 trial_y = np.zeros((t_len))
                 
-                trial_x[ready_time] = 1
-                trial_x[set_time] = 1
-                trial_y[go_time] = 1
+                trial_x[ready_time-1:ready_time+2] = 1
+                trial_x[set_time-1:set_time+2] = 1
+                trial_y[go_time-2:go_time+3] = 1
             else:
                 # check if width of gaussian is changed from default
                 scale = get_args_val(trial_args, 'scale', 1)
@@ -156,9 +173,9 @@ if __name__ == '__main__':
         dset = load_dataset(args.name)
 
         dset_len = len(dset)
-        sample = random.sample(dset, 12)
+        sample = random.sample(dset, 6)
         dset_range = range(len(sample[0][0]))
-        fig, ax = plt.subplots(3,4,sharex=True, sharey=True, figsize=(12,7))
+        fig, ax = plt.subplots(2,3,sharex=True, sharey=True, figsize=(12,7))
         for i, ax in enumerate(fig.axes):
             ax.plot(dset_range, sample[i][0], color='coral', label='ready/set', lw=2)
             ax.plot(dset_range, sample[i][1], color='dodgerblue', label='go', lw=2)

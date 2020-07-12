@@ -22,6 +22,10 @@ class Reservoir(nn.Module):
         self.tau_x = 10
         self.zero_reset = False
 
+        self.n_burn_in = 400
+        if hasattr(args, 'n_burn_in'):
+            self.n_burn_in = args.n_burn_in
+
         self._init_J(args.res_init_type, args.res_init_params)
         self.reset()
 
@@ -33,7 +37,7 @@ class Reservoir(nn.Module):
             self.W_u.weight.data = torch.normal(0, init_params['std'], self.W_u.weight.shape) / np.sqrt(self.args.N)
             torch.set_rng_state(rng_pt)
 
-    def burn_in(self, steps=20):
+    def burn_in(self, steps=200):
         for i in range(steps):
             g = self.activation(self.J(self.x))
             delta_x = (-self.x + g) / self.tau_x
@@ -56,7 +60,7 @@ class Reservoir(nn.Module):
             torch.manual_seed(res_state_seed)
             self.x = torch.normal(0, 1, (1, self.args.N))
             torch.set_rng_state(rng_pt)
-            self.burn_in()
+            self.burn_in(self.n_burn_in)
 
 
 class Network(nn.Module):
