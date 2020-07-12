@@ -51,7 +51,7 @@ class Trainer:
 
     def optimize_lbfgs(self, mode):
         if mode == 'pytorch':
-            # this doesn't work all that well
+            # don't use this. need to fix first if used
             best_loss = float('inf')
             best_loss_params = None
             for i in range(50):
@@ -89,8 +89,8 @@ class Trainer:
                     self.net.load_state_dict(best_loss_params)
 
         elif mode == 'scipy':
-            W_f_total = self.args.O * self.args.D
-            W_ro_total = self.args.N
+            W_f_total = self.args.L * self.args.D
+            W_ro_total = self.args.N * self.args.Z
             dset = np.asarray([x[:-1] for x in self.dset])
             x = torch.from_numpy(dset[:,0,:]).float()
             y = torch.from_numpy(dset[:,1,:]).float()
@@ -103,8 +103,8 @@ class Trainer:
             # need this because LBFGS only takes in a list of params
             def vec_to_param(v):
                 assert len(v) == W_f_total + W_ro_total
-                W_f = v[:W_f_total].reshape(self.args.D, self.args.O)
-                W_ro = v[W_f_total:].reshape(1, self.args.N)
+                W_f = v[:W_f_total].reshape(self.args.D, self.args.L)
+                W_ro = v[W_f_total:].reshape(self.args.Z, self.args.N)
                 return W_f, W_ro
 
             # this is what happens every iteration
@@ -120,9 +120,9 @@ class Trainer:
                 self.net.zero_grad()
                 total_loss = torch.tensor(0.)
                 for j in range(x.shape[1]):
-                    net_in = x[:,j].reshape(-1, 1)
+                    net_in = x[:,j].reshape(-1, self.args.L)
                     net_out, val_res, val_thal = self.net(net_in)
-                    net_target = y[:,j].reshape(-1, 1)
+                    net_target = y[:,j].reshape(-1, self.args.Z)
 
                     step_loss = self.criterion(net_out, net_target)
                     total_loss += step_loss
@@ -152,10 +152,10 @@ class Trainer:
                     xs = x[sample_n,:]
                     ys = y[sample_n,:]
                     for j in range(xs.shape[0]):
-                        net_in = xs[j].reshape(-1,1)
+                        net_in = xs[j].reshape(-1, self.args.L)
                         net_out, val_res, val_thal = self.net(net_in)
                         outs.append(net_out.item())
-                        net_target = ys[j].reshape(-1,1)
+                        net_target = ys[j].reshape(-1, self.args.Z)
                         step_loss = self.criterion(net_out, net_target)
                         total_loss += step_loss
 
@@ -164,12 +164,13 @@ class Trainer:
                     logging.info(f'iteration {self.scipy_ix}\t| loss {total_loss.item():.3f}')
 
             # random initialization of input weights
-            init_Wf = np.random.randn(self.args.D, self.args.O) / np.sqrt(self.args.O)
-            init_Wro = np.random.randn(1, self.args.N) / np.sqrt(self.args.N)
+            init_Wf = np.random.randn(self.args.D, self.args.L) / np.sqrt(self.args.L)
+            init_Wro = np.random.randn(self.args.Z, self.args.N) / np.sqrt(self.args.N)
             init = np.concatenate((init_Wf.reshape(-1), init_Wro.reshape(-1)))
             optim_options = {
                 'iprint': self.log_interval,
-                'maxiter': self.args.maxiter
+                'maxiter': self.args.maxiter,
+                'ftol': 1e-12
             }
             optim = minimize(closure, init, method='L-BFGS-B', jac=True, callback=callback, options=optim_options)
 
@@ -310,9 +311,11 @@ class Trainer:
 
 def parse_args():
     parser = argparse.ArgumentParser(description='')
-    parser.add_argument('-N', type=int, default=20, help='')
+    parser.add_argument('-L', type=int, default=1, help='')
     parser.add_argument('-D', type=int, default=5, help='')
-    parser.add_argument('-O', type=int, default=1, help='')
+    parser.add_argument('-N', type=int, default=20, help='')
+    parser.add_argument('-Z', type=int, default=1, help='')
+    
     parser.add_argument('--res_init_type', type=str, default='gaussian', help='')
     parser.add_argument('--res_init_gaussian_std', type=float, default=1.5)
     parser.add_argument('--network_delay', type=int, default=0)
@@ -320,16 +323,21 @@ def parse_args():
 
     parser.add_argument('--optimizer', choices=['adam', 'lbfgs-scipy', 'lbfgs-pytorch'], default='lbfgs-scipy')
     parser.add_argument('--loss', type=str, default='mse')
-    parser.add_argument('--lr', type=float, default=1e-4, help='learning rate. adam only')
-    parser.add_argument('-E', '--n_epochs', type=int, default=10, help='number of epochs to train for. adam only')
+
+    # lbfgs-scipy arguments
     parser.add_argument('--maxiter', type=int, default=5000, help='limit to # iterations. lbfgs-scipy only')
 
+    # adam arguments
     parser.add_argument('--conv_type', type=str, choices=['patience', 'grad'], default='grad', help='how to determine convergence. adam only')
-    parser.add_argument('--patience', type=int, default=1000, help='stop training if loss doesn\'t decrease')
-    parser.add_argument('--grad_threshold', type=float, default=1e-4, help='stop training if grad is less than certain amount')
+    parser.add_argument('--patience', type=int, default=1000, help='stop training if loss doesn\'t decrease. adam only')
+    parser.add_argument('--grad_threshold', type=float, default=1e-4, help='stop training if grad is less than certain amount. adam only')
+    parser.add_argument('--lr', type=float, default=1e-4, help='learning rate. adam only')
+    parser.add_argument('--n_epochs', type=int, default=10, help='number of epochs to train for. adam only')
 
     parser.add_argument('--seed', type=int, help='seed for most of network')
     parser.add_argument('--reservoir_seed', type=int, help='seed for reservoir')
+    parser.add_argument('--reservoir_x_seed', type=int, default=0, help='seed for reservoir init hidden states. -1 for zero init')
+    parser.add_argument('--reservoir_burn_steps', type=int, default=200, help='number of steps for reservoir to burn in')
 
     parser.add_argument('--no_log', action='store_true')
     parser.add_argument('--log_interval', type=int, default=50)
@@ -390,12 +398,12 @@ if __name__ == '__main__':
             writer = csv.writer(f, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
             if args.optimizer == 'adam':
                 if not csv_exists:
-                    writer.writerow(['slurm_id','N', 'D', 'O', 'seed', 'rseed', 'epochs', 'lr', 'dset', 'loss'])
-                writer.writerow([args.slurm_id, args.N, args.D, args.O, args.seed, args.reservoir_seed, args.n_epochs, args.lr, args.dataset, final_loss])
+                    writer.writerow(['slurm_id','L', 'D', 'N', 'seed', 'rseed', 'xseed', 'epochs', 'lr', 'dset', 'loss'])
+                writer.writerow([args.slurm_id, args.L, args.D, args.N, args.seed, args.reservoir_seed, args.reservoir_x_seed, args.n_epochs, args.lr, args.dataset, final_loss])
             elif args.optimizer == 'lbfgs-scipy':
                 if not csv_exists:
-                    writer.writerow(['slurm_id','N', 'D', 'O', 'seed', 'rseed', 'dset', 'loss'])
-                writer.writerow([args.slurm_id, args.N, args.D, args.O, args.seed, args.reservoir_seed, args.dataset, final_loss])
+                    writer.writerow(['slurm_id','L', 'D', 'N', 'seed', 'rseed', 'xseed', 'dset', 'loss'])
+                writer.writerow([args.slurm_id, args.L, args.D, args.N, args.seed, args.reservoir_seed, args.reservoir_x_seed, args.dataset, final_loss])
 
     logging.shutdown()
 

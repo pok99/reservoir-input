@@ -16,7 +16,12 @@ def load_model(m_dict):
     bunch = Bunch()
     bunch.N = m_dict['reservoir.J.weight'].shape[0]
     bunch.D = m_dict['reservoir.W_u.weight'].shape[1]
-    bunch.O = m_dict['W_f.weight'].shape[1]
+    bunch.L = m_dict['W_f.weight'].shape[1]
+    bunch.Z = m_dict['W_ro.weight'].shape[0]
+
+    bunch.reservoir_burn_steps = 200
+    bunch.reservoir_x_seed = 0
+    bunch.network_delay = 0
 
     bunch.res_init_type = 'gaussian'
     bunch.res_init_params = {'std': 1.5}

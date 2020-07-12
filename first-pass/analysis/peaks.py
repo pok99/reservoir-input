@@ -17,8 +17,8 @@ from dataset import load_dataset
 from reservoir import Network, Reservoir
 
 parser = argparse.ArgumentParser()
-parser.add_argument('file')
-parser.add_argument('dataset')
+parser.add_argument('file', help='model file')
+parser.add_argument('dataset', help='dataset we want to test it on')
 args = parser.parse_args()
 
 with open(args.file, 'rb') as f:
@@ -26,7 +26,7 @@ with open(args.file, 'rb') as f:
 
 dset = load_dataset(args.dataset)
 
-data = test_model(model, dset, 600)
+data = test_model(model, dset, 500)
 
 distr = {}
 
@@ -37,6 +37,8 @@ for i in range(len(data)):
 
     peak = np.argmax(z)
     dif = peak - g
+    if np.abs(dif) > 20:
+        continue
 
     interval = s - r
     if interval not in distr:
@@ -55,13 +57,13 @@ intervals, offsets, stds = list(zip(*intervals))
 offsets = np.array(offsets)
 stds = np.array(stds)
 
-plt.plot(intervals, offsets, lw=3, marker='o', color='tomato', ms=6)
-plt.fill_between(intervals, offsets - stds, offsets, color='coral', alpha=.5)
-plt.fill_between(intervals, offsets + stds, offsets, color='coral', alpha=.5)
+plt.scatter(intervals, offsets, marker='o', color='tomato', alpha=0.5)
+# plt.fill_between(intervals, offsets - stds, offsets, color='coral', alpha=.5)
+# plt.fill_between(intervals, offsets + stds, offsets, color='coral', alpha=.5)
 plt.xlabel('interval length')
 plt.ylabel('average peak offset')
 
-plt.xlim([0,50])
+plt.xlim([0,100])
 
 
 plt.show()

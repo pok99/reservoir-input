@@ -2,6 +2,7 @@ from itertools import product
 import os
 import json
 import argparse
+import random
 
 def create_parameters(name):
 
@@ -15,15 +16,29 @@ def create_parameters(name):
     # n_epochs = 50
     # patience = 4000
 
+    # keep the same network seeds
+    preserve_seed = True
+
     n_seeds = 2
     n_rseeds = 3
 
     datasets = [
-        'datasets/rsg_rs3_l25.pkl',
-        'datasets/rsg_rs3_g25.pkl'
+        'datasets/rsg2_s15.pkl',
+        'datasets/rsg2_s25.pkl',
+        'datasets/rsg2_s35.pkl',
+        'datasets/rsg2_s45.pkl',
+        'datasets/rsg2_s55.pkl',
+        'datasets/rsg2_s65.pkl',
+        'datasets/rsg2_s75.pkl',
+        'datasets/rsg2_s85.pkl'
     ]
 
     #n_commands = len(Ds) * len(Ns) * len(trial_lens) * len(singles) * len(lrs) * n_seeds
+
+    if preserve_seed:
+        seed_samples = random.sample(range(1000), n_seeds)
+
+    rseed_samples = random.sample(range(1000), n_rseeds)
 
     for (nD, nN, d, seed, rseed) in product(Ds, Ns, datasets, range(n_seeds), range(n_rseeds)):
         if nD > nN:
@@ -41,7 +56,11 @@ def create_parameters(name):
         # run with lbfgs instead - it's better
         run_params['optimizer'] = 'lbfgs-scipy'
 
-        run_params['reservoir_seed'] = rseed
+        # keep the seed the same across all runs sharing network seeds
+        # but use a totally random one otherwise. train.py will take care of it
+        if preserve_seed:
+            run_params['seed'] = seed_samples[seed]
+        run_params['reservoir_seed'] = rseed_samples[rseed]
 
         mapping[ix] = run_params
         ix += 1
