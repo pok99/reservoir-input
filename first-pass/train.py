@@ -153,7 +153,7 @@ class Trainer:
                 if 'reservoir' in self.args.train_parts:
                     grad_list.append(self.net.reservoir.J.weight.grad.detach().numpy().reshape(-1))
                     grad_list.append(self.net.reservoir.W_u.weight.grad.detach().numpy().reshape(-1))
-                    
+
                 vec = np.concatenate(grad_list)
                 post = np.float64(vec)
 
@@ -165,7 +165,7 @@ class Trainer:
                     return
                 self.scipy_ix += 1
                 if self.scipy_ix % self.log_interval == 0:
-                    W_f, W_ro = vec_to_param(xk)
+                    # W_f, W_ro = vec_to_param(xk)
                     sample_n = random.randrange(len(dset))
 
                     self.net.reset(res_state_seed=0)
@@ -186,10 +186,15 @@ class Trainer:
                     self.log_checkpoint(self.scipy_ix, xs.numpy(), ys.numpy(), z, total_loss.item(), total_loss.item())
                     logging.info(f'iteration {self.scipy_ix}\t| loss {total_loss.item():.3f}')
 
-            # random initialization of input weights
-            init_Wf = np.random.randn(self.args.D, self.args.L) / np.sqrt(self.args.L)
-            init_Wro = np.random.randn(self.args.Z, self.args.N) / np.sqrt(self.args.N)
-            init = np.concatenate((init_Wf.reshape(-1), init_Wro.reshape(-1)))
+            init_list = []
+            if 'W_f' in self.args.train_parts:
+                init_list.append(self.net.W_f.weight.data.numpy().reshape(-1))
+            if 'W_ro' in self.args.train_parts:
+                init_list.append(self.net.W_ro.weight.data.numpy().reshape(-1))
+            if 'reservoir' in self.args.train_parts:
+                init_list.append(self.net.reservoir.J.weight.data.numpy().reshape(-1))
+                init_list.append(self.net.reservoir.W_u.weight.data.numpy().reshape(-1))
+            init = np.concatenate(init_list)
             optim_options = {
                 'iprint': self.log_interval,
                 'maxiter': self.args.maxiter,
@@ -197,7 +202,7 @@ class Trainer:
             }
             optim = minimize(closure, init, method='L-BFGS-B', jac=True, callback=callback, options=optim_options)
 
-            W_f_final, W_ro_final = vec_to_param(optim.x)
+            # W_f_final, W_ro_final = vec_to_param(optim.x)
             error_final = optim.fun
 
             if not self.args.no_log:
