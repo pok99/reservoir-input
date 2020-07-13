@@ -33,8 +33,9 @@ class Trainer:
         
         self.train_params = []
         for q in self.net.named_parameters():
-            if q[0].split('.')[0] != 'reservoir':
-                self.train_params.append(q[1])
+            for p in self.args.train_parts:
+                if q[0].find(p) != -1:
+                    self.train_params.append(q[1])
         self.optimizer = get_optimizer(self.args, self.train_params)
 
         self.dset = load_dataset(self.args.dataset)
@@ -89,8 +90,10 @@ class Trainer:
                     self.net.load_state_dict(best_loss_params)
 
         elif mode == 'scipy':
-            W_f_total = self.args.L * self.args.D
-            W_ro_total = self.args.N * self.args.Z
+            W_f_total = self.args.L * self.args.D if 'W_f' in self.args.train_parts else 0
+            W_ro_total = self.args.N * self.args.Z if 'W_ro' in self.args.train_parts else 0
+            res_total = self.args.N * self.args.N if 'reservoir' in self.args.train_parts else 0
+            W_u_total = self.args.D * self.args.N if 'reservoir' in self.args.train_parts else 0
             dset = np.asarray([x[:-1] for x in self.dset])
             x = torch.from_numpy(dset[:,0,:]).float()
             y = torch.from_numpy(dset[:,1,:]).float()
@@ -102,17 +105,30 @@ class Trainer:
             # turn a list into W_f (D x O) and W_ro (1 x N)
             # need this because LBFGS only takes in a list of params
             def vec_to_param(v):
-                assert len(v) == W_f_total + W_ro_total
-                W_f = v[:W_f_total].reshape(self.args.D, self.args.L)
-                W_ro = v[W_f_total:].reshape(self.args.Z, self.args.N)
-                return W_f, W_ro
+                assert len(v) == W_f_total + W_ro_total + res_total + W_u_total
+                W_f, W_ro, J, W_u = [None] * 4
+                if 'W_f' in self.args.train_parts:
+                    W_f = v[:W_f_total].reshape(self.args.D, self.args.L)
+                if 'W_ro' in self.args.train_parts:
+                    W_ro = v[W_f_total:W_f_total+W_ro_total].reshape(self.args.Z, self.args.N)
+                if 'reservoir' in self.args.train_parts:
+                    J = v[W_f_total+W_ro_total:W_f_total+W_ro_total+res_total].reshape(self.args.N, self.args.N)
+                if 'reservoir' in self.args.train_parts:
+                    W_u = v[W_f_total+W_ro_total+res_total:].reshape(self.args.N, self.args.D)
+                return W_f, W_ro, J, W_u
 
             # this is what happens every iteration
             # run through all examples (x, y) and get loss, gradient
             def closure(v):
-                W_f, W_ro = vec_to_param(v)
-                self.net.W_f.weight = nn.Parameter(torch.from_numpy(W_f).float())
-                self.net.W_ro.weight = nn.Parameter(torch.from_numpy(W_ro).float())
+                W_f, W_ro, J, W_u = vec_to_param(v)
+                if W_f is not None:
+                    self.net.W_f.weight = nn.Parameter(torch.from_numpy(W_f).float())
+                if W_ro is not None:
+                    self.net.W_ro.weight = nn.Parameter(torch.from_numpy(W_ro).float())
+                if J is not None:
+                    self.net.reservoir.J.weight = nn.Parameter(torch.from_numpy(J).float())
+                if W_u is not None:
+                    self.net.reservoir.W_u.weight = nn.Parameter(torch.from_numpy(W_u).float())
 
                 # need to do this so that burn in works
                 # res state starting from same random seed for each iteration
@@ -129,9 +145,16 @@ class Trainer:
 
                 total_loss.backward()
 
-                Wf = self.net.W_f.weight.grad.detach().numpy().reshape(-1)
-                Wro = self.net.W_ro.weight.grad.detach().numpy().reshape(-1)
-                vec = np.concatenate((Wf, Wro))
+                grad_list = []
+                if 'W_f' in self.args.train_parts:
+                    grad_list.append(self.net.W_f.weight.grad.detach().numpy().reshape(-1))
+                if 'W_ro' in self.args.train_parts:
+                    grad_list.append(self.net.W_ro.weight.grad.detach().numpy().reshape(-1))
+                if 'reservoir' in self.args.train_parts:
+                    grad_list.append(self.net.reservoir.J.weight.grad.detach().numpy().reshape(-1))
+                    grad_list.append(self.net.reservoir.W_u.weight.grad.detach().numpy().reshape(-1))
+                    
+                vec = np.concatenate(grad_list)
                 post = np.float64(vec)
 
                 return total_loss.item(), post
@@ -316,7 +339,7 @@ def parse_args():
     parser.add_argument('-N', type=int, default=20, help='')
     parser.add_argument('-Z', type=int, default=1, help='')
 
-    parser.add_argument('--train_parts', type=str, nargs='+', choices=['reservoir', 'Wro', 'Wf'], default=['Wro', 'Wf'])
+    parser.add_argument('--train_parts', type=str, nargs='+', choices=['reservoir', 'W_ro', 'W_f'], default=['W_ro', 'W_f'])
     parser.add_argument('--Wro_path', type=str, default=None, help='saved Wf')
     parser.add_argument('--Wf_path', type=str, default=None, help='saved Wf')
     parser.add_argument('--reservoir_path', type=str, default=None, help='saved reservoir. should be saved with seed tho')
