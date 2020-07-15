@@ -24,6 +24,11 @@ class Reservoir(nn.Module):
         self.n_burn_in = args.reservoir_burn_steps
         self.reservoir_x_seed = args.reservoir_x_seed
 
+        if hasattr(args, 'reservoir_noise'):
+            self.noise_std = args.reservoir_noise
+        else:
+            self.noise_std = 0
+
         if hasattr(args, 'reservoir_path') and args.reservoir_path is not None:
             J, W_u = load_rb(args.reservoir_path)
             self.J.weight.data = J
@@ -50,7 +55,11 @@ class Reservoir(nn.Module):
 
     def forward(self, u):
         g = self.activation(self.J(self.x) + self.W_u(u))
-        delta_x = (-self.x + g) / self.tau_x
+        if self.noise_std > 0:
+            gn = g + torch.normal(torch.zeros_like(g), self.noise_std)
+        else:
+            gn = g
+        delta_x = (-self.x + gn) / self.tau_x
         self.x = self.x + delta_x
         return self.x
 
@@ -74,15 +83,24 @@ class Network(nn.Module):
         super().__init__()
         self.reservoir = Reservoir(args)
 
-        self.W_f = nn.Linear(args.L, args.D, bias=False)
-        self.W_ro = nn.Linear(args.N, args.Z, bias=False)
+        self.W_f = nn.Linear(args.L, args.D, bias=True)
+        self.W_ro = nn.Linear(args.N, args.Z, bias=True)
 
         if hasattr(args, 'Wf_path') and args.Wf_path is not None:
             W_f = load_rb(args.Wf_path)
+            # helps solve bias = False problems
+            if hasattr(type(W_f), '__iter__'):
+                self.W_f.weight.data = W_f[0]
+                self.W_f.bias.data = W_f[1]
             self.W_f.weight.data = W_f
+            #self.W_f.bias.data = self.W_f.bias * 0
         if hasattr(args, 'Wro_path') and args.Wro_path is not None:
             W_ro = load_rb(args.Wro_path)
+            if hasattr(type(W_ro), '__iter__'):
+                self.W_ro.weight.data = W_ro[0]
+                self.W_ro.bias.data = W_ro[1]
             self.W_ro.weight.data = W_ro
+            #self.W_ro.bias.data = self.W_ro.bias * 0
 
         self.network_delay = args.network_delay
 

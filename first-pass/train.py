@@ -90,8 +90,8 @@ class Trainer:
                     self.net.load_state_dict(best_loss_params)
 
         elif mode == 'scipy':
-            W_f_total = self.args.L * self.args.D if 'W_f' in self.args.train_parts else 0
-            W_ro_total = self.args.N * self.args.Z if 'W_ro' in self.args.train_parts else 0
+            W_f_total = self.args.L * self.args.D + self.args.D if 'W_f' in self.args.train_parts else 0
+            W_ro_total = self.args.N * self.args.Z + self.args.Z if 'W_ro' in self.args.train_parts else 0
             res_total = self.args.N * self.args.N if 'reservoir' in self.args.train_parts else 0
             W_u_total = self.args.D * self.args.N if 'reservoir' in self.args.train_parts else 0
             dset = np.asarray([x[:-1] for x in self.dset])
@@ -108,23 +108,27 @@ class Trainer:
                 assert len(v) == W_f_total + W_ro_total + res_total + W_u_total
                 W_f, W_ro, J, W_u = [None] * 4
                 if 'W_f' in self.args.train_parts:
-                    W_f = v[:W_f_total].reshape(self.args.D, self.args.L)
+                    W_f = v[:W_f_total-self.args.D].reshape(self.args.D, self.args.L)
+                    W_f_b = v[W_f_total-self.args.D:W_f_total].reshape(self.args.D)
                 if 'W_ro' in self.args.train_parts:
-                    W_ro = v[W_f_total:W_f_total+W_ro_total].reshape(self.args.Z, self.args.N)
+                    W_ro = v[W_f_total:W_f_total+W_ro_total-self.args.Z].reshape(self.args.Z, self.args.N)
+                    W_ro_b = v[W_f_total+W_ro_total-self.args.Z:W_f_total+W_ro_total].reshape(self.args.Z)
                 if 'reservoir' in self.args.train_parts:
                     J = v[W_f_total+W_ro_total:W_f_total+W_ro_total+res_total].reshape(self.args.N, self.args.N)
                 if 'reservoir' in self.args.train_parts:
                     W_u = v[W_f_total+W_ro_total+res_total:].reshape(self.args.N, self.args.D)
-                return W_f, W_ro, J, W_u
+                return W_f, W_f_b, W_ro, W_ro_b, J, W_u
 
             # this is what happens every iteration
             # run through all examples (x, y) and get loss, gradient
             def closure(v):
-                W_f, W_ro, J, W_u = vec_to_param(v)
+                W_f, W_f_b, W_ro, W_ro_b, J, W_u = vec_to_param(v)
                 if W_f is not None:
                     self.net.W_f.weight = nn.Parameter(torch.from_numpy(W_f).float())
+                    self.net.W_f.bias = nn.Parameter(torch.from_numpy(W_f_b).float())
                 if W_ro is not None:
                     self.net.W_ro.weight = nn.Parameter(torch.from_numpy(W_ro).float())
+                    self.net.W_ro.bias = nn.Parameter(torch.from_numpy(W_ro_b).float())
                 if J is not None:
                     self.net.reservoir.J.weight = nn.Parameter(torch.from_numpy(J).float())
                 if W_u is not None:
@@ -148,8 +152,10 @@ class Trainer:
                 grad_list = []
                 if 'W_f' in self.args.train_parts:
                     grad_list.append(self.net.W_f.weight.grad.detach().numpy().reshape(-1))
+                    grad_list.append(self.net.W_f.bias.grad.detach().numpy().reshape(-1))
                 if 'W_ro' in self.args.train_parts:
                     grad_list.append(self.net.W_ro.weight.grad.detach().numpy().reshape(-1))
+                    grad_list.append(self.net.W_ro.bias.grad.detach().numpy().reshape(-1))
                 if 'reservoir' in self.args.train_parts:
                     grad_list.append(self.net.reservoir.J.weight.grad.detach().numpy().reshape(-1))
                     grad_list.append(self.net.reservoir.W_u.weight.grad.detach().numpy().reshape(-1))
@@ -189,8 +195,10 @@ class Trainer:
             init_list = []
             if 'W_f' in self.args.train_parts:
                 init_list.append(self.net.W_f.weight.data.numpy().reshape(-1))
+                init_list.append(self.net.W_f.bias.data.numpy().reshape(-1))
             if 'W_ro' in self.args.train_parts:
                 init_list.append(self.net.W_ro.weight.data.numpy().reshape(-1))
+                init_list.append(self.net.W_ro.bias.data.numpy().reshape(-1))
             if 'reservoir' in self.args.train_parts:
                 init_list.append(self.net.reservoir.J.weight.data.numpy().reshape(-1))
                 init_list.append(self.net.reservoir.W_u.weight.data.numpy().reshape(-1))
@@ -352,7 +360,10 @@ def parse_args():
     parser.add_argument('--res_init_type', type=str, default='gaussian', help='')
     parser.add_argument('--res_init_gaussian_std', type=float, default=1.5)
     parser.add_argument('--network_delay', type=int, default=0)
-    parser.add_argument('--dataset', type=str, default='datasets/rsg.pkl')
+    parser.add_argument('--reservoir_noise', type=float, default=0)
+
+
+    parser.add_argument('--dataset', type=str, default='datasets/rsg2.pkl')
 
     parser.add_argument('--optimizer', choices=['adam', 'lbfgs-scipy', 'lbfgs-pytorch'], default='lbfgs-scipy')
     parser.add_argument('--loss', type=str, default='mse')
@@ -361,7 +372,7 @@ def parse_args():
     parser.add_argument('--maxiter', type=int, default=5000, help='limit to # iterations. lbfgs-scipy only')
 
     # adam arguments
-    parser.add_argument('--conv_type', type=str, choices=['patience', 'grad'], default='grad', help='how to determine convergence. adam only')
+    parser.add_argument('--conv_type', type=str, choices=['patience', 'grad'], default='patience', help='how to determine convergence. adam only')
     parser.add_argument('--patience', type=int, default=1000, help='stop training if loss doesn\'t decrease. adam only')
     parser.add_argument('--grad_threshold', type=float, default=1e-4, help='stop training if grad is less than certain amount. adam only')
     parser.add_argument('--lr', type=float, default=1e-4, help='learning rate. adam only')

@@ -28,6 +28,9 @@ def load_model(m_dict):
     bunch.reservoir_seed = 0
 
     net = Network(bunch)
+    if 'W_f.bias' not in m_dict:
+        m_dict['W_f.bias'] = torch.zeros(bunch.D)
+        m_dict['W_ro.bias'] = torch.zeros(bunch.Z)
     net.load_state_dict(m_dict)
     net.eval()
 
