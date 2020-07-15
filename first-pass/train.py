@@ -90,8 +90,8 @@ class Trainer:
                     self.net.load_state_dict(best_loss_params)
 
         elif mode == 'scipy':
-            W_f_total = self.args.L * self.args.D + self.args.D if 'W_f' in self.args.train_parts else 0
-            W_ro_total = self.args.N * self.args.Z + self.args.Z if 'W_ro' in self.args.train_parts else 0
+            W_f_total = self.args.L * self.args.D if 'W_f' in self.args.train_parts else 0
+            W_ro_total = self.args.N * self.args.Z if 'W_ro' in self.args.train_parts else 0
             res_total = self.args.N * self.args.N if 'reservoir' in self.args.train_parts else 0
             W_u_total = self.args.D * self.args.N if 'reservoir' in self.args.train_parts else 0
             dset = np.asarray([x[:-1] for x in self.dset])
@@ -104,19 +104,40 @@ class Trainer:
 
             # turn a list into W_f (D x O) and W_ro (1 x N)
             # need this because LBFGS only takes in a list of params
+            
             def vec_to_param(v):
-                assert len(v) == W_f_total + W_ro_total + res_total + W_u_total
-                W_f, W_ro, J, W_u = [None] * 4
+                if self.args.bias:
+                    assert len(v) == W_f_total + W_ro_total + res_total + W_u_total + self.args.D + self.args.Z
+                else:
+                    assert len(v) == W_f_total + W_ro_total + res_total + W_u_total
+                W_f, W_f_b, W_ro, W_ro_b, J, W_u = [None] * 6
+                ind_c = 0
+                ind_n = 0
                 if 'W_f' in self.args.train_parts:
-                    W_f = v[:W_f_total-self.args.D].reshape(self.args.D, self.args.L)
-                    W_f_b = v[W_f_total-self.args.D:W_f_total].reshape(self.args.D)
+                    ind_n += W_f_total
+                    W_f = v[ind_c:ind_n].reshape(self.args.D, self.args.L)
+                    ind_c = ind_n
+                    if self.args.bias:
+                        ind_n += self.args.D
+                        W_f_b = v[ind_c:ind_n].reshape(self.args.D)
+                        ind_c = ind_n
                 if 'W_ro' in self.args.train_parts:
-                    W_ro = v[W_f_total:W_f_total+W_ro_total-self.args.Z].reshape(self.args.Z, self.args.N)
-                    W_ro_b = v[W_f_total+W_ro_total-self.args.Z:W_f_total+W_ro_total].reshape(self.args.Z)
+                    ind_n += W_ro_total
+                    W_ro = v[ind_c:ind_n].reshape(self.args.Z, self.args.N)
+                    ind_c = ind_n
+                    if self.args.bias:
+                        ind_n += self.args.Z
+                        W_ro_b = v[ind_c:ind_n].reshape(self.args.Z)
+                        ind_c = ind_n
                 if 'reservoir' in self.args.train_parts:
-                    J = v[W_f_total+W_ro_total:W_f_total+W_ro_total+res_total].reshape(self.args.N, self.args.N)
+                    ind_n += res_total
+                    J = v[ind_c:ind_n].reshape(self.args.N, self.args.N)
+                    ind_c = ind_n
                 if 'reservoir' in self.args.train_parts:
-                    W_u = v[W_f_total+W_ro_total+res_total:].reshape(self.args.N, self.args.D)
+                    ind_n += W_u_total
+                    W_u = v[ind_c:ind_n].reshape(self.args.N, self.args.D)
+                    ind_c = ind_n
+
                 return W_f, W_f_b, W_ro, W_ro_b, J, W_u
 
             # this is what happens every iteration
@@ -125,10 +146,12 @@ class Trainer:
                 W_f, W_f_b, W_ro, W_ro_b, J, W_u = vec_to_param(v)
                 if W_f is not None:
                     self.net.W_f.weight = nn.Parameter(torch.from_numpy(W_f).float())
-                    self.net.W_f.bias = nn.Parameter(torch.from_numpy(W_f_b).float())
+                    if self.args.bias:
+                        self.net.W_f.bias = nn.Parameter(torch.from_numpy(W_f_b).float())
                 if W_ro is not None:
                     self.net.W_ro.weight = nn.Parameter(torch.from_numpy(W_ro).float())
-                    self.net.W_ro.bias = nn.Parameter(torch.from_numpy(W_ro_b).float())
+                    if self.args.bias:
+                        self.net.W_ro.bias = nn.Parameter(torch.from_numpy(W_ro_b).float())
                 if J is not None:
                     self.net.reservoir.J.weight = nn.Parameter(torch.from_numpy(J).float())
                 if W_u is not None:
@@ -152,10 +175,12 @@ class Trainer:
                 grad_list = []
                 if 'W_f' in self.args.train_parts:
                     grad_list.append(self.net.W_f.weight.grad.detach().numpy().reshape(-1))
-                    grad_list.append(self.net.W_f.bias.grad.detach().numpy().reshape(-1))
+                    if self.args.bias:
+                        grad_list.append(self.net.W_f.bias.grad.detach().numpy().reshape(-1))
                 if 'W_ro' in self.args.train_parts:
                     grad_list.append(self.net.W_ro.weight.grad.detach().numpy().reshape(-1))
-                    grad_list.append(self.net.W_ro.bias.grad.detach().numpy().reshape(-1))
+                    if self.args.bias:
+                        grad_list.append(self.net.W_ro.bias.grad.detach().numpy().reshape(-1))
                 if 'reservoir' in self.args.train_parts:
                     grad_list.append(self.net.reservoir.J.weight.grad.detach().numpy().reshape(-1))
                     grad_list.append(self.net.reservoir.W_u.weight.grad.detach().numpy().reshape(-1))
@@ -195,10 +220,12 @@ class Trainer:
             init_list = []
             if 'W_f' in self.args.train_parts:
                 init_list.append(self.net.W_f.weight.data.numpy().reshape(-1))
-                init_list.append(self.net.W_f.bias.data.numpy().reshape(-1))
+                if self.args.bias:
+                    init_list.append(self.net.W_f.bias.data.numpy().reshape(-1))
             if 'W_ro' in self.args.train_parts:
                 init_list.append(self.net.W_ro.weight.data.numpy().reshape(-1))
-                init_list.append(self.net.W_ro.bias.data.numpy().reshape(-1))
+                if self.args.bias:
+                    init_list.append(self.net.W_ro.bias.data.numpy().reshape(-1))
             if 'reservoir' in self.args.train_parts:
                 init_list.append(self.net.reservoir.J.weight.data.numpy().reshape(-1))
                 init_list.append(self.net.reservoir.W_u.weight.data.numpy().reshape(-1))
@@ -353,7 +380,7 @@ def parse_args():
     parser.add_argument('-Z', type=int, default=1, help='')
 
     parser.add_argument('--train_parts', type=str, nargs='+', choices=['reservoir', 'W_ro', 'W_f'], default=['W_ro', 'W_f'])
-    parser.add_argument('--Wro_path', type=str, default=None, help='saved Wf')
+    parser.add_argument('--Wro_path', type=str, default=None, help='saved Wro')
     parser.add_argument('--Wf_path', type=str, default=None, help='saved Wf')
     parser.add_argument('--reservoir_path', type=str, default=None, help='saved reservoir. should be saved with seed tho')
     
@@ -361,7 +388,7 @@ def parse_args():
     parser.add_argument('--res_init_gaussian_std', type=float, default=1.5)
     parser.add_argument('--network_delay', type=int, default=0)
     parser.add_argument('--reservoir_noise', type=float, default=0)
-
+    parser.add_argument('--no_bias', action='store_true')
 
     parser.add_argument('--dataset', type=str, default='datasets/rsg2.pkl')
 
@@ -394,6 +421,7 @@ def parse_args():
     args.res_init_params = {}
     if args.res_init_type == 'gaussian':
         args.res_init_params['std'] = args.res_init_gaussian_std
+    args.bias = not args.no_bias
     return args
 
 if __name__ == '__main__':
