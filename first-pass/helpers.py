@@ -26,11 +26,14 @@ def load_model(m_dict):
     bunch.res_init_type = 'gaussian'
     bunch.res_init_params = {'std': 1.5}
     bunch.reservoir_seed = 0
+    bunch.bias = True
 
-    net = Network(bunch)
     if 'W_f.bias' not in m_dict:
+        bunch.bias = False
         m_dict['W_f.bias'] = torch.zeros(bunch.D)
         m_dict['W_ro.bias'] = torch.zeros(bunch.Z)
+
+    net = Network(bunch)
     net.load_state_dict(m_dict)
     net.eval()
 

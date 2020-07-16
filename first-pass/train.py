@@ -106,10 +106,11 @@ class Trainer:
             # need this because LBFGS only takes in a list of params
             
             def vec_to_param(v):
-                if self.args.bias:
-                    assert len(v) == W_f_total + W_ro_total + res_total + W_u_total + self.args.D + self.args.Z
-                else:
-                    assert len(v) == W_f_total + W_ro_total + res_total + W_u_total
+                # assertions for testing purposes
+                # if self.args.bias:
+                #     assert len(v) == W_f_total + W_ro_total + res_total + W_u_total + self.args.D + self.args.Z
+                # else:
+                #     assert len(v) == W_f_total + W_ro_total + res_total + W_u_total
                 W_f, W_f_b, W_ro, W_ro_b, J, W_u = [None] * 6
                 ind_c = 0
                 ind_n = 0
@@ -474,8 +475,8 @@ if __name__ == '__main__':
                 writer.writerow([args.slurm_id, args.L, args.D, args.N, args.seed, args.reservoir_seed, args.reservoir_x_seed, args.n_epochs, args.lr, args.dataset, final_loss])
             elif args.optimizer == 'lbfgs-scipy':
                 if not csv_exists:
-                    writer.writerow(['slurm_id','L', 'D', 'N', 'seed', 'rseed', 'xseed', 'dset', 'loss'])
-                writer.writerow([args.slurm_id, args.L, args.D, args.N, args.seed, args.reservoir_seed, args.reservoir_x_seed, args.dataset, final_loss])
+                    writer.writerow(['slurm_id','L', 'D', 'N', 'bias', 'seed', 'rseed', 'xseed', 'dset', 'loss'])
+                writer.writerow([args.slurm_id, args.L, args.D, args.N, args.seed, args.bias, args.reservoir_seed, args.reservoir_x_seed, args.dataset, final_loss])
 
     logging.shutdown()
 

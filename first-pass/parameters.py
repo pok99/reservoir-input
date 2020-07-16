@@ -20,17 +20,12 @@ def create_parameters(name):
     preserve_seed = True
 
     n_seeds = 2
-    n_rseeds = 3
+    n_rseeds = 2
+
+    biases = [True, False]
 
     datasets = [
-        'datasets/rsg2_s15.pkl',
-        'datasets/rsg2_s25.pkl',
-        'datasets/rsg2_s35.pkl',
-        'datasets/rsg2_s45.pkl',
-        'datasets/rsg2_s55.pkl',
-        'datasets/rsg2_s65.pkl',
-        'datasets/rsg2_s75.pkl',
-        'datasets/rsg2_s85.pkl'
+        'datasets/rsg2.pkl'
     ]
 
     #n_commands = len(Ds) * len(Ns) * len(trial_lens) * len(singles) * len(lrs) * n_seeds
@@ -40,13 +35,15 @@ def create_parameters(name):
 
     rseed_samples = random.sample(range(1000), n_rseeds)
 
-    for (nD, nN, d, seed, rseed) in product(Ds, Ns, datasets, range(n_seeds), range(n_rseeds)):
+    for (nD, nN, d, seed, rseed, bias) in product(Ds, Ns, datasets, range(n_seeds), range(n_rseeds), biases):
         if nD > nN:
             continue
         run_params = {}
         run_params['dataset'] = d
         run_params['D'] = nD
         run_params['N'] = nN
+
+        run_params['bias'] = True
 
         # these parameters only useful when training with SGD
         # run_params['lr'] = lr
@@ -71,7 +68,7 @@ def create_parameters(name):
     with open(fname, 'w') as f:
         json.dump(mapping, f, indent=2)
 
-    print(f'Produced {n_commands} run commands in {fname}. Use with `sbatch --array=1-{n_commands} slurm_train.sbatch`.')
+    print(f'Produced {n_commands} run commands in {fname}. Use with:\nsbatch --array=1-{n_commands} slurm_train.sbatch')
 
     return mapping
 
