@@ -31,6 +31,19 @@ def add_yaml_args(args, config_file):
             #     logging.warning(f'{c} is not set to begin with: {v}')
     return args
 
+# fills an argument dictionary with keys from a default dictionary
+# also works with dicts now
+def fill_undefined_args(args, default_args):
+    if type(args) is Bunch:
+        for k in default_args.__dict__.keys():
+            if k not in args.__dict__:
+                args.__dict__[k] = default_args.__dict__[k]
+    elif type(args) is dict:
+        for k in default_args.keys():
+            if k not in args:
+                args[k] = default_args[k]
+    return args
+
 
 # produce run id and create log directory
 def log_this(config, log_dir, log_name=None, checkpoints=True, use_id=True):

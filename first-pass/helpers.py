@@ -7,7 +7,7 @@ import torch.optim as optim
 import random
 import pdb
 
-from reservoir import Network
+from network import Network
 from utils import Bunch
 
 

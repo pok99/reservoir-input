@@ -6,30 +6,50 @@ import torch.optim as optim
 import os
 import pickle
 import pdb
+import random
+import copy
 
-from utils import Bunch, load_rb
+from utils import Bunch, load_rb, fill_undefined_args
 
+default_arglist = {
+    'L': 1,
+    'D': 5,
+    'N': 20,
+    'Z': 1,
+    'res_init_type': 'gaussian',
+    'res_init_params': {'std': 1.5},
+    'reservoir_burn_steps': 200,
+    'reservoir_noise': 0,
+    'reservoir_path': None,
+    'bias': False,
+    'Wf_path': None,
+    'Wro_path': None,
+    'network_delay': 0
+}
+DEFAULT_ARGS = Bunch(**default_arglist)
 
 # reservoir network. shouldn't be trained
 class Reservoir(nn.Module):
-    def __init__(self, args):
+    def __init__(self, args=DEFAULT_ARGS):
         super().__init__()
-        self.args = args
+        self.args = copy.deepcopy(args)
+
+        if not hasattr(args, 'reservoir_seed'):
+            self.args.reservoir_seed = random.randrange(1e6)
+        if not hasattr(args, 'reservoir_x_seed'):
+            self.args.reservoir_x_seed = np.random.randint(1e6)
 
         self.J = nn.Linear(args.N, args.N, bias=False)
         self.W_u = nn.Linear(args.D, args.N, bias=False)
         self.activation = torch.tanh
         self.tau_x = 10
 
-        self.n_burn_in = args.reservoir_burn_steps
-        self.reservoir_x_seed = args.reservoir_x_seed
+        self.n_burn_in = self.args.reservoir_burn_steps
+        self.reservoir_x_seed = self.args.reservoir_x_seed
 
-        if hasattr(args, 'reservoir_noise'):
-            self.noise_std = args.reservoir_noise
-        else:
-            self.noise_std = 0
+        self.noise_std = args.reservoir_noise
 
-        if hasattr(args, 'reservoir_path') and args.reservoir_path is not None:
+        if args.reservoir_path is not None:
             J, W_u = load_rb(args.reservoir_path)
             self.J.weight.data = J
             self.W_u.weight.data = W_u
@@ -63,30 +83,37 @@ class Reservoir(nn.Module):
         self.x = self.x + delta_x
         return self.x
 
-    def reset(self, res_state_seed=None):
-        if res_state_seed is None:
-            res_state_seed = self.reservoir_x_seed
-        # reset to 0 if x seed is -1
-        if res_state_seed == -1:
-            self.x = torch.zeros((1, self.args.N))
-        else:
-            # burn in only req'd for random init because no biases to make a difference
-            rng_pt = torch.get_rng_state()
-            torch.manual_seed(res_state_seed)
-            self.x = torch.normal(0, 1, (1, self.args.N))
-            torch.set_rng_state(rng_pt)
+    def reset(self, res_state_seed=None, res_state=None):
+        if res_state is not None:
+            self.x = torch.from_numpy(res_state).float()
             self.burn_in(self.n_burn_in)
+        else:
+            if res_state_seed is None:
+                res_state_seed = self.reservoir_x_seed
+            # reset to 0 if x seed is -1
+            if res_state_seed == -1:
+                self.x = torch.zeros((1, self.args.N))
+            else:
+                # burn in only req'd for random init because no biases to make a difference
+                rng_pt = torch.get_rng_state()
+                torch.manual_seed(res_state_seed)
+                self.x = torch.normal(0, 1, (1, self.args.N))
+                torch.set_rng_state(rng_pt)
+                self.burn_in(self.n_burn_in)
 
 
 class Network(nn.Module):
-    def __init__(self, args):
+    def __init__(self, args=DEFAULT_ARGS):
         super().__init__()
+        args = fill_undefined_args(copy.deepcopy(args), DEFAULT_ARGS)
+        self.args = args
         self.reservoir = Reservoir(args)
+        
 
         if not hasattr(args, 'bias'):
             args.bias = False
 
-        self.W_f = nn.Linear(args.L, args.D, bias=args.bias)
+        self.W_f = nn.Linear(self.args.L, self.args.D, bias=args.bias)
         self.W_ro = nn.Linear(args.N, args.Z, bias=args.bias)
 
         if hasattr(args, 'Wf_path') and args.Wf_path is not None:

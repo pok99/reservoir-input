@@ -14,7 +14,7 @@ sys.path.append('../')
 from helpers import test_model
 
 from dataset import load_dataset
-from reservoir import Network, Reservoir
+from network import Network, Reservoir
 
 parser = argparse.ArgumentParser()
 parser.add_argument('file', help='model file')

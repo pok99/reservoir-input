@@ -15,7 +15,7 @@ import csv
 import math
 
 from dataset import load_dataset
-from reservoir import Network, Reservoir
+from network import Network, Reservoir
 
 from utils import log_this
 from helpers import get_optimizer, get_criterion

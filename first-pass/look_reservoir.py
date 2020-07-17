@@ -11,7 +11,7 @@ from utils import Bunch
 
 # for plotting some instances over the course of training
 
-from reservoir import Network, Reservoir
+from network import Network, Reservoir
 
 
 args = Bunch(N=250, D=100, O=1, res_init_type='gaussian', res_init_params={'std': 2}, reservoir_seed=0)

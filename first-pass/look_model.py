@@ -6,7 +6,7 @@ import argparse
 import pdb
 
 from helpers import load_model
-from reservoir import Network
+from network import Network
 from utils import Bunch
 
 

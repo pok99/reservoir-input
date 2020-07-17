@@ -10,7 +10,7 @@ import pdb
 
 from dataset import load_dataset
 from helpers import test_model
-from reservoir import Network, Reservoir
+from network import Network, Reservoir
 
 # for plotting some instances of a trained model on a specified dataset
 
