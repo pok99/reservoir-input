@@ -12,9 +12,9 @@ def create_parameters(name):
     Ds = [5, 10, 50, 100]
     Ns = [50, 100]
 
-    # lrs = [1e-3]
-    # n_epochs = 50
-    # patience = 4000
+    lr = 1e-5
+    n_epochs = 60
+    patience = 4000
 
     # keep the same network seeds
     preserve_seed = True
@@ -22,7 +22,7 @@ def create_parameters(name):
     n_seeds = 2
     n_rseeds = 2
 
-    biases = [True, False]
+    biases = [True]
 
     datasets = [
         'datasets/rsg2.pkl'
@@ -43,15 +43,18 @@ def create_parameters(name):
         run_params['D'] = nD
         run_params['N'] = nN
 
-        run_params['bias'] = True
+        if bias:
+            run_params['bias'] = True
+        else:
+            run_params['bias'] = False
 
-        # these parameters only useful when training with SGD
-        # run_params['lr'] = lr
-        # run_params['n_epochs'] = n_epochs
-        # run_params['patience'] = patience
+        # these parameters only useful when training with adam
+        run_params['lr'] = lr
+        run_params['n_epochs'] = n_epochs
+        run_params['patience'] = patience
 
         # run with lbfgs instead - it's better
-        run_params['optimizer'] = 'lbfgs-scipy'
+        run_params['optimizer'] = 'adam'
 
         # keep the seed the same across all runs sharing network seeds
         # but use a totally random one otherwise. train.py will take care of it
