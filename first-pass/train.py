@@ -409,6 +409,7 @@ def parse_args():
     parser.add_argument('--network_delay', type=int, default=0)
     parser.add_argument('--reservoir_noise', type=float, default=0)
     parser.add_argument('--no_bias', action='store_true')
+    parser.add_argument('--out_act', type=str, default='exp', help='output activation')
 
     parser.add_argument('--dataset', type=str, default='datasets/rsg2.pkl')
 

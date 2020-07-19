@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import argparse
 import pdb
 
-from helpers import load_model, test_model
+from testers import load_model, test_model
 from network import Network
 from utils import Bunch, load_rb
 

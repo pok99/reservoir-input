@@ -10,6 +10,7 @@ import random
 import copy
 
 from utils import Bunch, load_rb, fill_undefined_args
+from helpers import get_output_activation
 
 default_arglist = {
     'L': 1,
@@ -24,7 +25,8 @@ default_arglist = {
     'bias': False,
     'Wf_path': None,
     'Wro_path': None,
-    'network_delay': 0
+    'network_delay': 0,
+    'out_act': 'exp'
 }
 DEFAULT_ARGS = Bunch(**default_arglist)
 
@@ -109,7 +111,6 @@ class Network(nn.Module):
         self.args = args
         self.reservoir = Reservoir(args)
         
-
         if not hasattr(args, 'bias'):
             args.bias = False
 
@@ -138,8 +139,9 @@ class Network(nn.Module):
         u = self.W_f(o.reshape(-1, 1))
         x = self.reservoir(u)
         z = self.W_ro(x)
-        # z = torch.exp(z)
-        z = nn.ReLU()(z)
+        fn = get_output_activation(self.args)
+        z = fn(z)
+        #z = nn.ReLU()(z)
         if self.network_delay == 0:
             return z, x, u
         else:

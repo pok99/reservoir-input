@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.stats import norm
 from sklearn.gaussian_process import GaussianProcessRegressor as gpr
-from sklearn.gaussian_process.kernels import RBF
+from sklearn.gaussian_process.kernels import RBF, Matern, WhiteKernel
 import pickle
 import os
 import sys
@@ -12,6 +12,8 @@ import random
 import matplotlib.pyplot as plt
 
 import argparse
+
+from utils import load_rb
 
 eps = 1e-6
 
@@ -90,7 +92,7 @@ def create_dataset(args):
             trials.append((trial_x, trial_y, info))
 
 
-    elif t_type == 'copy':
+    elif t_type == 'copy_gp':
         for n in range(n_trials):
             dim = 1
             x = np.arange(0, t_len)
@@ -99,7 +101,8 @@ def create_dataset(args):
             interval = int(get_args_val(trial_args, 'interval', 10))
             scale = get_args_val(trial_args, 'scale', 1)
             delay = int(get_args_val(trial_args, 'delay', 0))
-            rbf = RBF(length_scale=3)
+            rbf = RBF(length_scale=5)
+            kernel = Matern(length_scale=2, nu=1.5) + WhiteKernel(noise_level=1)
 
             x_filter = x_list[::interval]
             n_pts = x_filter.squeeze().shape[0]
@@ -112,7 +115,7 @@ def create_dataset(args):
                 else:
                     y_filter[i] = np.random.multivariate_normal(np.zeros(dim), cov=scale*np.eye(dim))
 
-            gp = gpr(kernel=rbf, normalize_y=True).fit(x_filter, y_filter)
+            gp = gpr(kernel=kernel, normalize_y=False).fit(x_filter, y_filter)
             y_prediction, y_std = gp.predict(x_list, return_std=True)
 
             y = y_prediction.reshape(-1)
@@ -125,12 +128,40 @@ def create_dataset(args):
 
             trials.append((y, z, delay))
 
+    elif t_type == 'copy_cos':
+        for n in range(n_trials):
+            x = np.arange(0, t_len)
+            y = np.zeros_like(x)
+
+            delay = int(get_args_val(trial_args, 'delay', 0))
+            n_freqs = int(get_args_val(trial_args, 'n_freqs', 15))
+            f_range = get_args_val(trial_args, 'range', [3, 30])
+            amp = int(get_args_val(trial_args, 'amp', 1))
+
+            freqs = np.random.uniform(f_range[0], f_range[1], (n_freqs))
+            amps = np.random.uniform(-amp, amp, (n_freqs))
+            for i in range(n_freqs):
+                y = y + amps[i] * np.cos(1/freqs[i] * x)
+
+            z = np.zeros_like(y)
+            if delay == 0:
+                z = y
+            else:
+                z[delay:] = y[:-delay]
+
+            trials.append((y, z, delay))
+
     return trials
 
-def get_args_val(args, name, default):
+def get_args_val(args, name, default, n_vals=1):
     if name in args:
         idx = args.index(name)
-        val = float(args[idx + 1])
+        if n_vals == 1:
+            val = float(args[idx + 1])
+        else:
+            vals = []
+            for i in range(1, n_vals+1):
+                vals.append(float(args[idx + i]))
     else:
         val = default
     return val
@@ -151,11 +182,11 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('mode', default='load')
     parser.add_argument('name')
-    parser.add_argument('--trial_type', default='rsg')
+    parser.add_argument('-t', '--trial_type', default='rsg')
     parser.add_argument('--rsg_intervals', nargs='*', type=int, default=None)
     parser.add_argument('--trial_args', nargs='*', help='terms to specify parameters of trial type')
-    parser.add_argument('--trial_len', type=int, default=100)
-    parser.add_argument('--n_trials', type=int, default=1000)
+    parser.add_argument('-l', '--trial_len', type=int, default=100)
+    parser.add_argument('-n', '--n_trials', type=int, default=1000)
     args = parser.parse_args()
 
     if args.trial_args is None:
@@ -165,7 +196,7 @@ if __name__ == '__main__':
         dset = create_dataset(args)
         save_dataset(dset, args.name, args=args)
     elif args.mode == 'load':
-        dset = load_dataset(args.name)
+        dset = load_rb(args.name)
 
         dset_len = len(dset)
         sample = random.sample(dset, 6)

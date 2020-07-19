@@ -9,7 +9,7 @@ import argparse
 import pdb
 
 from utils import load_rb
-from helpers import test_model
+from testers import test_model
 from network import Network, Reservoir
 
 # for plotting some instances of a trained model on a specified dataset
