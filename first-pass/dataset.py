@@ -145,11 +145,6 @@ def save_dataset(dset, name, args=None):
     #     with open(os.path.join('data', gname), 'w') as f:
     #         json.dump(args, f)
 
-def load_dataset(fpath):
-    with open(fpath, 'rb') as f:
-        dset = pickle.load(f)
-    return dset
-
 
 if __name__ == '__main__':
 

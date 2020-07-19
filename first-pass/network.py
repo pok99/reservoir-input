@@ -138,7 +138,8 @@ class Network(nn.Module):
         u = self.W_f(o.reshape(-1, 1))
         x = self.reservoir(u)
         z = self.W_ro(x)
-        z = torch.exp(z)
+        # z = torch.exp(z)
+        z = nn.ReLU()(z)
         if self.network_delay == 0:
             return z, x, u
         else:

@@ -8,7 +8,7 @@ import pickle
 import argparse
 import pdb
 
-from dataset import load_dataset
+from utils import load_rb
 from helpers import test_model
 from network import Network, Reservoir
 
@@ -17,12 +17,25 @@ from network import Network, Reservoir
 parser = argparse.ArgumentParser()
 parser.add_argument('model', help='path to a model file, to be loaded into pytorch')
 parser.add_argument('dataset', help='path to a dataset of trials')
+parser.add_argument('--noise', default=0, help='noise to add to trained weights')
 args = parser.parse_args()
 
 with open(args.model, 'rb') as f:
     model = torch.load(f)
 
-dset = load_dataset(args.dataset)
+if args.noise != 0:
+    J = model['W_f.weight']
+    v = J.std()
+    shp = J.shape
+    model['W_f.weight'] += torch.normal(0, v * .5, shp)
+
+    J = model['W_ro.weight']
+    v = J.std()
+    shp = J.shape
+    model['W_ro.weight'] += torch.normal(0, v * .5, shp)
+
+
+dset = load_rb(args.dataset)
 data = test_model(model, dset, n_tests=12)
 
 run_id = '/'.join(args.model.split('/')[-3:-1])

@@ -17,15 +17,19 @@ args = parser.parse_args()
 
 with open(args.model, 'rb') as f:
     m_dict = torch.load(f)
-    J = m_dict['W_f.weight']
-    v = J.std()
-    shp = J.shape
-    m_dict['W_f.weight'] += torch.normal(0, v * .01, shp)
+    
 
-    J = m_dict['W_ro.weight']
-    v = J.std()
-    shp = J.shape
-    m_dict['W_ro.weight'] += torch.normal(0, v * .01, shp)
+
+    
+J = m_dict['W_f.weight']
+v = J.std()
+shp = J.shape
+m_dict['W_f.weight'] += torch.normal(0, v * .01, shp)
+
+J = m_dict['W_ro.weight']
+v = J.std()
+shp = J.shape
+m_dict['W_ro.weight'] += torch.normal(0, v * .01, shp)
 
 
 dset = load_rb(args.dset)

@@ -13,11 +13,11 @@ import logging
 import random
 import csv
 import math
+import json
 
-from dataset import load_dataset
 from network import Network, Reservoir
 
-from utils import log_this
+from utils import log_this, load_rb
 from helpers import get_optimizer, get_criterion
 
 sigmoid = lambda x: 1 / (1 + np.exp(-x))
@@ -29,6 +29,11 @@ class Trainer:
         self.args = args
 
         self.net = Network(self.args)
+        if args.model_path is not None:
+            m_dict = torch.load(args.model_path)
+            self.net.load_state_dict(m_dict)
+            logging.info('Loaded model file.')
+
         self.criterion = get_criterion(self.args)
         
         self.train_params = []
@@ -38,7 +43,7 @@ class Trainer:
                     self.train_params.append(q[1])
         self.optimizer = get_optimizer(self.args, self.train_params)
 
-        self.dset = load_dataset(self.args.dataset)
+        self.dset = load_rb(self.args.dataset)
         
         self.log_interval = self.args.log_interval
         if not self.args.no_log:
@@ -252,7 +257,7 @@ class Trainer:
     def log_checkpoint(self, ix, x, y, z, total_loss, avg_loss):
         self.writer.writerow([ix, avg_loss])
         self.csv_path.flush()
-        # saving all checkpoints takes too much space so we just save one
+        # saving all checkpoints takes too much space so we just save one model at a time
         if os.path.exists(self.model_path):
             os.remove(self.model_path)
         torch.save(self.net.state_dict(), self.model_path)
@@ -260,6 +265,7 @@ class Trainer:
         if self.args.loss == 'bce':
             z = sigmoid(z)
 
+        # but we can save individual samples at each checkpoint, that's not too bad space-wise
         self.vis_samples.append([ix, x, y, z, total_loss, avg_loss])
         if os.path.exists(self.plot_checkpoint_path):
             os.remove(self.plot_checkpoint_path)
@@ -278,21 +284,21 @@ class Trainer:
         # individual losses for each timestep within a trial
         sublosses = []
         total_loss = torch.tensor(0.)
-        for j in range(x.shape[0]):
+        for j in range(x.shape[1]):
             # run the step
-            net_in = x[j].unsqueeze(0)
+            net_in = x[:,j].reshape(-1, self.args.L)
             net_out, val_res, val_thal = self.net(net_in)
-            net_target = y[j].unsqueeze(0)
+            net_target = y[:,j].reshape(-1, self.args.Z)
 
-            outs.append(net_out.item())
-            thals.append(list(val_thal.detach().numpy().squeeze()))
-            ress.append(list(val_res.detach().numpy().squeeze()))
-
-            step_loss = self.criterion(net_out.view(1), net_target)
+            step_loss = self.criterion(net_out, net_target)
+            sublosses.append(step_loss.item())
             if np.isnan(step_loss.item()):
                 return -1, (outs, thals, ress, sublosses)
-            sublosses.append(step_loss.item())
             total_loss += step_loss
+
+            outs.append(net_out[-1].item())
+            thals.append(list(val_thal[-1].detach().numpy().squeeze()))
+            ress.append(list(val_res[-1].detach().numpy().squeeze()))
 
         total_loss.backward()
 
@@ -300,6 +306,9 @@ class Trainer:
 
     def train(self):
         ix = 0
+
+        its_p_epoch = len(self.dset) // self.args.batch_size
+        logging.info(f'Dataset size {len(self.dset)} | batch size {self.args.batch_size} --> {its_p_epoch} iterations / epoch')
 
         # for convergence testing
         max_abs_grads = []
@@ -312,10 +321,16 @@ class Trainer:
         ending = False
         for e in range(self.args.n_epochs):
             np.random.shuffle(self.dset)
-            for trial in self.dset:
+            epoch_idx = 0
+            while epoch_idx < its_p_epoch:
+                epoch_idx += 1
+                batch = self.dset[(epoch_idx-1) * self.args.batch_size:epoch_idx * self.args.batch_size]
+                if len(batch) < self.args.batch_size:
+                    break
                 ix += 1
-                x = torch.from_numpy(trial[0]).float()
-                y = torch.from_numpy(trial[1]).float()
+                x, y, _ = list(zip(*batch))
+                x = torch.Tensor(x)
+                y = torch.Tensor(y)
 
                 loss, etc = self.iteration(x, y)
                 self.optimizer.step()
@@ -359,6 +374,7 @@ class Trainer:
 
                 if ending:
                     break
+            logging.info(f'Finished dataset epoch {e+1}')
             if ending:
                 break
 
@@ -377,13 +393,16 @@ def parse_args():
     parser = argparse.ArgumentParser(description='')
     parser.add_argument('-L', type=int, default=1, help='')
     parser.add_argument('-D', type=int, default=5, help='')
-    parser.add_argument('-N', type=int, default=20, help='')
+    parser.add_argument('-N', type=int, default=50, help='')
     parser.add_argument('-Z', type=int, default=1, help='')
 
     parser.add_argument('--train_parts', type=str, nargs='+', choices=['reservoir', 'W_ro', 'W_f'], default=['W_ro', 'W_f'])
     parser.add_argument('--Wro_path', type=str, default=None, help='saved Wro')
     parser.add_argument('--Wf_path', type=str, default=None, help='saved Wf')
     parser.add_argument('--reservoir_path', type=str, default=None, help='saved reservoir. should be saved with seed tho')
+
+    parser.add_argument('--model_path', type=str, default=None, help='start training from certain model')
+    parser.add_argument('--model_config_path', type=str, default=None, help='config path corresponding to model load path')
     
     parser.add_argument('--res_init_type', type=str, default='gaussian', help='')
     parser.add_argument('--res_init_gaussian_std', type=float, default=1.5)
@@ -393,13 +412,14 @@ def parse_args():
 
     parser.add_argument('--dataset', type=str, default='datasets/rsg2.pkl')
 
-    parser.add_argument('--optimizer', choices=['adam', 'lbfgs-scipy', 'lbfgs-pytorch'], default='lbfgs-scipy')
+    parser.add_argument('--optimizer', choices=['adam', 'sgd', 'rmsprop', 'lbfgs-scipy', 'lbfgs-pytorch'], default='lbfgs-scipy')
     parser.add_argument('--loss', type=str, default='mse')
 
     # lbfgs-scipy arguments
     parser.add_argument('--maxiter', type=int, default=5000, help='limit to # iterations. lbfgs-scipy only')
 
     # adam arguments
+    parser.add_argument('--batch_size', type=int, default=1, help='size of minibatch used')
     parser.add_argument('--conv_type', type=str, choices=['patience', 'grad'], default='patience', help='how to determine convergence. adam only')
     parser.add_argument('--patience', type=int, default=1000, help='stop training if loss doesn\'t decrease. adam only')
     parser.add_argument('--grad_threshold', type=float, default=1e-4, help='stop training if grad is less than certain amount. adam only')
@@ -428,10 +448,24 @@ def parse_args():
 if __name__ == '__main__':
     args = parse_args()
 
-    if args.seed is None:
-        args.seed = random.randrange(1e6)
+    # don't use logging.info before we initialize the logger!! or else stuff is gonna fail
+
+    # in case we are loading from a model
+    # if we don't use this we might end up with an error when loading model
+    if args.model_path is not None and args.model_config_path is not None:
+        with open(args.model_config_path) as f:
+            config = json.load(f)
+        args.N = config['N']
+        args.D = config['D']
+        args.L = config['L']
+        args.Z = config['Z']
+        args.bias = config['bias']
+        args.reservoir_seed = config['reservoir_seed']
+            
     if args.reservoir_seed is None:
         args.reservoir_seed = random.randrange(1e6)
+    if args.seed is None:
+        args.seed = random.randrange(1e6)
 
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
@@ -455,12 +489,21 @@ if __name__ == '__main__':
     else:
         logging.basicConfig(format='%(message)s', level=logging.DEBUG)
 
+    # when loading models from paths
+    if args.model_path is not None:
+        logging.info(f'Using model path {args.model_path}')
+        if args.model_config_path is not None:
+            logging.info(f'...with config file {args.model_config_path}')
+        else:
+            logging.info('...but not using any config file. Errors may ensue due to net param mismatches')
+
     trainer = Trainer(args)
+    logging.info(f'Initialized trainer. Using optimizer {args.optimizer}')
     if args.optimizer == 'lbfgs-scipy':
         final_loss = trainer.optimize_lbfgs('scipy')
     elif args.optimizer == 'lbfgs-pytorch':
         final_loss = trainer.optimize_lbfgs('pytorch')
-    elif args.optimizer == 'adam':
+    elif args.optimizer in ['sgd', 'rmsprop', 'adam']:
         final_loss = trainer.train()
 
     if args.slurm_id is not None:

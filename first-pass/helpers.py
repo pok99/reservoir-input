@@ -92,12 +92,16 @@ def test_model(m_dict, dset, n_tests=0):
 
 
 def get_optimizer(args, train_params):
-    optimizer = None
+    op = None
     if args.optimizer == 'adam':
-        optimizer = optim.Adam(train_params, lr=args.lr)
+        op = optim.Adam(train_params, lr=args.lr)
+    elif args.optimizer == 'sgd':
+        op = optim.SGD(train_params, lr=args.lr)
+    elif args.optimizer == 'rmsprop':
+        op = optim.RMSprop(train_params, lr=args.lr)
     elif args.optimizer == 'lbfgs-pytorch':
-        optimizer = optim.LBFGS(train_params, lr=0.75)
-    return optimizer
+        op = optim.LBFGS(train_params, lr=0.75)
+    return op
 
 def get_criterion(args):
     if args.loss == 'mse':
