@@ -92,33 +92,51 @@ def create_dataset(args):
             trials.append((trial_x, trial_y, info))
 
 
-    elif t_type == 'copy_gp':
+    elif t_type == 'copy':
         for n in range(n_trials):
             dim = 1
             x = np.arange(0, t_len)
-            x_list = x[..., np.newaxis]
+            
+            copy_type = get_args_val(trial_args, 'type', 'cos')
 
-            interval = int(get_args_val(trial_args, 'interval', 10))
-            scale = get_args_val(trial_args, 'scale', 1)
-            delay = int(get_args_val(trial_args, 'delay', 0))
-            rbf = RBF(length_scale=5)
-            kernel = Matern(length_scale=2, nu=1.5) + WhiteKernel(noise_level=1)
+            if copy_type == 'cos':
+                y = np.zeros_like(x)
 
-            x_filter = x_list[::interval]
-            n_pts = x_filter.squeeze().shape[0]
+                delay = int(get_args_val(trial_args, 'delay', 0))
+                n_freqs = int(get_args_val(trial_args, 'n_freqs', 15))
+                f_range = get_args_val(trial_args, 'range', [3, 30])
+                amp = int(get_args_val(trial_args, 'amp', 1))
 
-            y_filter = np.zeros((n_pts, dim))
-            y_filter[0] = 0
-            for i in range(1, n_pts):
-                if 'smoothing' in trial_args:
-                    y_filter[i] = np.random.multivariate_normal(y_filter[i-1]/2, cov=scale*np.eye(dim))
-                else:
-                    y_filter[i] = np.random.multivariate_normal(np.zeros(dim), cov=scale*np.eye(dim))
+                freqs = np.random.uniform(f_range[0], f_range[1], (n_freqs))
+                amps = np.random.uniform(-amp, amp, (n_freqs))
+                for i in range(n_freqs):
+                    y = y + amps[i] * np.cos(1/freqs[i] * x)
 
-            gp = gpr(kernel=kernel, normalize_y=False).fit(x_filter, y_filter)
-            y_prediction, y_std = gp.predict(x_list, return_std=True)
+            elif copy_type == 'gp':
+                interval = int(get_args_val(trial_args, 'interval', 10))
+                scale = get_args_val(trial_args, 'scale', 1)
+                delay = int(get_args_val(trial_args, 'delay', 0))
+                kernel = RBF(length_scale=5)
 
-            y = y_prediction.reshape(-1)
+                x_list = x[..., np.newaxis]
+                x_filter = x_list[::interval]
+                n_pts = x_filter.squeeze().shape[0]
+
+                y_filter = np.zeros((n_pts, dim))
+                y_filter[0] = 0
+                for i in range(1, n_pts):
+                    if 'smoothing' in trial_args:
+                        y_filter[i] = np.random.multivariate_normal(y_filter[i-1]/2, cov=scale*np.eye(dim))
+                    else:
+                        y_filter[i] = np.random.multivariate_normal(np.zeros(dim), cov=scale*np.eye(dim))
+
+                gp = gpr(kernel=kernel, normalize_y=False).fit(x_filter, y_filter)
+                y_prediction, y_std = gp.predict(x_list, return_std=True)
+
+                y = y_prediction.reshape(-1)
+
+            else:
+                raise Exception
 
             z = np.zeros_like(y)
             if delay == 0:
@@ -128,12 +146,31 @@ def create_dataset(args):
 
             trials.append((y, z, delay))
 
-    elif t_type == 'copy_cos':
+    elif t_type == 'amplify':
         for n in range(n_trials):
             x = np.arange(0, t_len)
             y = np.zeros_like(x)
 
-            delay = int(get_args_val(trial_args, 'delay', 0))
+            n_freqs = int(get_args_val(trial_args, 'n_freqs', 15))
+            f_range = get_args_val(trial_args, 'range', [3, 30])
+            amp = int(get_args_val(trial_args, 'amp', 1))
+            mag = get_args_val(trial_args, 'mag', 1)
+
+            freqs = np.random.uniform(f_range[0], f_range[1], (n_freqs))
+            amps = np.random.uniform(-amp, amp, (n_freqs))
+            for i in range(n_freqs):
+                y = y + amps[i] * np.cos(1/freqs[i] * x)
+
+            z = y * mag
+            trials.append((y, z, mag))
+
+    elif t_type == 'integration':
+        for n in range(n_trials):
+            x = np.arange(0, t_len)
+            y = np.zeros_like(x)
+
+            xp = t_len//2
+
             n_freqs = int(get_args_val(trial_args, 'n_freqs', 15))
             f_range = get_args_val(trial_args, 'range', [3, 30])
             amp = int(get_args_val(trial_args, 'amp', 1))
@@ -141,15 +178,19 @@ def create_dataset(args):
             freqs = np.random.uniform(f_range[0], f_range[1], (n_freqs))
             amps = np.random.uniform(-amp, amp, (n_freqs))
             for i in range(n_freqs):
-                y = y + amps[i] * np.cos(1/freqs[i] * x)
+                pdb.set_trace()
+                y[:xp] = y[:xp] + amps[i] * np.cos(1/freqs[i] * x[:xp])
 
+            y[:xp] = y[:xp] * np.cos(np.pi/2 * x[:xp] / x[xp])
+            print(y)
+
+            z_mag = np.sum(y)
+            scale=1
             z = np.zeros_like(y)
-            if delay == 0:
-                z = y
-            else:
-                z[delay:] = y[:-delay]
+            trial_range = np.arange(t_len)
+            z = 4 * scale * norm.pdf(trial_range, loc=int(xp * 3/4), scale=scale)
 
-            trials.append((y, z, delay))
+            trials.append((y, z, 0))
 
     return trials
 

@@ -25,6 +25,7 @@ def load_model(m_dict):
     bunch.res_init_params = {'std': 1.5}
     bunch.reservoir_seed = 0
     bunch.bias = True
+    bunch.out_act = 'none'
 
     if 'W_f.bias' not in m_dict:
         bunch.bias = False
