@@ -167,7 +167,7 @@ def create_dataset(args):
     elif t_type == 'integration':
         for n in range(n_trials):
             x = np.arange(0, t_len)
-            y = np.zeros_like(x)
+            y = np.zeros_like(x).astype(np.float32)
 
             xp = t_len//2
 
@@ -178,19 +178,16 @@ def create_dataset(args):
             freqs = np.random.uniform(f_range[0], f_range[1], (n_freqs))
             amps = np.random.uniform(-amp, amp, (n_freqs))
             for i in range(n_freqs):
-                pdb.set_trace()
                 y[:xp] = y[:xp] + amps[i] * np.cos(1/freqs[i] * x[:xp])
 
             y[:xp] = y[:xp] * np.cos(np.pi/2 * x[:xp] / x[xp])
-            print(y)
 
             z_mag = np.sum(y)
-            scale=1
-            z = np.zeros_like(y)
             trial_range = np.arange(t_len)
-            z = 4 * scale * norm.pdf(trial_range, loc=int(xp * 3/4), scale=scale)
+            z = z_mag / 2 * norm.pdf(trial_range, loc=int(xp * 3/2), scale=2)
 
             trials.append((y, z, 0))
+
 
     return trials
 
