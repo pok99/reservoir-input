@@ -29,10 +29,26 @@ class Trainer:
         self.args = args
 
         self.net = Network(self.args)
+
+        # load any specified model parameters into the network
         if args.model_path is not None:
             m_dict = torch.load(args.model_path)
             self.net.load_state_dict(m_dict)
             logging.info('Loaded model file.')
+        if args.Wf_path is not None:
+            m_dict = torch.load(args.Wf_path)
+            self.net.W_f.weight = m_dict['W_f.weight']
+            if 'W_f.bias' in m_dict:
+                self.net.W_f.bias = m_dict['W_f.bias']
+        if args.Wro_path is not None:
+            m_dict = torch.load(args.Wro_path)
+            self.net.W_ro.weight = m_dict['W_ro.weight']
+            if 'W_ro.bias' in m_dict:
+                self.net.W_ro.bias = m_dict['W_ro.bias']
+        if args.reservoir_path is not None:
+            m_dict = torch.load(args.Wro_path)
+            self.net.reservoir.J.weight = m_dict['reservoir.J.weight']
+            self.net.reservoir.W_u.weight = m_dict['reservoir.W_u.weight']
 
         self.criterion = get_criterion(self.args)
         
@@ -53,7 +69,7 @@ class Trainer:
             self.writer = csv.writer(self.csv_path, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
             self.writer.writerow(['ix', 'avg_loss'])
             self.plot_checkpoint_path = os.path.join(self.log.run_dir, 'checkpoints.pkl')
-            self.model_path = os.path.join(log.run_dir, 'model.pth')
+            self.save_model_path = os.path.join(log.run_dir, 'model.pth')
 
     def optimize_lbfgs(self, mode):
         if mode == 'pytorch':
@@ -258,9 +274,9 @@ class Trainer:
         self.writer.writerow([ix, avg_loss])
         self.csv_path.flush()
         # saving all checkpoints takes too much space so we just save one model at a time
-        if os.path.exists(self.model_path):
-            os.remove(self.model_path)
-        torch.save(self.net.state_dict(), self.model_path)
+        if os.path.exists(self.save_model_path):
+            os.remove(self.save_model_path)
+        torch.save(self.net.state_dict(), self.save_model_path)
 
         if self.args.loss == 'bce':
             z = sigmoid(z)
@@ -314,21 +330,20 @@ class Trainer:
         x = torch.Tensor(x)
         y = torch.Tensor(y)
 
-        self.net.eval()
-        self.net.reset()
+        with torch.no_grad():
+            self.net.reset()
 
-        total_loss = torch.tensor(0.)
-        for j in range(x.shape[1]):
-            # run the step
-            net_in = x[:,j].reshape(-1, self.args.L)
-            net_out, _, _ = self.net(net_in)
-            net_target = y[:,j].reshape(-1, self.args.Z)
+            total_loss = torch.tensor(0.)
+            for j in range(x.shape[1]):
+                # run the step
+                net_in = x[:,j].reshape(-1, self.args.L)
+                net_out, _, _ = self.net(net_in)
+                net_target = y[:,j].reshape(-1, self.args.Z)
 
-            step_loss = self.criterion(net_out, net_target)
-            total_loss += step_loss
+                step_loss = self.criterion(net_out, net_target)
+                total_loss += step_loss
 
-        self.net.train()
-        return total_loss
+        return total_loss.item()
 
     def train(self):
         ix = 0
@@ -377,7 +392,7 @@ class Trainer:
                     avg_loss = running_loss / self.log_interval
                     test_loss = self.test()
                     avg_max_grad = running_mag / self.log_interval
-                    logging.info(f'iteration {ix}\t| loss {avg_loss:.3f}\t| max abs grad {avg_max_grad:.3f} | test {test_loss:.3f}')
+                    logging.info(f'iteration {ix}\t| loss {avg_loss:.3f}\t| max abs grad {avg_max_grad:.3f} | test loss {test_loss:.3f}')
 
                     if not self.args.no_log:
                         self.log_checkpoint(ix, etc[0].numpy(), etc[1].numpy(), z, running_loss, avg_loss)
@@ -414,7 +429,8 @@ class Trainer:
 
             self.csv_path.close()
 
-        return avg_loss
+        final_loss = self.test()
+        return final_loss
 
 def parse_args():
     parser = argparse.ArgumentParser(description='')
@@ -424,12 +440,13 @@ def parse_args():
     parser.add_argument('-Z', type=int, default=1, help='')
 
     parser.add_argument('--train_parts', type=str, nargs='+', choices=['reservoir', 'W_ro', 'W_f'], default=['W_ro', 'W_f'])
-    parser.add_argument('--Wro_path', type=str, default=None, help='saved Wro')
-    parser.add_argument('--Wf_path', type=str, default=None, help='saved Wf')
-    parser.add_argument('--reservoir_path', type=str, default=None, help='saved reservoir. should be saved with seed tho')
-
-    parser.add_argument('--model_path', type=str, default=None, help='start training from certain model')
+    
+    # make sure model_config path is specified if you use any paths! it ensures correct dimensions, bias, etc.
     parser.add_argument('--model_config_path', type=str, default=None, help='config path corresponding to model load path')
+    parser.add_argument('--model_path', type=str, default=None, help='start training from certain model. superseded by below')
+    parser.add_argument('--Wro_path', type=str, default=None, help='start training from certain Wro')
+    parser.add_argument('--Wf_path', type=str, default=None, help='start training from certain Wf')
+    parser.add_argument('--reservoir_path', type=str, default=None, help='saved reservoir. should be saved with seed tho')
     
     parser.add_argument('--res_init_type', type=str, default='gaussian', help='')
     parser.add_argument('--res_init_gaussian_std', type=float, default=1.5)
