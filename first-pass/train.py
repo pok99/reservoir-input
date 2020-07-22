@@ -304,6 +304,32 @@ class Trainer:
 
         return total_loss, (x, y, outs, thals, ress, sublosses)
 
+    def test(self, n=0):
+        if n != 0:
+            assert n <= len(self.dset)
+            batch = np.random.choice(self.dset, n)
+        else:
+            batch = self.dset
+        x, y, _ = list(zip(*batch))
+        x = torch.Tensor(x)
+        y = torch.Tensor(y)
+
+        self.net.eval()
+        self.net.reset()
+
+        total_loss = torch.tensor(0.)
+        for j in range(x.shape[1]):
+            # run the step
+            net_in = x[:,j].reshape(-1, self.args.L)
+            net_out, _, _ = self.net(net_in)
+            net_target = y[:,j].reshape(-1, self.args.Z)
+
+            step_loss = self.criterion(net_out, net_target)
+            total_loss += step_loss
+
+        self.net.train()
+        return total_loss
+
     def train(self):
         ix = 0
 
@@ -349,8 +375,9 @@ class Trainer:
                     z = np.stack(outs).squeeze()
                     # avg of the last 50 trials
                     avg_loss = running_loss / self.log_interval
+                    test_loss = self.test()
                     avg_max_grad = running_mag / self.log_interval
-                    logging.info(f'iteration {ix}\t| loss {avg_loss:.3f}\t| max abs grad {avg_max_grad:.3f}')
+                    logging.info(f'iteration {ix}\t| loss {avg_loss:.3f}\t| max abs grad {avg_max_grad:.3f} | test {test_loss:.3f}')
 
                     if not self.args.no_log:
                         self.log_checkpoint(ix, etc[0].numpy(), etc[1].numpy(), z, running_loss, avg_loss)
@@ -409,7 +436,7 @@ def parse_args():
     parser.add_argument('--network_delay', type=int, default=0)
     parser.add_argument('--reservoir_noise', type=float, default=0)
     parser.add_argument('--no_bias', action='store_true')
-    parser.add_argument('--out_act', type=str, default='exp', help='output activation')
+    parser.add_argument('--out_act', type=str, help='output activation')
 
     parser.add_argument('--dataset', type=str, default='datasets/rsg2.pkl')
 
@@ -462,7 +489,14 @@ if __name__ == '__main__':
         args.Z = config['Z']
         args.bias = config['bias']
         args.reservoir_seed = config['reservoir_seed']
-            
+
+    if args.out_act is None:
+        if 'rsg' in args.dataset:
+            args.out_act = 'exp'
+        else:
+            args.out_act = 'none'
+    
+    # setting seeds
     if args.reservoir_seed is None:
         args.reservoir_seed = random.randrange(1e6)
     if args.seed is None:
@@ -472,10 +506,12 @@ if __name__ == '__main__':
     np.random.seed(args.seed)
     random.seed(args.seed)
 
+    # dealing with slurm
     if args.slurm_id is not None:
         from parameters import apply_parameters
         args = apply_parameters(args.param_path, args)
 
+    # initializing logging
     if not args.no_log:
         if args.slurm_id is not None:
             log = log_this(args, 'logs', os.path.join(args.name.split('_')[0], args.name.split('_')[1]), checkpoints=False)
@@ -490,7 +526,7 @@ if __name__ == '__main__':
     else:
         logging.basicConfig(format='%(message)s', level=logging.DEBUG)
 
-    # when loading models from paths
+    # logging, when loading models from paths
     if args.model_path is not None:
         logging.info(f'Using model path {args.model_path}')
         if args.model_config_path is not None:

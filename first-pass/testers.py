@@ -3,14 +3,16 @@ import torch
 import torch.nn as nn
 
 import random
+import pdb
 
 from network import Network
-from utils import Bunch
+from utils import Bunch, load_rb
 
 
 
 # extracts the correct parameters N, D, O, etc. in order to properly create a net to load into
-def load_model(m_dict):
+def load_model_path(path, params={}):
+    m_dict = torch.load(path)
     bunch = Bunch()
     bunch.N = m_dict['reservoir.J.weight'].shape[0]
     bunch.D = m_dict['reservoir.W_u.weight'].shape[1]
@@ -24,9 +26,19 @@ def load_model(m_dict):
     bunch.res_init_type = 'gaussian'
     bunch.res_init_params = {'std': 1.5}
     bunch.reservoir_seed = 0
-    bunch.bias = True
-    bunch.out_act = 'none'
 
+    bunch.reservoir_noise = 0
+    if 'reservoir_noise' in params:
+        bunch.reservoir_noise = params['reservoir_noise']
+
+    bunch.out_act = 'exp'
+    if 'dset' in path:
+        if 'rsg' in path['dset']:
+            bunch.out_act = 'exp'
+        else:
+            bunch.out_act = 'none'
+
+    bunch.bias = True
     if 'W_f.bias' not in m_dict:
         bunch.bias = False
         m_dict['W_f.bias'] = torch.zeros(bunch.D)
@@ -40,51 +52,43 @@ def load_model(m_dict):
 
 # given a model and a dataset, see how well the model does on it
 # works with plot_trained.py
-def test_model(m_dict, dset, n_tests=0):
-    net = load_model(m_dict)
+def test_model(net, dset, n_tests=0):
 
     criterion = nn.MSELoss()
     dset_idx = range(len(dset))
     if n_tests != 0:
         dset_idx = sorted(random.sample(range(len(dset)), n_tests))
 
-    xs = []
-    ys = []
-    zs = []
-    losses = []
+    dset = [dset[i] for i in dset_idx]
 
-    ix = 0
-    for ix in range(len(dset_idx)):
-        trial = dset[dset_idx[ix]]
-        # next data sample
-        x = torch.from_numpy(trial[0]).float()
-        y = torch.from_numpy(trial[1]).float()
-        xs.append(x)
-        ys.append(y)
+    x, y, _ = list(zip(*dset))
+    x = torch.Tensor(x)
+    y = torch.Tensor(y)
 
+    with torch.no_grad():
         net.reset()
 
+        losses = []
         outs = []
 
         total_loss = torch.tensor(0.)
-        for j in range(x.shape[0]):
+        for j in range(x.shape[1]):
             # run the step
-            net_in = x[j].unsqueeze(0)
+            net_in = x[:,j].reshape(-1, net.args.L)
             net_out, val_thal, val_res = net(net_in)
+            outs.append(net_out)
+            net_target = y[:,j].reshape(-1, net.args.Z)
 
-            # this is the desired output
-            net_target = y[j].unsqueeze(0)
-            outs.append(net_out.item())
+            trial_losses = []
+            for k in range(len(dset)):
+                step_loss = criterion(net_out[k], net_target[k])
+                trial_losses.append(step_loss)
+            losses.append(np.array(trial_losses))
 
-            # this is the loss from the step
-            step_loss = criterion(net_out.view(1), net_target)
+        losses = np.sum(losses, axis=0)
+        z = torch.stack(outs, dim=1).squeeze()
 
-            total_loss += step_loss
-
-        z = np.stack(outs).squeeze()
-        zs.append(z)
-        losses.append(total_loss.item())
-
-    data = list(zip(dset_idx, xs, ys, zs, losses))
+    data = list(zip(dset_idx, x, y, z, losses))
 
     return data
+

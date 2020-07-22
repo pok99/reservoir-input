@@ -9,23 +9,28 @@ def create_parameters(name):
     mapping = {}
     ix = 1
 
-    Ds = [5, 10, 50, 100]
+    Ds = [5, 10, 50]
     Ns = [50, 100]
 
-    lr = 1e-5
-    n_epochs = 60
+    lr = 1e-4
+    n_epochs = 30
     patience = 4000
 
     # keep the same network seeds
-    preserve_seed = True
+    preserve_seed = False
 
-    n_seeds = 2
+    n_seeds = 1
     n_rseeds = 2
 
     biases = [True]
 
     datasets = [
-        'datasets/rsg2.pkl'
+        'datasets/rsg2.pkl',
+        'datasets/rsg2_25.pkl',
+        'datasets/rsg2_65.pkl',
+        'datasets/copy2.pkl',
+        'datasets/copy2_d50.pkl',
+        'datasets/copy2_d100.pkl'
     ]
 
     #n_commands = len(Ds) * len(Ns) * len(trial_lens) * len(singles) * len(lrs) * n_seeds
@@ -55,6 +60,8 @@ def create_parameters(name):
 
         # run with lbfgs instead - it's better
         run_params['optimizer'] = 'adam'
+
+        run_params['train_parts'] = ['W_ro', 'W_f', 'reservoir']
 
         # keep the seed the same across all runs sharing network seeds
         # but use a totally random one otherwise. train.py will take care of it

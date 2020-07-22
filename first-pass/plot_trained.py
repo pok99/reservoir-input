@@ -9,7 +9,7 @@ import argparse
 import pdb
 
 from utils import load_rb
-from testers import test_model
+from testers import load_model_path, test_model
 from network import Network, Reservoir
 
 # for plotting some instances of a trained model on a specified dataset
@@ -35,8 +35,9 @@ if args.noise != 0:
     model['W_ro.weight'] += torch.normal(0, v * .5, shp)
 
 
+net = load_model_path(args.model)
 dset = load_rb(args.dataset)
-data = test_model(model, dset, n_tests=12)
+data = test_model(net, dset, n_tests=12)
 
 run_id = '/'.join(args.model.split('/')[-3:-1])
 
