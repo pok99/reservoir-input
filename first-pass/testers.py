@@ -32,8 +32,8 @@ def load_model_path(path, params={}):
         bunch.reservoir_noise = params['reservoir_noise']
 
     bunch.out_act = 'exp'
-    if 'dset' in path:
-        if 'rsg' in path['dset']:
+    if 'dset' in params:
+        if 'rsg' in params['dset']:
             bunch.out_act = 'exp'
         else:
             bunch.out_act = 'none'

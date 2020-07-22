@@ -35,7 +35,7 @@ if args.noise != 0:
     model['W_ro.weight'] += torch.normal(0, v * .5, shp)
 
 
-net = load_model_path(args.model)
+net = load_model_path(args.model, params={'dset': args.dataset})
 dset = load_rb(args.dataset)
 data = test_model(net, dset, n_tests=12)
 
@@ -60,8 +60,7 @@ for i, ax in enumerate(fig.axes):
     ax.plot(xr, z, color='cornflowerblue', alpha=1, lw=1.5, label='response')
 
     ax.tick_params(axis='both', color='white')
-
-    ax.set_title(f'trial {ix}, avg loss {round(loss, 1)}', size='small')
+    ax.set_title(f'trial {ix}, avg loss {np.round(float(loss), 1)}', size='small')
     ax.set_ylim([-2,2])
 
 fig.text(0.5, 0.04, 'timestep', ha='center', va='center')

@@ -9,7 +9,7 @@ args = p.parse_args()
 
 results = pd.read_csv(f'logs/{args.id}.csv')
 
-results = results[(results.N == 50) & (results.D == 10)]
+results = results[results.dset == 'datasets/rsg2.pkl']
 results = results.sort_values('dset')
 
 #results = results.sort_values('loss')

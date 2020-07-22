@@ -549,14 +549,19 @@ if __name__ == '__main__':
         csv_exists = os.path.exists(csv_path)
         with open(csv_path, 'a') as f:
             writer = csv.writer(f, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
+            labels_csv = ['slurm_id', 'D', 'N', 'bias', 'seed', 'rseed', 'xseed', 'rnoise', 'dset', 'loss']
+            vals_csv = [args.slurm_id, args.D, args.N, args.bias, args.seed, \
+                args.reservoir_seed, args.reservoir_x_seed, args.reservoir_noise, args.dataset, final_loss]
             if args.optimizer == 'adam':
+                labels_csv.extend(['lr', 'epochs'])
+                vals_csv.extend([args.lr, args.n_epochs])
                 if not csv_exists:
-                    writer.writerow(['slurm_id','L', 'D', 'N', 'seed', 'rseed', 'xseed', 'epochs', 'lr', 'dset', 'loss'])
-                writer.writerow([args.slurm_id, args.L, args.D, args.N, args.seed, args.reservoir_seed, args.reservoir_x_seed, args.n_epochs, args.lr, args.dataset, final_loss])
+                    writer.writerow(labels_csv)
+                writer.writerow(vals_csv)
             elif args.optimizer == 'lbfgs-scipy':
                 if not csv_exists:
-                    writer.writerow(['slurm_id','L', 'D', 'N', 'bias', 'seed', 'rseed', 'xseed', 'dset', 'loss'])
-                writer.writerow([args.slurm_id, args.L, args.D, args.N, args.seed, args.bias, args.reservoir_seed, args.reservoir_x_seed, args.dataset, final_loss])
+                    writer.writerow(labels_csv)
+                writer.writerow(vals_csv)
 
     logging.shutdown()
 
