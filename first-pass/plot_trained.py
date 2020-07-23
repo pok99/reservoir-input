@@ -60,7 +60,7 @@ for i, ax in enumerate(fig.axes):
     ax.plot(xr, z, color='cornflowerblue', alpha=1, lw=1.5, label='response')
 
     ax.tick_params(axis='both', color='white')
-    ax.set_title(f'trial {ix}, avg loss {np.round(float(loss), 1)}', size='small')
+    ax.set_title(f'trial {ix}, avg loss {np.round(float(loss), 2)}', size='small')
     ax.set_ylim([-2,2])
 
 fig.text(0.5, 0.04, 'timestep', ha='center', va='center')

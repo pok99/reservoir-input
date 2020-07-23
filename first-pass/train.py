@@ -345,6 +345,31 @@ class Trainer:
 
         return total_loss.item()
 
+    def test_and_return(self, n=0):
+        if n != 0:
+            assert n <= len(self.dset)
+            batch = np.random.choice(self.dset, n)
+        else:
+            batch = self.dset
+        x, y, _ = list(zip(*batch))
+        x = torch.Tensor(x)
+        y = torch.Tensor(y)
+
+        with torch.no_grad():
+            self.net.reset()
+
+            total_loss = torch.tensor(0.)
+            for j in range(x.shape[1]):
+                # run the step
+                net_in = x[:,j].reshape(-1, self.args.L)
+                net_out, val_res, val_thal = self.net(net_in)
+                net_target = y[:,j].reshape(-1, self.args.Z)
+
+                step_loss = self.criterion(net_out, net_target)
+                total_loss += step_loss
+
+        return total_loss.item()
+
     def train(self):
         ix = 0
 
@@ -358,7 +383,6 @@ class Trainer:
 
         running_loss = 0.0
         running_mag = 0.0
-        avg_loss = -1
         ending = False
         for e in range(self.args.n_epochs):
             np.random.shuffle(self.dset)
@@ -401,9 +425,9 @@ class Trainer:
 
                     # convergence based on no avg loss decrease after patience samples
                     if self.args.conv_type == 'patience':
-                        if avg_loss < running_min_error:
+                        if test_loss < running_min_error:
                             running_no_min = 0
-                            running_min_error = avg_loss
+                            running_min_error = test_loss
                         else:
                             running_no_min += self.log_interval
                         if running_no_min > self.args.patience:
@@ -413,14 +437,11 @@ class Trainer:
                         if avg_max_grad < self.args.grad_threshold:
                             logging.info(f'iteration {ix}: max absolute grad < {args.grad_threshold}. ending')
                             ending = True
-
                 if ending:
                     break
             logging.info(f'Finished dataset epoch {e+1}')
             if ending:
                 break
-
-        logging.info(f'END | iterations: {(ix // self.log_interval) * self.log_interval} | loss: {avg_loss}')
 
         if not self.args.no_log:
             # for later visualization of outputs over timesteps
@@ -430,6 +451,7 @@ class Trainer:
             self.csv_path.close()
 
         final_loss = self.test()
+        logging.info(f'END | iterations: {(ix // self.log_interval) * self.log_interval} | test loss: {final_loss}')
         return final_loss
 
 def parse_args():
@@ -439,7 +461,7 @@ def parse_args():
     parser.add_argument('-N', type=int, default=50, help='')
     parser.add_argument('-Z', type=int, default=1, help='')
 
-    parser.add_argument('--train_parts', type=str, nargs='+', choices=['reservoir', 'W_ro', 'W_f'], default=['W_ro', 'W_f'])
+    parser.add_argument('--train_parts', type=str, nargs='+', choices=['all', 'reservoir', 'W_ro', 'W_f'], default=['W_ro', 'W_f'])
     
     # make sure model_config path is specified if you use any paths! it ensures correct dimensions, bias, etc.
     parser.add_argument('--model_config_path', type=str, default=None, help='config path corresponding to model load path')
@@ -507,6 +529,11 @@ if __name__ == '__main__':
         args.bias = config['bias']
         args.reservoir_seed = config['reservoir_seed']
 
+    # shortcut for specifying train everything including reservoir
+    if args.train_parts == ['all']:
+        args.train_parts = ['W_ro', 'W_f', 'reservoir']
+
+    # output activation depends on the task / dataset used
     if args.out_act is None:
         if 'rsg' in args.dataset:
             args.out_act = 'exp'

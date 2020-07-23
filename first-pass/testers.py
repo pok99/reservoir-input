@@ -19,19 +19,19 @@ def load_model_path(path, params={}):
     bunch.L = m_dict['W_f.weight'].shape[1]
     bunch.Z = m_dict['W_ro.weight'].shape[0]
 
-    bunch.reservoir_burn_steps = 200
-    bunch.reservoir_x_seed = 0
-    bunch.network_delay = 0
+    #bunch.reservoir_burn_steps = 200
+    #bunch.reservoir_x_seed = 0
+    #bunch.network_delay = 0
 
-    bunch.res_init_type = 'gaussian'
-    bunch.res_init_params = {'std': 1.5}
-    bunch.reservoir_seed = 0
+    #bunch.res_init_type = 'gaussian'
+    #bunch.res_init_params = {'std': 1.5}
+    #bunch.reservoir_seed = 0
 
-    bunch.reservoir_noise = 0
+    #bunch.reservoir_noise = 0
     if 'reservoir_noise' in params:
         bunch.reservoir_noise = params['reservoir_noise']
 
-    bunch.out_act = 'exp'
+    #bunch.out_act = 'exp'
     if 'dset' in params:
         if 'rsg' in params['dset']:
             bunch.out_act = 'exp'
@@ -41,12 +41,13 @@ def load_model_path(path, params={}):
     bunch.bias = True
     if 'W_f.bias' not in m_dict:
         bunch.bias = False
-        m_dict['W_f.bias'] = torch.zeros(bunch.D)
-        m_dict['W_ro.bias'] = torch.zeros(bunch.Z)
+        # m_dict['W_f.bias'] = torch.zeros(bunch.D)
+        # m_dict['W_ro.bias'] = torch.zeros(bunch.Z)
 
     net = Network(bunch)
     net.load_state_dict(m_dict)
     net.eval()
+
 
     return net
 
@@ -85,7 +86,7 @@ def test_model(net, dset, n_tests=0):
                 trial_losses.append(step_loss)
             losses.append(np.array(trial_losses))
 
-        losses = np.sum(losses, axis=0)
+        losses = np.mean(losses, axis=0)
         z = torch.stack(outs, dim=1).squeeze()
 
     data = list(zip(dset_idx, x, y, z, losses))

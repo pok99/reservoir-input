@@ -1,4 +1,5 @@
 import os
+import numpy as np
 
 #import tensorflow as tf
 
@@ -80,7 +81,6 @@ def log_this(config, log_dir, log_name=None, checkpoints=True, use_id=True):
     log.run_log = log_path
     log.run_id = run_id
 
-    
     print('===============\n', flush=True)
     return log
 
@@ -94,3 +94,8 @@ def load_rb(path):
     with open(path, 'rb') as f:
         qs = pickle.load(f)
     return qs
+
+def lrange(l, p=0.1):
+    return np.linspace(0, (l-1) * p, l)
+
+

@@ -87,16 +87,18 @@ class Reservoir(nn.Module):
 
     def reset(self, res_state_seed=None, res_state=None):
         if res_state is not None:
+            # load a particular specified hidden state
             self.x = torch.from_numpy(res_state).float()
             self.burn_in(self.n_burn_in)
         else:
+            # load specified hidden state from seed
             if res_state_seed is None:
                 res_state_seed = self.reservoir_x_seed
             # reset to 0 if x seed is -1
             if res_state_seed == -1:
                 self.x = torch.zeros((1, self.args.N))
             else:
-                # burn in only req'd for random init because no biases to make a difference
+                # if any other seed set, set the net to that seed and burn in
                 rng_pt = torch.get_rng_state()
                 torch.manual_seed(res_state_seed)
                 self.x = torch.normal(0, 1, (1, self.args.N))

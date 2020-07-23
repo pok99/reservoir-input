@@ -33,3 +33,10 @@ def get_output_activation(args):
     elif args.out_act == 'none':
         fn =  lambda x: x
     return fn
+
+
+def get_dim(a):
+    if hasattr(a, '__iter__'):
+        return len(a)
+    else:
+        return 1
