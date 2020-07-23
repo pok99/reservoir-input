@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 
 import argparse
 
+from gen_fn import gen_fn_motifs
 from utils import load_rb
 
 eps = 1e-6
@@ -135,6 +136,11 @@ def create_dataset(args):
 
                 y = y_prediction.reshape(-1)
 
+            elif copy_type == 'motifs':
+                assert args.motifs is not None
+                motifs = load_rb(args.motifs)
+
+
             else:
                 raise Exception
 
@@ -222,6 +228,7 @@ if __name__ == '__main__':
     parser.add_argument('name')
     parser.add_argument('-t', '--trial_type', default='rsg')
     parser.add_argument('--rsg_intervals', nargs='*', type=int, default=None)
+    parser.add_argument('--motifs', type=str, help='path to motifs')
     parser.add_argument('--trial_args', nargs='*', help='terms to specify parameters of trial type')
     parser.add_argument('-l', '--trial_len', type=int, default=100)
     parser.add_argument('-n', '--n_trials', type=int, default=1000)
