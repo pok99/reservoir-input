@@ -1,0 +1,13 @@
+{
+  "start_zero": true,
+  "l_range": [
+    5,
+    20
+  ],
+  "n_freqs": 15,
+  "f_range": [
+    2,
+    30
+  ],
+  "amp": 1
+}

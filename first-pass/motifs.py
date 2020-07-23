@@ -41,6 +41,7 @@ def gen_motifs(n, l_range=[5, 30], amp=1, n_freqs=15, f_range=[3, 30], start_zer
     motifs = []
 
     for i in range(n):
+        len_motif = np.random.randint(l_range[0], l_range[1])
         y = gen_fn(len_motif, amp=amp, n_freqs=n_freqs, f_range=f_range, start_zero=start_zero)
         motifs.append(y)
 
@@ -60,7 +61,7 @@ def gen_fn_motifs(motifs, length=200, pause=10, amp=.1, smoothing='cubic'):
                 if smoothing == 'cubic':
                     cur_slope = cm[1]
                     x1 = len(y) - 1
-                    x2 = len(y) - 1 + pause
+                    x2 = len(y) + pause - 1
                     # solve set of linear equations with conditions:
                     # slopes on both sides are as given
                     # starts at end of first motifs, ends at 0
@@ -104,11 +105,10 @@ def gen_fn_motifs(motifs, length=200, pause=10, amp=.1, smoothing='cubic'):
 def plot_fn():
 
     plt.style.use('ggplot')
-    motifs = load_rb('motifsets/temp.pkl')
+    motifs = load_rb('motifsets/test.pkl')
     traj = gen_fn_motifs(motifs, length=200, amp=.1, smoothing='cubic')
     #traj = gen_fn(length=200, amp=.1, n_freqs=10)
-    plt.plot(traj[0])
-    plt.plot(traj[1])
+    plt.plot(traj)
     
     plt.xlabel('timestep')
     plt.ylabel('activity')

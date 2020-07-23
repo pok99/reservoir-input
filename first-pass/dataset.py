@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 
 import argparse
 
-from gen_fn import gen_fn_motifs
+from motifs import gen_fn_motifs
 from utils import load_rb
 
 eps = 1e-6
@@ -93,17 +93,16 @@ def create_dataset(args):
             trials.append((trial_x, trial_y, info))
 
 
-    elif t_type == 'copy':
+    elif t_type.startswith('copy'):
         for n in range(n_trials):
             dim = 1
             x = np.arange(0, t_len)
+
+            delay = int(get_args_val(trial_args, 'delay', 0))
             
-            copy_type = get_args_val(trial_args, 'type', 'cos')
-
-            if copy_type == 'cos':
+            if t_type == 'copy':
                 y = np.zeros_like(x)
-
-                delay = int(get_args_val(trial_args, 'delay', 0))
+                
                 n_freqs = int(get_args_val(trial_args, 'n_freqs', 15))
                 f_range = get_args_val(trial_args, 'range', [3, 30])
                 amp = int(get_args_val(trial_args, 'amp', 1))
@@ -113,10 +112,9 @@ def create_dataset(args):
                 for i in range(n_freqs):
                     y = y + amps[i] * np.cos(1/freqs[i] * x)
 
-            elif copy_type == 'gp':
+            elif t_type == 'copy_gp':
                 interval = int(get_args_val(trial_args, 'interval', 10))
                 scale = get_args_val(trial_args, 'scale', 1)
-                delay = int(get_args_val(trial_args, 'delay', 0))
                 kernel = RBF(length_scale=5)
 
                 x_list = x[..., np.newaxis]
@@ -136,10 +134,10 @@ def create_dataset(args):
 
                 y = y_prediction.reshape(-1)
 
-            elif copy_type == 'motifs':
+            elif t_type == 'copy_motifs':
                 assert args.motifs is not None
                 motifs = load_rb(args.motifs)
-
+                y = gen_fn_motifs(motifs, length=t_len, pause=10, amp=.1, smoothing='cubic')
 
             else:
                 raise Exception
