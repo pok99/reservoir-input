@@ -48,10 +48,7 @@ def create_parameters(name):
         run_params['D'] = nD
         run_params['N'] = nN
 
-        if bias:
-            run_params['bias'] = True
-        else:
-            run_params['bias'] = False
+        run_params['bias'] = bias
 
         # these parameters only useful when training with adam
         # run_params['lr'] = lr

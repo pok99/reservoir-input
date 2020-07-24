@@ -11,6 +11,7 @@ from utils import Bunch, load_rb
 
 
 # extracts the correct parameters N, D, O, etc. in order to properly create a net to load into
+# TODO: load from config path instead it will be easier than wrestling with bugs
 def load_model_path(path, params={}):
     m_dict = torch.load(path)
     bunch = Bunch()
@@ -20,7 +21,7 @@ def load_model_path(path, params={}):
     bunch.Z = m_dict['W_ro.weight'].shape[0]
 
     #bunch.reservoir_burn_steps = 200
-    #bunch.reservoir_x_seed = 0
+    bunch.reservoir_x_seed = 0
     #bunch.network_delay = 0
 
     #bunch.res_init_type = 'gaussian'
@@ -86,10 +87,12 @@ def test_model(net, dset, n_tests=0):
                 trial_losses.append(step_loss)
             losses.append(np.array(trial_losses))
 
-        losses = np.mean(losses, axis=0)
-        z = torch.stack(outs, dim=1).squeeze()
+    losses = np.sum(losses, axis=0)
+    z = torch.stack(outs, dim=1).squeeze()
 
     data = list(zip(dset_idx, x, y, z, losses))
+
+    print('avg summed loss across timesteps:', np.sum(losses, axis=0) / len(dset))
 
     return data
 

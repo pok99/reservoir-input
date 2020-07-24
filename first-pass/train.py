@@ -155,7 +155,7 @@ class Trainer:
                     ind_n += res_total
                     J = v[ind_c:ind_n].reshape(self.args.N, self.args.N)
                     ind_c = ind_n
-                if 'reservoir' in self.args.train_parts:
+
                     ind_n += W_u_total
                     W_u = v[ind_c:ind_n].reshape(self.args.N, self.args.D)
                     ind_c = ind_n
@@ -261,6 +261,7 @@ class Trainer:
 
             # W_f_final, W_ro_final = vec_to_param(optim.x)
             error_final = optim.fun
+            # error_final = self.test()
 
             if not self.args.no_log:
                 with open(os.path.join(self.log.run_dir, 'checkpoints.pkl'), 'wb') as f:
@@ -478,7 +479,7 @@ def parse_args():
     parser.add_argument('--network_delay', type=int, default=0)
     parser.add_argument('--reservoir_noise', type=float, default=0)
     parser.add_argument('--no_bias', action='store_true')
-    parser.add_argument('--out_act', type=str, help='output activation')
+    parser.add_argument('--out_act', type=str, default=None, help='output activation')
 
     parser.add_argument('--dataset', type=str, default='datasets/rsg2.pkl')
 
@@ -520,6 +521,21 @@ if __name__ == '__main__':
     args = parse_args()
 
     # don't use logging.info before we initialize the logger!! or else stuff is gonna fail
+    
+    # setting seeds
+    if args.reservoir_seed is None:
+        args.reservoir_seed = random.randrange(1e6)
+    if args.seed is None:
+        args.seed = random.randrange(1e6)
+
+    torch.manual_seed(args.seed)
+    np.random.seed(args.seed)
+    random.seed(args.seed)
+
+    # dealing with slurm. do this first!! before anything else other than seed setting, which we want to override
+    if args.slurm_id is not None:
+        from parameters import apply_parameters
+        args = apply_parameters(args.param_path, args)
 
     # in case we are loading from a model
     # if we don't use this we might end up with an error when loading model
@@ -543,21 +559,6 @@ if __name__ == '__main__':
             args.out_act = 'exp'
         else:
             args.out_act = 'none'
-    
-    # setting seeds
-    if args.reservoir_seed is None:
-        args.reservoir_seed = random.randrange(1e6)
-    if args.seed is None:
-        args.seed = random.randrange(1e6)
-
-    torch.manual_seed(args.seed)
-    np.random.seed(args.seed)
-    random.seed(args.seed)
-
-    # dealing with slurm
-    if args.slurm_id is not None:
-        from parameters import apply_parameters
-        args = apply_parameters(args.param_path, args)
 
     # initializing logging
     if not args.no_log:
