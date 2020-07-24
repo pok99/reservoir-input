@@ -9,28 +9,28 @@ def create_parameters(name):
     mapping = {}
     ix = 1
 
-    Ds = [5, 10, 50]
-    Ns = [50, 100]
+    Ds = [5, 10, 50, 100, 250]
+    Ns = [50, 100, 250]
 
-    lr = 1e-4
-    n_epochs = 30
-    patience = 4000
+    # lr = 1e-4
+    # n_epochs = 30
+    # patience = 4000
 
     # keep the same network seeds
     preserve_seed = False
 
-    n_seeds = 1
-    n_rseeds = 2
+    n_seeds = 2
+    n_rseeds = 3
 
     biases = [True]
 
     datasets = [
         'datasets/rsg2.pkl',
-        'datasets/rsg2_25.pkl',
-        'datasets/rsg2_65.pkl',
-        'datasets/copy2.pkl',
-        'datasets/copy2_d50.pkl',
-        'datasets/copy2_d100.pkl'
+        'datasets/rsg2_l50.pkl',
+        'datasets/rsg2_g50.pkl',
+        'datasets/copy_cos.pkl',
+        'datasets/copy_cos_d50.pkl',
+        'datasets/motifs_s1.pkl'
     ]
 
     #n_commands = len(Ds) * len(Ns) * len(trial_lens) * len(singles) * len(lrs) * n_seeds
@@ -54,14 +54,15 @@ def create_parameters(name):
             run_params['bias'] = False
 
         # these parameters only useful when training with adam
-        run_params['lr'] = lr
-        run_params['n_epochs'] = n_epochs
-        run_params['patience'] = patience
+        # run_params['lr'] = lr
+        # run_params['n_epochs'] = n_epochs
+        # run_params['patience'] = patience
 
         # run with lbfgs instead - it's better
-        run_params['optimizer'] = 'adam'
+        run_params['optimizer'] = 'lbfgs-scipy'
+        # run_params['optimizer'] = 'adam'
 
-        run_params['train_parts'] = ['W_ro', 'W_f', 'reservoir']
+        # run_params['train_parts'] = ['W_ro', 'W_f', 'reservoir']
 
         # keep the seed the same across all runs sharing network seeds
         # but use a totally random one otherwise. train.py will take care of it

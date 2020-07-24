@@ -47,7 +47,7 @@ def fill_undefined_args(args, default_args):
 
 
 # produce run id and create log directory
-def log_this(config, log_dir, log_name=None, checkpoints=True, use_id=True):
+def log_this(config, log_dir, log_name=None, checkpoints=False, use_id=True):
     run_id = str(int(time.time() * 100))[-7:]
     print('\n=== Logging ===', flush=True)
     
@@ -65,7 +65,7 @@ def log_this(config, log_dir, log_name=None, checkpoints=True, use_id=True):
     if checkpoints:
         checkpoint_dir = os.path.join(run_dir, f'checkpoints_{run_id}')
         os.makedirs(checkpoint_dir, exist_ok=True)
-        print(f'Logging checkpoints to {checkpoint_dir}', flush=True)
+        print(f'Logging checkpoints to: {checkpoint_dir}', flush=True)
     else:
         checkpoint_dir = None
 

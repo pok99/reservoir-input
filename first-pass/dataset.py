@@ -106,18 +106,22 @@ def create_dataset(args):
 
         if t_type == 'copy':
             n_freqs = get_args_val(trial_args, 'n_freqs', 15, int)
-            f_range = get_args_val(trial_args, 'f_range', [3, 30], float, n_vals=2)
+            f_range = get_args_val(trial_args, 'f_range', [2, 30], float, n_vals=2)
             amp = get_args_val(trial_args, 'amp', 1, float)
+            start_zero = 'start_nonzero' not in trial_args
             config['n_freqs'] = n_freqs
             config['f_range'] = f_range
             config['amp'] = amp
+            config['start_zero'] = start_zero
+
+            fn = np.sin if start_zero else np.cos
 
             for n in range(n_trials):
                 y = np.zeros_like(x)
                 freqs = np.random.uniform(f_range[0], f_range[1], (n_freqs))
                 amps = np.random.uniform(-amp, amp, (n_freqs))
                 for i in range(n_freqs):
-                    y = y + amps[i] * np.cos(1/freqs[i] * x)
+                    y = y + amps[i] * fn(1/freqs[i] * x)
 
                 ys.append(y)
 
@@ -220,7 +224,7 @@ def create_dataset(args):
             trials.append((y, z, z_mag))
 
 
-    return trials
+    return trials, config
 
 def get_args_val(args, name, default, dtype, n_vals=1):
     if name in args:
@@ -235,15 +239,14 @@ def get_args_val(args, name, default, dtype, n_vals=1):
         val = default
     return val
 
-def save_dataset(dset, name, args=None):
+def save_dataset(dset, name, config=None):
     fname = name + '.pkl'
     with open(os.path.join('datasets', fname), 'wb') as f:
         pickle.dump(dset, f)
-    # gname = name + '.json'
-    # if args is not None:
-    #     args = vars(args)
-    #     with open(os.path.join('data', gname), 'w') as f:
-    #         json.dump(args, f)
+    gname = name + '.json'
+    if config is not None:
+        with open(os.path.join('datasets', 'configs', gname), 'w') as f:
+            json.dump(config, f, indent=2)
 
 
 if __name__ == '__main__':
@@ -263,8 +266,8 @@ if __name__ == '__main__':
         args.trial_args = []
 
     if args.mode == 'create':
-        dset = create_dataset(args)
-        save_dataset(dset, args.name, args=args)
+        dset, config = create_dataset(args)
+        save_dataset(dset, args.name, config=config)
     elif args.mode == 'load':
         dset = load_rb(args.name)
 

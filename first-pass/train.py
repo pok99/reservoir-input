@@ -271,10 +271,13 @@ class Trainer:
 
 
     def log_checkpoint(self, ix, x, y, z, total_loss, avg_loss):
+        
         self.writer.writerow([ix, avg_loss])
         self.csv_path.flush()
-        # saving all checkpoints takes too much space so we just save one model at a time
-        if os.path.exists(self.save_model_path):
+        # saving all checkpoints takes too much space so we just save one model at a time, unless we explicitly specify it
+        if self.args.log_checkpoint_models:
+            self.save_model_path = os.path.join(log.checkpoint_dir, f'model_{ix}.pth')
+        elif os.path.exists(self.save_model_path):
             os.remove(self.save_model_path)
         torch.save(self.net.state_dict(), self.save_model_path)
 
@@ -500,6 +503,7 @@ def parse_args():
 
     parser.add_argument('--no_log', action='store_true')
     parser.add_argument('--log_interval', type=int, default=50)
+    parser.add_argument('--log_checkpoint_models', action='store_true')
 
     parser.add_argument('--name', type=str, default='test')
     parser.add_argument('--param_path', type=str, default=None)
@@ -558,9 +562,9 @@ if __name__ == '__main__':
     # initializing logging
     if not args.no_log:
         if args.slurm_id is not None:
-            log = log_this(args, 'logs', os.path.join(args.name.split('_')[0], args.name.split('_')[1]), checkpoints=False)
+            log = log_this(args, 'logs', os.path.join(args.name.split('_')[0], args.name.split('_')[1]), checkpoints=args.log_checkpoint_models)
         else:
-            log = log_this(args, 'logs', args.name, checkpoints=False)
+            log = log_this(args, 'logs', args.name, checkpoints=args.log_checkpoint_models)
 
         logging.basicConfig(format='%(message)s', filename=log.run_log, level=logging.DEBUG)
         console = logging.StreamHandler()
