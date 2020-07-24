@@ -17,7 +17,7 @@ from helpers import get_dim
 eps = 1e-6
 
 
-def gen_fn(length=50, amp=1, n_freqs=15, f_range=[3,30], start_zero=True):
+def gen_fn(length=50, amp=1, n_freqs=15, f_range=[2,30], start_zero=True):
     x = np.arange(length)
     y = np.zeros(length)
 
@@ -30,7 +30,7 @@ def gen_fn(length=50, amp=1, n_freqs=15, f_range=[3,30], start_zero=True):
 
     return y
 
-def gen_motifs(n, l_range=[5, 30], amp=1, n_freqs=15, f_range=[3, 30], start_zero=True):
+def gen_motifs(n, l_range=[3, 30], amp=1, n_freqs=15, f_range=[3, 30], start_zero=True):
     config = {}
     config['start_zero'] = start_zero
     config['l_range'] = l_range
@@ -166,9 +166,9 @@ def save_motifs(motifs, name, config):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('mode')
-    parser.add_argument('--name', type=str, default='temp')
+    parser.add_argument('name', type=str, default='temp')
     parser.add_argument('-n', type=int, default=10)
-    parser.add_argument('--l_range', nargs=2, type=int, default=[5, 20])
+    parser.add_argument('--l_range', nargs=2, type=int, default=[3, 30])
     parser.add_argument('--f_range', nargs=2, type=int, default=[2, 30])
     parser.add_argument('--amp', type=float, default=1)
     parser.add_argument('--n_freqs', type=int, default=15)

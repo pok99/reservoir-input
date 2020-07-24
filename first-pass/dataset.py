@@ -26,6 +26,11 @@ def create_dataset(args):
     t_len = args.trial_len
     trial_args = args.trial_args
 
+    config = {}
+    config['t_type'] = t_type
+    config['n_trials'] = n_trials
+    config['t_len'] = t_len
+
     trials = []
 
     if t_type == 'rsg':
@@ -41,14 +46,10 @@ def create_dataset(args):
         use_ints = 'use_ints' in trial_args
         if args.rsg_intervals is None:
             # amount of time in between ready and set cues
-            min_t = 15
-            max_t = t_len // 2 - 15
-            if 'gt' in trial_args:
-                idx = trial_args.index('gt')
-                min_t = int(trial_args[idx + 1])
-            elif 'lt' in trial_args:
-                idx = trial_args.index('lt')
-                max_t = int(trial_args[idx + 1])
+            min_t = get_args_val(trial_args, 'gt', 15, int)
+            max_t = get_args_val(trial_args, 'lt', t_len // 2 - 15, int)
+            config['min_t'] = min_t
+            config['max_t'] = max_t
         for n in range(n_trials):
             if args.rsg_intervals is None:
                 if use_ints:
@@ -72,6 +73,7 @@ def create_dataset(args):
 
             # output 0s and 1s instead of pdf, use with CrossEntropyLoss
             if 'delta' in trial_args:
+                config['scale'] = 'DELTA'
                 trial_x = np.zeros((t_len))
                 trial_y = np.zeros((t_len))
                 
@@ -80,7 +82,8 @@ def create_dataset(args):
                 trial_y[go_time-2:go_time+3] = 1
             else:
                 # check if width of gaussian is changed from default
-                scale = get_args_val(trial_args, 'scale', 1)
+                scale = get_args_val(trial_args, 'scale', 1, float)
+                config['scale'] = scale
 
                 trial_range = np.arange(t_len)
                 trial_x = norm.pdf(trial_range, loc=ready_time, scale=1)
@@ -94,33 +97,42 @@ def create_dataset(args):
 
 
     elif t_type.startswith('copy'):
-        for n in range(n_trials):
-            dim = 1
-            x = np.arange(0, t_len)
+        delay = get_args_val(trial_args, 'delay', 0, int)
+        config['delay'] = delay
+        
+        dim = 1
+        x = np.arange(0, t_len)
+        ys = []
 
-            delay = int(get_args_val(trial_args, 'delay', 0))
-            
-            if t_type == 'copy':
+        if t_type == 'copy':
+            n_freqs = get_args_val(trial_args, 'n_freqs', 15, int)
+            f_range = get_args_val(trial_args, 'f_range', [3, 30], float, n_vals=2)
+            amp = get_args_val(trial_args, 'amp', 1, float)
+            config['n_freqs'] = n_freqs
+            config['f_range'] = f_range
+            config['amp'] = amp
+
+            for n in range(n_trials):
                 y = np.zeros_like(x)
-                
-                n_freqs = int(get_args_val(trial_args, 'n_freqs', 15))
-                f_range = get_args_val(trial_args, 'range', [3, 30])
-                amp = int(get_args_val(trial_args, 'amp', 1))
-
                 freqs = np.random.uniform(f_range[0], f_range[1], (n_freqs))
                 amps = np.random.uniform(-amp, amp, (n_freqs))
                 for i in range(n_freqs):
                     y = y + amps[i] * np.cos(1/freqs[i] * x)
 
-            elif t_type == 'copy_gp':
-                interval = int(get_args_val(trial_args, 'interval', 10))
-                scale = get_args_val(trial_args, 'scale', 1)
-                kernel = RBF(length_scale=5)
+                ys.append(y)
 
-                x_list = x[..., np.newaxis]
-                x_filter = x_list[::interval]
-                n_pts = x_filter.squeeze().shape[0]
+        elif t_type == 'copy_gp':
+            interval = get_args_val(trial_args, 'interval', 10, int)
+            scale = get_args_val(trial_args, 'scale', 1, float)
+            kernel = RBF(length_scale=5)
+            config['interval'] = interval
+            config['scale'] = scale
 
+            x_list = x[..., np.newaxis]
+            x_filter = x_list[::interval]
+            n_pts = x_filter.squeeze().shape[0]
+
+            for n in range(n_trials):
                 y_filter = np.zeros((n_pts, dim))
                 y_filter[0] = 0
                 for i in range(1, n_pts):
@@ -133,15 +145,23 @@ def create_dataset(args):
                 y_prediction, y_std = gp.predict(x_list, return_std=True)
 
                 y = y_prediction.reshape(-1)
+                ys.append(y)
 
-            elif t_type == 'copy_motifs':
-                assert args.motifs is not None
-                motifs = load_rb(args.motifs)
-                y = gen_fn_motifs(motifs, length=t_len, pause=10, amp=.1, smoothing='cubic')
+        elif t_type == 'copy_motifs':
+            assert args.motifs is not None
+            motifs = load_rb(args.motifs)
+            pause = get_args_val(trial_args, 'pause', 10, int)
+            amp = get_args_val(trial_args, 'amp', .1, float)
+            config['pause'] = pause
+            config['amp'] = amp
 
-            else:
-                raise Exception
+            for n in range(n_trials):
+                y = gen_fn_motifs(motifs, length=t_len, pause=pause, amp=amp, smoothing='cubic')
+                ys.append(y)
+        else:
+            raise Exception
 
+        for y in ys:
             z = np.zeros_like(y)
             if delay == 0:
                 z = y
@@ -152,13 +172,17 @@ def create_dataset(args):
 
     elif t_type == 'amplify':
         for n in range(n_trials):
+            n_freqs = get_args_val(trial_args, 'n_freqs', 15, int)
+            f_range = get_args_val(trial_args, 'f_range', [3, 30], float, n_vals=2)
+            amp = get_args_val(trial_args, 'amp', 1, float)
+            mag = get_args_val(trial_args, 'mag', 1, float)
+            config['n_freqs'] = n_freqs
+            config['f_range'] = f_range
+            config['amp'] = amp
+            config['mag'] = mag
+
             x = np.arange(0, t_len)
             y = np.zeros_like(x)
-
-            n_freqs = int(get_args_val(trial_args, 'n_freqs', 15))
-            f_range = get_args_val(trial_args, 'range', [3, 30])
-            amp = int(get_args_val(trial_args, 'amp', 1))
-            mag = get_args_val(trial_args, 'mag', 1)
 
             freqs = np.random.uniform(f_range[0], f_range[1], (n_freqs))
             amps = np.random.uniform(-amp, amp, (n_freqs))
@@ -170,14 +194,17 @@ def create_dataset(args):
 
     elif t_type == 'integration':
         for n in range(n_trials):
+            n_freqs = get_args_val(trial_args, 'n_freqs', 15, int)
+            f_range = get_args_val(trial_args, 'f_range', [3, 30], float, n_vals=2)
+            amp = get_args_val(trial_args, 'amp', 1, int)
+            config['n_freqs'] = n_freqs
+            config['f_range'] = f_range
+            config['amp'] = amp
+
             x = np.arange(0, t_len)
             y = np.zeros_like(x).astype(np.float32)
 
             xp = t_len//2
-
-            n_freqs = int(get_args_val(trial_args, 'n_freqs', 15))
-            f_range = get_args_val(trial_args, 'range', [3, 30])
-            amp = int(get_args_val(trial_args, 'amp', 1))
 
             freqs = np.random.uniform(f_range[0], f_range[1], (n_freqs))
             amps = np.random.uniform(-amp, amp, (n_freqs))
@@ -190,20 +217,20 @@ def create_dataset(args):
             trial_range = np.arange(t_len)
             z = z_mag / 2 * norm.pdf(trial_range, loc=int(xp * 3/2), scale=2)
 
-            trials.append((y, z, 0))
+            trials.append((y, z, z_mag))
 
 
     return trials
 
-def get_args_val(args, name, default, n_vals=1):
+def get_args_val(args, name, default, dtype, n_vals=1):
     if name in args:
         idx = args.index(name)
         if n_vals == 1:
-            val = float(args[idx + 1])
+            val = dtype(args[idx + 1])
         else:
             vals = []
             for i in range(1, n_vals+1):
-                vals.append(float(args[idx + i]))
+                vals.append(dtype(args[idx + i]))
     else:
         val = default
     return val
@@ -228,7 +255,7 @@ if __name__ == '__main__':
     parser.add_argument('--rsg_intervals', nargs='*', type=int, default=None)
     parser.add_argument('--motifs', type=str, help='path to motifs')
     parser.add_argument('--trial_args', nargs='*', help='terms to specify parameters of trial type')
-    parser.add_argument('-l', '--trial_len', type=int, default=100)
+    parser.add_argument('-l', '--trial_len', type=int, default=200)
     parser.add_argument('-n', '--n_trials', type=int, default=1000)
     args = parser.parse_args()
 
