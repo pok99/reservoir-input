@@ -10,26 +10,24 @@ def create_parameters(name):
     ix = 1
 
     Ds = [5, 10, 50, 100, 250]
-    Ns = [50, 100, 250]
+    Ns = [100, 250]
 
-    # lr = 1e-4
-    # n_epochs = 30
-    # patience = 4000
+    lr = 1e-4
+    n_epochs = 50
+    patience = 4000
 
     # keep the same network seeds
     preserve_seed = False
 
-    n_seeds = 2
+    n_seeds = 1
     n_rseeds = 3
 
-    biases = [True]
+    # biases = [True]
+    noises = [0, 0.1, 0.01]
 
     datasets = [
         'datasets/rsg2.pkl',
-        'datasets/rsg2_l50.pkl',
-        'datasets/rsg2_g50.pkl',
         'datasets/copy_cos.pkl',
-        'datasets/copy_cos_d50.pkl',
         'datasets/motifs_s1.pkl'
     ]
 
@@ -40,7 +38,7 @@ def create_parameters(name):
 
     rseed_samples = random.sample(range(1000), n_rseeds)
 
-    for (nD, nN, d, seed, rseed, bias) in product(Ds, Ns, datasets, range(n_seeds), range(n_rseeds), biases):
+    for (nD, nN, d, seed, rseed, noise) in product(Ds, Ns, datasets, range(n_seeds), range(n_rseeds), noises):
         if nD > nN:
             continue
         run_params = {}
@@ -48,18 +46,20 @@ def create_parameters(name):
         run_params['D'] = nD
         run_params['N'] = nN
 
-        run_params['bias'] = bias
+        run_params['bias'] = True
 
         # these parameters only useful when training with adam
-        # run_params['lr'] = lr
-        # run_params['n_epochs'] = n_epochs
-        # run_params['patience'] = patience
+        run_params['lr'] = lr
+        run_params['n_epochs'] = n_epochs
+        run_params['patience'] = patience
 
         # run with lbfgs instead - it's better
-        run_params['optimizer'] = 'lbfgs-scipy'
-        # run_params['optimizer'] = 'adam'
+        # run_params['optimizer'] = 'lbfgs-scipy'
+        run_params['optimizer'] = 'adam'
 
-        # run_params['train_parts'] = ['W_ro', 'W_f', 'reservoir']
+        run_params['train_parts'] = ['W_ro', 'W_f', 'reservoir']
+
+        run_params['reservoir_noise'] = noise
 
         # keep the seed the same across all runs sharing network seeds
         # but use a totally random one otherwise. train.py will take care of it

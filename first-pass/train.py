@@ -261,31 +261,33 @@ class Trainer:
 
             # W_f_final, W_ro_final = vec_to_param(optim.x)
             error_final = optim.fun
+            n_iters = optim.nit
             # error_final = self.test()
+            self.log_model(ix='final')
 
             if not self.args.no_log:
+                self.log_model()
                 with open(os.path.join(self.log.run_dir, 'checkpoints.pkl'), 'wb') as f:
                     pickle.dump(self.vis_samples, f)
                 self.csv_path.close()
 
-            return error_final
+            return error_final, n_iters
 
-
-    def log_checkpoint(self, ix, x, y, z, total_loss, avg_loss):
-        
-        self.writer.writerow([ix, avg_loss])
-        self.csv_path.flush()
+    def log_model(self, ix=0):
         # saving all checkpoints takes too much space so we just save one model at a time, unless we explicitly specify it
         if self.args.log_checkpoint_models:
-            self.save_model_path = os.path.join(log.checkpoint_dir, f'model_{ix}.pth')
+            self.save_model_path = os.path.join(self.log.checkpoint_dir, f'model_{ix}.pth')
         elif os.path.exists(self.save_model_path):
             os.remove(self.save_model_path)
         torch.save(self.net.state_dict(), self.save_model_path)
 
-        if self.args.loss == 'bce':
-            z = sigmoid(z)
+    def log_checkpoint(self, ix, x, y, z, total_loss, avg_loss):
+        self.writer.writerow([ix, avg_loss])
+        self.csv_path.flush()
 
-        # but we can save individual samples at each checkpoint, that's not too bad space-wise
+        self.log_model(ix)
+
+        # we can save individual samples at each checkpoint, that's not too bad space-wise
         self.vis_samples.append([ix, x, y, z, total_loss, avg_loss])
         if os.path.exists(self.plot_checkpoint_path):
             os.remove(self.plot_checkpoint_path)
@@ -585,10 +587,11 @@ if __name__ == '__main__':
 
     trainer = Trainer(args)
     logging.info(f'Initialized trainer. Using optimizer {args.optimizer}')
+    n_iters = 0
     if args.optimizer == 'lbfgs-scipy':
         final_loss = trainer.optimize_lbfgs('scipy')
     elif args.optimizer == 'lbfgs-pytorch':
-        final_loss = trainer.optimize_lbfgs('pytorch')
+        final_loss, n_iters = trainer.optimize_lbfgs('pytorch')
     elif args.optimizer in ['sgd', 'rmsprop', 'adam']:
         final_loss = trainer.train()
 
@@ -598,9 +601,12 @@ if __name__ == '__main__':
         csv_exists = os.path.exists(csv_path)
         with open(csv_path, 'a') as f:
             writer = csv.writer(f, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
-            labels_csv = ['slurm_id', 'D', 'N', 'bias', 'seed', 'rseed', 'xseed', 'rnoise', 'dset', 'loss']
-            vals_csv = [args.slurm_id, args.D, args.N, args.bias, args.seed, \
-                args.reservoir_seed, args.reservoir_x_seed, args.reservoir_noise, args.dataset, final_loss]
+            labels_csv = ['slurm_id', 'D', 'N', 'bias', 'seed', 'rseed', 'xseed', 'rnoise', 'dset', 'niter', 'loss']
+            vals_csv = [
+                args.slurm_id, args.D, args.N, args.bias, args.seed,
+                args.reservoir_seed, args.reservoir_x_seed, args.reservoir_noise,
+                args.dataset, n_iters, final_loss
+            ]
             if args.optimizer == 'adam':
                 labels_csv.extend(['lr', 'epochs'])
                 vals_csv.extend([args.lr, args.n_epochs])
