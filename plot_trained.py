@@ -61,7 +61,7 @@ for i, ax in enumerate(fig.axes):
 
     ax.tick_params(axis='both', color='white')
     ax.set_title(f'trial {ix}, avg loss {np.round(float(loss), 2)}', size='small')
-    #ax.set_ylim([-2,2])
+    ax.set_ylim([-2,3])
 
 fig.text(0.5, 0.04, 'timestep', ha='center', va='center')
 fig.text(0.06, 0.5, 'value', ha='center', va='center', rotation='vertical')

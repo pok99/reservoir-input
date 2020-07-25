@@ -26,9 +26,11 @@ def create_parameters(name):
     noises = [0, 0.1, 0.01]
 
     datasets = [
-        'datasets/rsg2.pkl',
-        'datasets/copy_cos.pkl',
-        'datasets/motifs_s1.pkl'
+        'datasets/rsg2_s15.pkl',
+        'datasets/rsg2_s35.pkl',
+        'datasets/rsg2_s50.pkl',
+        'datasets/rsg2_s65.pkl',
+        'datasets/rsg2_s85.pkl'
     ]
 
     #n_commands = len(Ds) * len(Ns) * len(trial_lens) * len(singles) * len(lrs) * n_seeds
@@ -57,7 +59,7 @@ def create_parameters(name):
         # run_params['optimizer'] = 'lbfgs-scipy'
         run_params['optimizer'] = 'adam'
 
-        run_params['train_parts'] = ['W_ro', 'W_f', 'reservoir']
+        # run_params['train_parts'] = ['W_ro', 'W_f', 'reservoir']
 
         run_params['reservoir_noise'] = noise
 
