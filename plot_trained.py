@@ -18,6 +18,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('model', help='path to a model file, to be loaded into pytorch')
 parser.add_argument('dataset', help='path to a dataset of trials')
 parser.add_argument('--noise', default=0, help='noise to add to trained weights')
+parser.add_argument('--out_act', default=None)
 args = parser.parse_args()
 
 with open(args.model, 'rb') as f:
@@ -34,8 +35,7 @@ if args.noise != 0:
     shp = J.shape
     model['W_ro.weight'] += torch.normal(0, v * .5, shp)
 
-
-net = load_model_path(args.model, params={'dset': args.dataset})
+net = load_model_path(args.model, params={'dset': args.dataset, 'out_act': args.out_act})
 dset = load_rb(args.dataset)
 data = test_model(net, dset, n_tests=12)
 

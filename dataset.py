@@ -274,14 +274,22 @@ if __name__ == '__main__':
         dset_len = len(dset)
         sample = random.sample(dset, 6)
         dset_range = range(len(sample[0][0]))
-        fig, ax = plt.subplots(2,3,sharex=True, sharey=True, figsize=(12,7))
+        fig, ax = plt.subplots(2,3,sharex=True, sharey=True, figsize=(8,4))
         for i, ax in enumerate(fig.axes):
             ax.plot(dset_range, sample[i][0], color='coral', label='ready/set', lw=2)
             ax.plot(dset_range, sample[i][1], color='dodgerblue', label='go', lw=2)
-            ax.set_title(sample[i][2])
+            ax.axvline(x=0, color='dimgray', alpha = 1)
+            ax.axhline(y=0, color='dimgray', alpha = 1)
+            ax.grid(True, which='major', lw=1, color='lightgray', alpha=0.4)
+            ax.tick_params(axis='both', color='white')
+            #ax.set_title(sample[i][2])
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+            ax.spines['left'].set_visible(False)
+            ax.spines['bottom'].set_visible(False)
 
         handles, labels = ax.get_legend_handles_labels()
-        fig.legend(handles, labels, loc='lower center')
+        #fig.legend(handles, labels, loc='lower center')
         plt.show()
     # confirm ready set go works
     # for i in range(5):

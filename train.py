@@ -589,7 +589,7 @@ if __name__ == '__main__':
     logging.info(f'Initialized trainer. Using optimizer {args.optimizer}')
     n_iters = 0
     if args.optimizer == 'lbfgs-scipy':
-        final_loss = trainer.optimize_lbfgs('scipy')
+        final_loss, n_iters = trainer.optimize_lbfgs('scipy')
     elif args.optimizer == 'lbfgs-pytorch':
         final_loss, n_iters = trainer.optimize_lbfgs('pytorch')
     elif args.optimizer in ['sgd', 'rmsprop', 'adam']:

@@ -49,14 +49,16 @@ csv_path = '../logs/2676780.csv'
 csv_data = pd.read_csv(csv_path)
 
 csv_data['dset'] = csv_data['dset'].apply(lambda x: x.replace('.', '/').split('/')[1])
-# csv_data = csv_data[csv_data['dset'] == 'rsg2']
+csv_data = csv_data[csv_data['dset'].str.startswith('rsg2_') == False]
 csv_data = csv_data.sort_values(['rseed', 'N', 'D', 'loss'])
+csv_data = csv_data[csv_data['D'] != 5]
+
 
 # csv_data = csv_data[csv_data.reservoir_seed == 0]
 
 dsets = csv_data.dset.unique()
 
-fig, ax = plt.subplots(nrows=3, ncols=6, sharex=True, figsize=(14,6))
+fig, ax = plt.subplots(nrows=3, ncols=4, sharex=True, figsize=(14,6))
 
 color_scale = ['coral', 'chartreuse', 'skyblue']
 colors = {}
@@ -71,16 +73,25 @@ for i,d in enumerate(dsets):
     for j,n in enumerate(Ns):
         subset2 = subset[subset.N == n]
         for s in subset2.rseed.unique():
+            axis = ax[j, i]
             subset3 = subset2[subset2.rseed == s]
-            ax[j, i].scatter(subset3.D, subset3.loss, c=colors[s], marker='+', s=60, label=f'seed = {s}')
-            ax[j, i].set_xticks(subset3.D.unique())
-            ax[j, i].grid(True, which='major', lw=1, color='lightgray', alpha=0.4)
-            ax[j, i].spines['top'].set_visible(False)
-            ax[j, i].spines['right'].set_visible(False)
+            axis.scatter(subset3.D, subset3.loss, c=colors[s], marker='+', s=60, label=f'seed = {s}')
+            axis.set_xticks(subset3.D.unique())
+            axis.grid(True, which='major', lw=1, color='lightgray', alpha=0.4)
+            axis.spines['top'].set_visible(False)
+            axis.spines['right'].set_visible(False)
+            axis.spines['bottom'].set_visible(False)
+            axis.spines['left'].set_visible(False)
+            axis.axvline(x=0, color='dimgray', alpha = 1)
+            axis.axhline(y=0, color='dimgray', alpha = 1)
+            axis.tick_params(axis='both', color='white')
             # need to include N too
-            ax[j, i].set_ylabel('loss')
-            ax[j, i].set_xlabel('D')
-            ax[j, i].set_title(f'dset = {d}, N = {n}')
+            # axis.set_ylabel('loss')
+            # axis.set_xlabel('D')
+            axis.set_title(f'N = {n}')
+
+fig.text(0.5, 0.04, 'D', ha='center', va='center')
+fig.text(0.06, 0.5, 'loss', ha='center', va='center', rotation='vertical')
 
 plt.legend()
 plt.show()

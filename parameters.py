@@ -9,28 +9,28 @@ def create_parameters(name):
     mapping = {}
     ix = 1
 
-    Ds = [5, 10, 50, 100, 250]
-    Ns = [100, 250]
+    Ds = [10, 50, 100]
+    Ns = [100, 250, 500]
 
     lr = 1e-4
-    n_epochs = 50
+    n_epochs = 40
     patience = 4000
 
     # keep the same network seeds
     preserve_seed = False
 
-    n_seeds = 1
-    n_rseeds = 3
+    n_seeds = 2
+    n_rseeds = 2
 
     # biases = [True]
-    noises = [0, 0.1, 0.01]
+    # noises = [0, 0.1, 0.01]
+    noises = [0]
 
     datasets = [
-        'datasets/rsg2_s15.pkl',
-        'datasets/rsg2_s35.pkl',
-        'datasets/rsg2_s50.pkl',
-        'datasets/rsg2_s65.pkl',
-        'datasets/rsg2_s85.pkl'
+        'datasets/copy_cos.pkl',
+        'datasets/copy_cos_d50.pkl',
+        'datasets/motifs_s1.pkl',
+        'datasets/motifs_s1_d50.pkl'
     ]
 
     #n_commands = len(Ds) * len(Ns) * len(trial_lens) * len(singles) * len(lrs) * n_seeds
