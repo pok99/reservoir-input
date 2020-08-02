@@ -94,7 +94,7 @@ def test_model(net, dset, n_tests=0):
 
     data = list(zip(dset_idx, x, y, z, losses))
 
-    print('avg summed loss across timesteps:', np.sum(losses, axis=0) / len(dset))
+    final_loss = np.mean(losses, axis=0)
 
-    return data
+    return data, final_loss
 

@@ -9,8 +9,8 @@ def create_parameters(name):
     mapping = {}
     ix = 1
 
-    Ds = [10, 50, 100]
-    Ns = [100, 250, 500]
+    Ds = [5, 10, 50]
+    Ns = [50, 100]
 
     lr = 1e-4
     n_epochs = 40
@@ -23,8 +23,8 @@ def create_parameters(name):
     n_rseeds = 2
 
     # biases = [True]
-    # noises = [0, 0.1, 0.01]
-    noises = [0]
+    noises = [0, 0.1, 0.01]
+    #noises = [0]
 
     datasets = [
         'datasets/copy_cos.pkl',
@@ -59,7 +59,7 @@ def create_parameters(name):
         # run_params['optimizer'] = 'lbfgs-scipy'
         run_params['optimizer'] = 'adam'
 
-        # run_params['train_parts'] = ['W_ro', 'W_f', 'reservoir']
+        run_params['train_parts'] = ['W_ro', 'W_f', 'reservoir']
 
         run_params['reservoir_noise'] = noise
 

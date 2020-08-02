@@ -118,7 +118,15 @@ def plot_fn():
 def plot_motifs(motifs, name=None, labels=True):
     dim = get_dim(motifs[0][0])
     if dim == 1:
-        plt.style.use('ggplot')
+        ax = plt.gca()
+        ax.axvline(x=0, color='dimgray', alpha = 1)
+        ax.axhline(y=0, color='dimgray', alpha = 1)
+        ax.grid(True, which='major', lw=1, color='lightgray', alpha=0.4)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['left'].set_visible(False)
+        ax.spines['bottom'].set_visible(False)
+        # plt.style.use('ggplot')
         for ind, m in enumerate(motifs):
             t = np.arange(len(m))
             plt.plot(t, m, lw=2, label=ind)

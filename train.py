@@ -263,10 +263,10 @@ class Trainer:
             error_final = optim.fun
             n_iters = optim.nit
             # error_final = self.test()
-            self.log_model(ix='final')
+            
 
             if not self.args.no_log:
-                self.log_model()
+                self.log_model(ix='final')
                 with open(os.path.join(self.log.run_dir, 'checkpoints.pkl'), 'wb') as f:
                     pickle.dump(self.vis_samples, f)
                 self.csv_path.close()
@@ -489,7 +489,7 @@ def parse_args():
     parser.add_argument('--loss', type=str, default='mse')
 
     # lbfgs-scipy arguments
-    parser.add_argument('--maxiter', type=int, default=5000, help='limit to # iterations. lbfgs-scipy only')
+    parser.add_argument('--maxiter', type=int, default=10000, help='limit to # iterations. lbfgs-scipy only')
 
     # adam arguments
     parser.add_argument('--batch_size', type=int, default=1, help='size of minibatch used')
