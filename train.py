@@ -519,11 +519,9 @@ def parse_args():
     args.bias = not args.no_bias
     return args
 
-if __name__ == '__main__':
-    args = parse_args()
-
+def adjust_args(args):
     # don't use logging.info before we initialize the logger!! or else stuff is gonna fail
-    
+
     # setting seeds
     if args.reservoir_seed is None:
         args.reservoir_seed = random.randrange(1e6)
@@ -576,6 +574,7 @@ if __name__ == '__main__':
         args.log = log
     else:
         logging.basicConfig(format='%(message)s', level=logging.DEBUG)
+        logging.info('NOT LOGGING THIS RUN.')
 
     # logging, when loading models from paths
     if args.model_path is not None:
@@ -584,6 +583,14 @@ if __name__ == '__main__':
             logging.info(f'...with config file {args.model_config_path}')
         else:
             logging.info('...but not using any config file. Errors may ensue due to net param mismatches')
+
+    return args
+
+
+if __name__ == '__main__':
+    args = parse_args()
+
+    args = adjust_args(args)   
 
     trainer = Trainer(args)
     logging.info(f'Initialized trainer. Using optimizer {args.optimizer}')

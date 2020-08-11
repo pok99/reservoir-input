@@ -6,6 +6,8 @@ import pdb
 import sys
 import random
 
+sys.path.append('../')
+
 from network import Network, Reservoir
 from utils import Bunch
 
