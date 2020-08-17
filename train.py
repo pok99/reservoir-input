@@ -69,7 +69,7 @@ class Trainer:
             self.writer = csv.writer(self.csv_path, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
             self.writer.writerow(['ix', 'avg_loss'])
             self.plot_checkpoint_path = os.path.join(self.log.run_dir, 'checkpoints.pkl')
-            self.save_model_path = os.path.join(log.run_dir, 'model.pth')
+            self.save_model_path = os.path.join(self.log.run_dir, 'model.pth')
 
     def optimize_lbfgs(self, mode):
         if mode == 'pytorch':
@@ -468,6 +468,7 @@ def parse_args():
     parser.add_argument('-Z', type=int, default=1, help='')
 
     parser.add_argument('--train_parts', type=str, nargs='+', choices=['all', 'reservoir', 'W_ro', 'W_f'], default=['W_ro', 'W_f'])
+    parser.add_argument('--stride', type=int, default=1, help='stride of the W_f')
     
     # make sure model_config path is specified if you use any paths! it ensures correct dimensions, bias, etc.
     parser.add_argument('--model_config_path', type=str, default=None, help='config path corresponding to model load path')

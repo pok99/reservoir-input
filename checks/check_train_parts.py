@@ -40,6 +40,7 @@ J = net.reservoir.J.weight.detach().clone().numpy()
 
 ending = [Wf, Wro, J]
 
+# nonzero entries will be the ones that have changed
 print('W_f:', np.mean(np.abs(ending[0] - beginning[0])))
 print('W_ro:', np.mean(np.abs(ending[1] - beginning[1])))
 print('J:', np.mean(np.abs(ending[2] - beginning[2])))

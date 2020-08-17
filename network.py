@@ -26,7 +26,8 @@ default_arglist = {
     'Wf_path': None,
     'Wro_path': None,
     'network_delay': 0,
-    'out_act': 'exp'
+    'out_act': 'exp',
+    'stride': 1
 }
 DEFAULT_ARGS = Bunch(**default_arglist)
 
@@ -76,7 +77,12 @@ class Reservoir(nn.Module):
         self.x.detach_()
 
     def forward(self, u):
-        g = self.activation(self.J(self.x) + self.W_u(u))
+        if type(u) is int and u == -1:
+            # ensures that we don't add the bias term
+            g = self.activation(self.J(self.x))
+        else:
+            g = self.activation(self.J(self.x) + self.W_u(u))
+        # adding any inherent reservoir noise
         if self.noise_std > 0:
             gn = g + torch.normal(torch.zeros_like(g), self.noise_std)
         else:
@@ -112,6 +118,9 @@ class Network(nn.Module):
         args = fill_undefined_args(copy.deepcopy(args), DEFAULT_ARGS)
         self.args = args
         self.reservoir = Reservoir(args)
+
+        self.stride = args.stride
+        self.stride_step = 0
         
         if not hasattr(args, 'bias'):
             args.bias = False
@@ -119,27 +128,24 @@ class Network(nn.Module):
         self.W_f = nn.Linear(self.args.L, self.args.D, bias=args.bias)
         self.W_ro = nn.Linear(args.N, args.Z, bias=args.bias)
 
-        # if hasattr(args, 'Wf_path') and args.Wf_path is not None:
-        #     W_f = load_rb(args.Wf_path)
-        #     # helps solve bias = False problems
-        #     if hasattr(type(W_f), '__iter__'):
-        #         self.W_f.weight.data = W_f[0]
-        #         self.W_f.bias.data = W_f[1]
-        #     self.W_f.weight.data = W_f
-        # if hasattr(args, 'Wro_path') and args.Wro_path is not None:
-        #     W_ro = load_rb(args.Wro_path)
-        #     if hasattr(type(W_ro), '__iter__'):
-        #         self.W_ro.weight.data = W_ro[0]
-        #         self.W_ro.bias.data = W_ro[1]
-        #     self.W_ro.weight.data = W_ro
-
         self.network_delay = args.network_delay
 
         self.reset()
 
     def forward(self, o):
         u = self.W_f(o.reshape(-1, 1))
-        x = self.reservoir(u)
+
+        self.stride_step += 1
+        if self.stride_step % self.stride == 0:
+            x = self.reservoir(u)
+            self.stride_step = 0
+        else:
+            x = self.reservoir(-1)
+            if x.shape[0] != u.shape[0]:
+                # to expand hidden layer to appropriate batch size
+                mul = u.shape[0]
+                x = x.repeat((mul, 1))
+
         z = self.W_ro(x)
         fn = get_output_activation(self.args)
         z = fn(z)
