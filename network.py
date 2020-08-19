@@ -112,7 +112,7 @@ class Reservoir(nn.Module):
                 self.burn_in(self.n_burn_in)
 
 
-class Network(nn.Module):
+class BasicNetwork(nn.Module):
     def __init__(self, args=DEFAULT_ARGS):
         super().__init__()
         args = fill_undefined_args(copy.deepcopy(args), DEFAULT_ARGS)
@@ -121,9 +121,6 @@ class Network(nn.Module):
 
         self.stride = args.stride
         self.stride_step = 0
-        
-        if not hasattr(args, 'bias'):
-            args.bias = False
 
         self.W_f = nn.Linear(self.args.L, self.args.D, bias=args.bias)
         self.W_ro = nn.Linear(args.N, args.Z, bias=args.bias)
@@ -166,4 +163,112 @@ class Network(nn.Module):
         if self.network_delay != 0:
             self.delay_output = [None] * self.network_delay
             self.delay_ind = 0
+
+
+# given state and action, predicts next state
+class Simulator(nn.Module):
+    def __init__(self, args):
+        super().__init__()
+        self.args = args
+
+        # using 2 for now for 2D target, can generalize later
+        # also only using 1 layer for now, can add more later
+        self.W_sim = nn.Linear(self.args.L + self.args.D, 2)
+
+
+    def forward(self, s, p):
+        inp = torch.cat(s, p)
+        pred = self.W_sim(inp)
+        return pred
+
+# given current state and task, samples a proposal
+class Hypothesizer(nn.Module):
+    def __init__(self, args):
+        super().__init__()
+        self.args = args
+        self.sample_std = .1
+
+        # simple one layer linear network for now, can generalize later
+        # L dimensions for state, 2 dimensions for task (desired state)
+        self.W_sample = nn.Linear(self.args.L + 2, self.args.D)
+
+    def forward(self, t, s):
+        inp = torch.cat(t, s)
+        inp = inp + torch.normal(torch.zeros_like(inp), self.sample_std)
+        pred = self.W_sample(inp)
+
+
+
+# captures the hypothesis generator and simulator into a single class
+class HypothesisNetwork(nn.Module):
+    def __init__(self, args=DEFAULT_ARGS):
+        super().__init__()
+        args = fill_undefined_args(copy.deepcopy(args), DEFAULT_ARGS)
+        self.args = args
+        self.simulator = Simulator(args)
+        self.hypothesizer = Hypothesizer(args)
+        self.reservoir = Reservoir(args)
+
+        self.stride = args.stride
+        self.stride_step = 0
+
+        self.W_ro = nn.Linear(args.N, args.Z, bias=args.bias)
+
+        self.network_delay = args.network_delay
+
+        self.reset()
+
+    def forward(self, t):
+        fail_count = 0
+        while True:
+            prop = self.hypothesizer(t, self.s)
+            sim = self.simulator(prop, self.s)
+
+            # test the sim here
+            cos_ang = torch.dot(prop/prop.norm(), t/t.norm())
+            cur_dist = torch.norm(t - self.s)
+            dx_ratio = (cur_dist - torch.norm(t - prop)) / cur_dist
+
+            if cos_ang * dx_ratio >= 1:
+                break
+            fail_count += 1
+            if fail_count >= 1000:
+                print('really failed here')
+                pdb.set_trace()
+
+        u = prop
+
+        self.stride_step += 1
+        if self.stride_step % self.stride == 0:
+            x = self.reservoir(u)
+            self.stride_step = 0
+        else:
+            x = self.reservoir(-1)
+            if x.shape[0] != u.shape[0]:
+                # to expand hidden layer to appropriate batch size
+                mul = u.shape[0]
+                x = x.repeat((mul, 1))
+
+        z = self.W_ro(x)
+        fn = get_output_activation(self.args)
+        z = fn(z)
+        #z = nn.ReLU()(z)
+        if self.network_delay == 0:
+            return z, x, u
+        else:
+            z2 = self.delay_output[self.delay_ind]
+            self.delay_output[self.delay_ind] = z
+            self.delay_ind = (self.delay_ind + 1) % self.network_delay
+            return z2, x, u
+
+
+    def reset(self, res_state_seed=None):
+        self.reservoir.reset(res_state_seed=res_state_seed)
+        self.s = torch.tensor([0,0])
+        # set up network delay mechanism. essentially a queue of length network_delay
+        # with a pointer to the current index
+        if self.network_delay != 0:
+            self.delay_output = [None] * self.network_delay
+            self.delay_ind = 0
+
 

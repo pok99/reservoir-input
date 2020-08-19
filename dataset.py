@@ -223,6 +223,15 @@ def create_dataset(args):
 
             trials.append((y, z, z_mag))
 
+    elif t_type == 'seq-goals':
+        for n in range(n_trials):
+            # np.random.uniform(5, 20)
+
+            n_goals = 10
+            trial = []
+            for i in range(n_goals):
+                trial.append(np.random.normal(loc=0, scale=5, size=2))
+
 
     return trials, config
 

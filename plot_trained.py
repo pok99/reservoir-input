@@ -10,7 +10,6 @@ import pdb
 
 from utils import load_rb
 from testers import load_model_path, test_model
-from network import Network, Reservoir
 
 # for plotting some instances of a trained model on a specified dataset
 
@@ -18,7 +17,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument('model', help='path to a model file, to be loaded into pytorch')
 parser.add_argument('dataset', help='path to a dataset of trials')
 parser.add_argument('--noise', default=0, help='noise to add to trained weights')
-parser.add_argument('--out_act', default=None)
+parser.add_argument('--out_act', default=None, type=str)
+parser.add_argument('--stride', default=1, type=int)
 parser.add_argument('-a', '--test_all', action='store_true')
 parser.add_argument('-n', '--no_plot', action='store_true')
 args = parser.parse_args()
@@ -37,7 +37,7 @@ if args.noise != 0:
     shp = J.shape
     model['W_ro.weight'] += torch.normal(0, v * .5, shp)
 
-net = load_model_path(args.model, params={'dset': args.dataset, 'out_act': args.out_act})
+net = load_model_path(args.model, params={'dset': args.dataset, 'out_act': args.out_act, 'stride': args.stride})
 dset = load_rb(args.dataset)
 
 if args.test_all:

@@ -15,7 +15,7 @@ import csv
 import math
 import json
 
-from network import Network, Reservoir
+from network import BasicNetwork, Reservoir
 
 from utils import log_this, load_rb
 from helpers import get_optimizer, get_criterion
@@ -28,7 +28,7 @@ class Trainer:
 
         self.args = args
 
-        self.net = Network(self.args)
+        self.net = BasicNetwork(self.args)
 
         # load any specified model parameters into the network
         if args.model_path is not None:
@@ -351,32 +351,7 @@ class Trainer:
 
         return total_loss.item()
 
-    def test_and_return(self, n=0):
-        if n != 0:
-            assert n <= len(self.dset)
-            batch = np.random.choice(self.dset, n)
-        else:
-            batch = self.dset
-        x, y, _ = list(zip(*batch))
-        x = torch.Tensor(x)
-        y = torch.Tensor(y)
-
-        with torch.no_grad():
-            self.net.reset()
-
-            total_loss = torch.tensor(0.)
-            for j in range(x.shape[1]):
-                # run the step
-                net_in = x[:,j].reshape(-1, self.args.L)
-                net_out, val_res, val_thal = self.net(net_in)
-                net_target = y[:,j].reshape(-1, self.args.Z)
-
-                step_loss = self.criterion(net_out, net_target)
-                total_loss += step_loss
-
-        return total_loss.item()
-
-    def train(self):
+    def train(self, ix_callback=None):
         ix = 0
 
         its_p_epoch = len(self.dset) // self.args.batch_size
@@ -404,6 +379,8 @@ class Trainer:
                 y = torch.Tensor(y)
 
                 loss, etc = self.iteration(x, y)
+                if ix_callback is not None:
+                    ix_callback(loss, etc)
                 self.optimizer.step()
 
                 if loss == -1:
@@ -458,7 +435,7 @@ class Trainer:
 
         final_loss = self.test()
         logging.info(f'END | iterations: {(ix // self.log_interval) * self.log_interval} | test loss: {final_loss}')
-        return final_loss
+        return final_loss, ix
 
 def parse_args():
     parser = argparse.ArgumentParser(description='')
@@ -601,7 +578,7 @@ if __name__ == '__main__':
     elif args.optimizer == 'lbfgs-pytorch':
         final_loss, n_iters = trainer.optimize_lbfgs('pytorch')
     elif args.optimizer in ['sgd', 'rmsprop', 'adam']:
-        final_loss = trainer.train()
+        final_loss, n_iters = trainer.train()
 
     if args.slurm_id is not None:
         # if running many jobs, then we gonna put the results into a csv
@@ -618,13 +595,12 @@ if __name__ == '__main__':
             if args.optimizer == 'adam':
                 labels_csv.extend(['lr', 'epochs'])
                 vals_csv.extend([args.lr, args.n_epochs])
-                if not csv_exists:
-                    writer.writerow(labels_csv)
-                writer.writerow(vals_csv)
             elif args.optimizer == 'lbfgs-scipy':
-                if not csv_exists:
-                    writer.writerow(labels_csv)
-                writer.writerow(vals_csv)
+                pass
+
+            if not csv_exists:
+                writer.writerow(labels_csv)
+            writer.writerow(vals_csv)
 
     logging.shutdown()
 

@@ -5,7 +5,7 @@ import torch.nn as nn
 import random
 import pdb
 
-from network import Network
+from network import BasicNetwork
 from utils import Bunch, load_rb
 
 
@@ -41,13 +41,16 @@ def load_model_path(path, params={}):
         else:
             bunch.out_act = 'none'
 
+    if 'stride' in params and params['stride'] is not None:
+        bunch.stride = params['stride']
+
     bunch.bias = True
     if 'W_f.bias' not in m_dict:
         bunch.bias = False
         # m_dict['W_f.bias'] = torch.zeros(bunch.D)
         # m_dict['W_ro.bias'] = torch.zeros(bunch.Z)
 
-    net = Network(bunch)
+    net = BasicNetwork(bunch)
     net.load_state_dict(m_dict)
     net.eval()
 
