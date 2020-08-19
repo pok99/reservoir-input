@@ -14,13 +14,12 @@ import random
 import csv
 import math
 import json
+import copy
 
 from network import BasicNetwork, Reservoir
 
 from utils import log_this, load_rb
 from helpers import get_optimizer, get_criterion
-
-sigmoid = lambda x: 1 / (1 + np.exp(-x))
 
 class Trainer:
     def __init__(self, args):
@@ -115,9 +114,14 @@ class Trainer:
             W_ro_total = self.args.N * self.args.Z if 'W_ro' in self.args.train_parts else 0
             res_total = self.args.N * self.args.N if 'reservoir' in self.args.train_parts else 0
             W_u_total = self.args.D * self.args.N if 'reservoir' in self.args.train_parts else 0
-            dset = np.asarray([x[:-1] for x in self.dset])
-            x = torch.from_numpy(dset[:,0,:]).float()
-            y = torch.from_numpy(dset[:,1,:]).float()
+
+            if 'seq-goals' not in self.args.dataset:
+                dset = np.asarray([x[:-1] for x in self.dset])
+                x = torch.from_numpy(dset[:,0,:]).float()
+                y = torch.from_numpy(dset[:,1,:]).float()
+
+            if 'seq-goals' in self.args.dataset:
+                targets = torch.Tensor(self.dset)
 
             # so that the callback for scipy.optimize.minimize knows what step it is on
             self.scipy_ix = 0
@@ -184,13 +188,42 @@ class Trainer:
                 self.net.reset(res_state_seed=0)
                 self.net.zero_grad()
                 total_loss = torch.tensor(0.)
-                for j in range(x.shape[1]):
-                    net_in = x[:,j].reshape(-1, self.args.L)
-                    net_out, val_res, val_thal = self.net(net_in)
-                    net_target = y[:,j].reshape(-1, self.args.Z)
 
-                    step_loss = self.criterion(net_out, net_target)
-                    total_loss += step_loss
+
+                # testing with my random loss function
+                if 'seq-goals' in self.args.dataset:
+                    cur_indices = [0 for i in range(len(self.dset))]
+                    cur_targets = targets[:,0,:]
+                    done = []
+                    for j in range(100):
+                        net_in = targets[torch.arange(len(self.dset)),cur_indices,:]
+                        net_out, _, _ = self.net(net_in)
+                        dists = []
+                        for seq in range(len(self.dset)):
+                            if seq in done:
+                                dists.append(0)
+                                continue
+                            dist = torch.norm(net_out[seq] - net_in[seq])
+                            # if dist < 0.1:
+                            #     cur_indices[seq] += 1
+                            #     if cur_indices[seq] >= len(self.dset):
+                            #         dist = 0
+                            #         done.append(seq)
+                            #     else:
+                            #         cur_targets[seq] = targets[seq,cur_indices[seq],:]
+                            dists.append(dist)
+                        step_loss = sum([(len(self.dset) - i) * dists[i] for i in cur_indices])
+                        step_loss = sum(dists)
+                        total_loss += step_loss
+
+                else:
+                    for j in range(x.shape[1]):
+                        net_in = x[:,j].reshape(-1, self.args.L)
+                        net_out, val_res, val_thal = self.net(net_in)
+                        net_target = y[:,j].reshape(-1, self.args.Z)
+
+                        step_loss = self.criterion(net_out, net_target)
+                        total_loss += step_loss
 
                 total_loss.backward()
 
@@ -219,21 +252,43 @@ class Trainer:
                 self.scipy_ix += 1
                 if self.scipy_ix % self.log_interval == 0:
                     # W_f, W_ro = vec_to_param(xk)
-                    sample_n = random.randrange(len(dset))
+                    sample_n = random.randrange(len(self.dset))
 
                     self.net.reset(res_state_seed=0)
                     self.net.zero_grad()
                     outs = []
                     total_loss = torch.tensor(0.)
-                    xs = x[sample_n,:]
-                    ys = y[sample_n,:]
-                    for j in range(xs.shape[0]):
-                        net_in = xs[j].reshape(-1, self.args.L)
-                        net_out, val_res, val_thal = self.net(net_in)
-                        outs.append(net_out.item())
-                        net_target = ys[j].reshape(-1, self.args.Z)
-                        step_loss = self.criterion(net_out, net_target)
-                        total_loss += step_loss
+
+
+                    if 'seq-goals' in self.args.dataset:
+                        done = []
+                        cur_index = 0
+                        for j in range(100):
+                            net_in = targets[sample_n,cur_index,:]
+                            net_out, _, _ = self.net(net_in)
+                            dist = torch.norm(net_out[seq] - net_in[seq])
+                            # if dist < 0.1:
+                            #     cur_indices[seq] += 1
+                            #     if cur_indices[seq] >= len(self.dset):
+                            #         dist = 0
+                            #         done.append(seq)
+                            #     else:
+                            #         cur_targets[seq] = targets[seq,cur_indices[seq],:]
+                            dists.append(dist)
+                            # step_loss = sum([(len(self.dset) - i) * dists[i] for i in cur_indices])
+                            step_loss = sum(dists)
+                            total_loss += step_loss
+
+                    else:
+                        xs = x[sample_n,:]
+                        ys = y[sample_n,:]
+                        for j in range(xs.shape[0]):
+                            net_in = xs[j].reshape(-1, self.args.L)
+                            net_out, val_res, val_thal = self.net(net_in)
+                            outs.append(net_out.item())
+                            net_target = ys[j].reshape(-1, self.args.Z)
+                            step_loss = self.criterion(net_out, net_target)
+                            total_loss += step_loss
 
                     z = np.stack(outs).squeeze()
                     self.log_checkpoint(self.scipy_ix, xs.numpy(), ys.numpy(), z, total_loss.item(), total_loss.item())

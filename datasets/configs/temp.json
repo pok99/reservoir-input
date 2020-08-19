@@ -1,1 +1,5 @@
-{"t_type": "copy", "n_trials": 20, "t_len": 200, "delay": 0, "n_freqs": 15, "f_range": [3, 30], "amp": 1}
+{
+  "t_type": "seq-goals",
+  "n_trials": 20,
+  "t_len": 200
+}

@@ -232,6 +232,7 @@ def create_dataset(args):
             for i in range(n_goals):
                 trial.append(np.random.normal(loc=0, scale=5, size=2))
 
+            trials.append(trial)
 
     return trials, config
 

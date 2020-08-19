@@ -29,12 +29,15 @@ default_arglist = {
     'out_act': 'exp',
     'stride': 1
 }
-DEFAULT_ARGS = Bunch(**default_arglist)
+BASIC_ARGS = Bunch(**default_arglist)
+SIMULATOR_ARGS = copy.deepcopy(BASIC_ARGS)
+SIMULATOR_ARGS.reservoir_seed = 0
 
 # reservoir network. shouldn't be trained
 class Reservoir(nn.Module):
-    def __init__(self, args=DEFAULT_ARGS):
+    def __init__(self, args=BASIC_ARGS):
         super().__init__()
+        args = fill_undefined_args(copy.deepcopy(args), BASIC_ARGS)
         self.args = copy.deepcopy(args)
 
         if not hasattr(args, 'reservoir_seed'):
@@ -113,9 +116,9 @@ class Reservoir(nn.Module):
 
 
 class BasicNetwork(nn.Module):
-    def __init__(self, args=DEFAULT_ARGS):
+    def __init__(self, args=BASIC_ARGS):
         super().__init__()
-        args = fill_undefined_args(copy.deepcopy(args), DEFAULT_ARGS)
+        args = fill_undefined_args(copy.deepcopy(args), BASIC_ARGS)
         self.args = args
         self.reservoir = Reservoir(args)
 
@@ -123,14 +126,14 @@ class BasicNetwork(nn.Module):
         self.stride_step = 0
 
         self.W_f = nn.Linear(self.args.L, self.args.D, bias=args.bias)
-        self.W_ro = nn.Linear(args.N, args.Z, bias=args.bias)
+        self.W_ro = nn.Linear(self.args.N, self.args.Z, bias=args.bias)
 
         self.network_delay = args.network_delay
 
         self.reset()
 
     def forward(self, o):
-        u = self.W_f(o.reshape(-1, 1))
+        u = self.W_f(o.reshape(-1, self.args.L))
 
         self.stride_step += 1
         if self.stride_step % self.stride == 0:
@@ -167,7 +170,8 @@ class BasicNetwork(nn.Module):
 
 # given state and action, predicts next state
 class Simulator(nn.Module):
-    def __init__(self, args):
+    def __init__(self, args=SIMULATOR_ARGS):
+        args = fill_undefined_args(copy.deepcopy(args), SIMULATOR_ARGS)
         super().__init__()
         self.args = args
 
@@ -177,8 +181,9 @@ class Simulator(nn.Module):
 
 
     def forward(self, s, p):
-        inp = torch.cat(s, p)
+        inp = torch.cat([s, p])
         pred = self.W_sim(inp)
+
         return pred
 
 # given current state and task, samples a proposal
@@ -193,17 +198,19 @@ class Hypothesizer(nn.Module):
         self.W_sample = nn.Linear(self.args.L + 2, self.args.D)
 
     def forward(self, t, s):
-        inp = torch.cat(t, s)
+        inp = torch.cat([t, s])
         inp = inp + torch.normal(torch.zeros_like(inp), self.sample_std)
         pred = self.W_sample(inp)
+
+        return pred
 
 
 
 # captures the hypothesis generator and simulator into a single class
 class HypothesisNetwork(nn.Module):
-    def __init__(self, args=DEFAULT_ARGS):
+    def __init__(self, args=BASIC_ARGS):
         super().__init__()
-        args = fill_undefined_args(copy.deepcopy(args), DEFAULT_ARGS)
+        args = fill_undefined_args(copy.deepcopy(args), BASIC_ARGS)
         self.args = args
         self.simulator = Simulator(args)
         self.hypothesizer = Hypothesizer(args)
@@ -224,18 +231,22 @@ class HypothesisNetwork(nn.Module):
             prop = self.hypothesizer(t, self.s)
             sim = self.simulator(prop, self.s)
 
+
             # test the sim here
-            cos_ang = torch.dot(prop/prop.norm(), t/t.norm())
+            cos_ang = torch.dot(sim/sim.norm(), t/t.norm())
             cur_dist = torch.norm(t - self.s)
-            dx_ratio = (cur_dist - torch.norm(t - prop)) / cur_dist
+            dx_ratio = (cur_dist - torch.norm(t - sim)) / cur_dist
 
             if cos_ang * dx_ratio >= 1:
                 break
             fail_count += 1
+            print('failed', cos_ang,dx_ratio)
+            pdb.set_trace()
             if fail_count >= 1000:
                 print('really failed here')
                 pdb.set_trace()
 
+        pdb.set_trace()
         u = prop
 
         self.stride_step += 1
@@ -250,6 +261,7 @@ class HypothesisNetwork(nn.Module):
                 x = x.repeat((mul, 1))
 
         z = self.W_ro(x)
+        pdb.set_trace()
         fn = get_output_activation(self.args)
         z = fn(z)
         #z = nn.ReLU()(z)
@@ -264,7 +276,7 @@ class HypothesisNetwork(nn.Module):
 
     def reset(self, res_state_seed=None):
         self.reservoir.reset(res_state_seed=res_state_seed)
-        self.s = torch.tensor([0,0])
+        self.s = torch.zeros(2)
         # set up network delay mechanism. essentially a queue of length network_delay
         # with a pointer to the current index
         if self.network_delay != 0:
