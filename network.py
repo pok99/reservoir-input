@@ -313,10 +313,10 @@ class StateNet(nn.Module):
 
         z = self.W_ro(x)
         # clipping so movements can't be too large
-        z = torch.clamp(z, -1, 1)
+        z = torch.clamp(z, -5, 5)
         self.s = self.s + z
         if extras:
-            return z, self.s
+            return self.s, z
         else:
             return self.s
 

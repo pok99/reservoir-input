@@ -55,12 +55,6 @@ def load_model_path(path, params={}):
     if 'stride' in params and params['stride'] is not None:
         bunch.stride = params['stride']
 
-    # bunch.bias = True
-    # if 'W_f.bias' not in m_dict:
-    #     bunch.bias = False
-    #     # m_dict['W_f.bias'] = torch.zeros(bunch.D)
-    #     # m_dict['W_ro.bias'] = torch.zeros(bunch.Z)
-
     if config['net'] == 'basic':
         net = BasicNetwork(bunch)
     elif config['net'] == 'state':
@@ -73,7 +67,9 @@ def load_model_path(path, params={}):
 
 # given a model and a dataset, see how well the model does on it
 # works with plot_trained.py
-def test_model(net, dset, n_tests=0):
+def test_model(net, dset, n_tests=0, params={}):
+
+    is_seq_goals = 'dset' in params and 'seq-goals' in params['dset']
 
     criterion = nn.MSELoss()
     dset_idx = range(len(dset))
@@ -82,9 +78,13 @@ def test_model(net, dset, n_tests=0):
 
     dset = [dset[i] for i in dset_idx]
 
-    x, y, _ = list(zip(*dset))
-    x = torch.Tensor(x)
-    y = torch.Tensor(y)
+    if is_seq_goals:
+        x = torch.Tensor(dset)
+        y = x
+    else:
+        x, y, _ = list(zip(*dset))
+        x = torch.Tensor(x)
+        y = torch.Tensor(y)
 
     with torch.no_grad():
         net.reset()
@@ -93,18 +93,42 @@ def test_model(net, dset, n_tests=0):
         outs = []
 
         total_loss = torch.tensor(0.)
-        for j in range(x.shape[1]):
-            # run the step
-            net_in = x[:,j].reshape(-1, net.args.L)
-            net_out = net(net_in)
-            outs.append(net_out)
-            net_target = y[:,j].reshape(-1, net.args.Z)
+        if is_seq_goals:
+            n_pts = x.shape[1]
+            n_trials = x.shape[0]
+            cur_indices = [0 for i in range(n_trials)]
+            for j in range(100):
+                net_in = x[torch.arange(n_trials),cur_indices,:]
 
-            trial_losses = []
-            for k in range(len(dset)):
-                step_loss = criterion(net_out[k], net_target[k])
-                trial_losses.append(step_loss)
-            losses.append(np.array(trial_losses))
+                net_in = net_in.reshape(-1, net.args.L)
+                net_out, extras = net(net_in, extras=True)
+                net_target = net_in.reshape(-1, net.args.Z)
+
+                dists = torch.norm(net_out - net_target, dim=1)
+                losses.append(dists.numpy())
+                outs.append(net_out)
+                step_loss = torch.sum(dists)
+
+                done = 0
+                for seq in range(n_trials):
+                    dist = dists[seq]
+                    if dist < 0.1 and cur_indices[seq] < n_pts:
+                        cur_indices[seq] += 1
+                        done += 1
+                total_loss += step_loss
+        else:
+            for j in range(x.shape[1]):
+                # run the step
+                net_in = x[:,j].reshape(-1, net.args.L)
+                net_out = net(net_in)
+                outs.append(net_out)
+                net_target = y[:,j].reshape(-1, net.args.Z)
+
+                trial_losses = []
+                for k in range(len(dset)):
+                    step_loss = criterion(net_out[k], net_target[k])
+                    trial_losses.append(step_loss)
+                losses.append(np.array(trial_losses))
 
     losses = np.sum(losses, axis=0)
     z = torch.stack(outs, dim=1).squeeze()

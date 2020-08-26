@@ -68,13 +68,7 @@ class Trainer:
 
         self.criterion = get_criterion(self.args)
         
-        # self.train_params = []
-        # for q in self.net.named_parameters():
-        #     for p in self.args.train_parts:
-        #         pdb.set_trace()
-        #         if q[0].find(p) != -1:
-        #             self.train_params.append(q[1])
-        # self.optimizer = get_optimizer(self.args, self.train_params)
+        self.optimizer = get_optimizer(self.args, self.train_params)
 
         self.dset = load_rb(self.args.dataset)
         
@@ -226,7 +220,6 @@ class Trainer:
                         for j in range(100):
                             net_in = targets[sample_n,cur_index,:]
                             action, next_state = self.net(net_in)
-                            pdb.set_trace()
                             dist = torch.norm(next_state - net_in)
                             ins.append(net_in.numpy())
                             outs.append(net_out.detach().squeeze().numpy())
@@ -317,79 +310,101 @@ class Trainer:
         self.net.reset()
         self.optimizer.zero_grad()
 
+        
         outs = []
-        # the intermediate representation right before reservoir
-        thals = []
-        # the reservoir representations
-        ress = []
-        # individual losses for each timestep within a trial
         sublosses = []
         total_loss = torch.tensor(0.)
 
 
         if 'seq-goals' in self.args.dataset:
-            n_pts = len(self.dset[0])
-            n_trials = len(self.dset)
+            ins = []
+            goals = []
+            n_pts = x.shape[1]
+            n_trials = x.shape[0]
             cur_indices = [0 for i in range(n_trials)]
             for j in range(100):
-                net_in = targets[torch.arange(n_trials),cur_indices,:]
-                net_out = self.net(net_in)
-                run_iteration(net_in, )
-                dists = []
+                net_in = x[torch.arange(n_trials),cur_indices,:]
+                ins.append(net_in)
+                goals.append(net_in)
+                net_out, step_loss, extras = self.run_iteration(net_in, net_in)
+                dists = torch.norm(net_out - net_in, dim=1)
                 done = 0
                 for seq in range(n_trials):
-                    dist = torch.norm(net_out[seq] - net_in[seq])
+                    dist = dists[seq]
                     if dist < 0.1 and cur_indices[seq] < n_pts:
                         cur_indices[seq] += 1
                         done += 1
-                    dists.append(dist)
                 # step_loss = sum([(n_pts + 1 - i) + dists[i] for i in cur_indices])
-                step_loss = sum(dists)# - done
+                # step_loss = sum(dists)# - done
+                outs.append(net_out[-1].detach().numpy())
                 total_loss += step_loss
 
-        for j in range(x.shape[1]):
-            # run the step
+            ins = torch.cat(ins)
+            goals = torch.cat(goals)
 
-            step_loss, (out, res, thal) = run_iteration(x[:,j], y[:,j])
+        else:
 
-            sublosses.append(step_loss.item())
-            if np.isnan(step_loss.item()):
-                return -1, (outs, thals, ress, sublosses)
-            total_loss += step_loss
+            ins = x
+            goals = y
 
-            outs.append(out[-1].item())
-            thals.append(list(thal[-1].detach().numpy().squeeze()))
-            ress.append(list(res[-1].detach().numpy().squeeze()))
+            for j in range(x.shape[1]):
+                # run the step
+
+                net_out, step_loss, extras = self.run_iteration(x[:,j], y[:,j])
+
+                sublosses.append(step_loss.item())
+                if np.isnan(step_loss.item()):
+                    return -1, (net_out, extras)
+                total_loss += step_loss
+
+                outs.append(net_out[-1].item())
+                # thals.append(list(thal[-1].detach().numpy().squeeze()))
+                # ress.append(list(res[-1].detach().numpy().squeeze()))
 
         total_loss.backward()
 
+        return total_loss, (ins, goals, outs, None, None, None)
         return total_loss, (x, y, outs, thals, ress, sublosses)
 
     def run_iteration(self, x, y):
         net_in = x.reshape(-1, self.args.L)
-        net_out, res, thal = self.net(net_in, extras=True)
+        net_out, extras = self.net(net_in, extras=True)
         net_target = y.reshape(-1, self.args.Z)
-        step_loss = self.criterion(net_out, net_target)
-
-        return step_loss, (net_out, res, thal)
-
         if 'seq-goals' in self.args.dataset:
-            n_pts = len(self.dset[0])
-            cur_indices = [0 for i in range(len(self.dset))]
-            for j in range(100):
-                net_in = targets[torch.arange(len(self.dset)),cur_indices,:]
-                net_out = self.net(net_in)
-                dists = []
-                done = 0
-                for seq in range(len(self.dset)):
-                    dist = torch.norm(net_out[seq] - net_in[seq])
-                    if dist < 0.1 and cur_indices[seq] < n_pts:
-                        cur_indices[seq] += 1
-                        done += 1
-                    dists.append(dist)
-                # step_loss = sum([(n_pts + 1 - i) + dists[i] for i in cur_indices])
-                step_loss = sum(dists)# - done
-                total_loss += step_loss
+            # calculate norm across batches
+            dists = torch.norm(net_out - net_target, dim=1)
+            step_loss = torch.sum(dists)
+        else:
+            step_loss = self.criterion(net_out, net_target)
+
+        return net_out, step_loss, extras
+
+        # if 'seq-goals' in self.args.dataset:
+
+        #     net_in = x.reshape(-1, self.args.L)
+        #     net_out, extras = self.net(net_in, extras=True)
+        #     net_target = y
+
+
+
+
+
+        #     n_pts = len(self.dset[0])
+        #     cur_indices = [0 for i in range(len(self.dset))]
+        #     for j in range(100):
+        #         net_in = targets[torch.arange(len(self.dset)),cur_indices,:]
+        #         net_out = self.net(net_in)
+        #         dists = []
+        #         done = 0
+        #         for seq in range(len(self.dset)):
+        #             dist = torch.norm(net_out[seq] - net_in[seq])
+        #             if dist < 0.1 and cur_indices[seq] < n_pts:
+        #                 cur_indices[seq] += 1
+        #                 done += 1
+        #             dists.append(dist)
+        #         # step_loss = sum([(n_pts + 1 - i) + dists[i] for i in cur_indices])
+        #         step_loss = sum(dists)# - done
+        #         total_loss += step_loss
 
 
     def test(self, n=0):
@@ -398,16 +413,38 @@ class Trainer:
             batch = np.random.choice(self.dset, n)
         else:
             batch = self.dset
-        x, y, _ = list(zip(*batch))
-        x = torch.Tensor(x)
-        y = torch.Tensor(y)
+        if 'seq-goals' in self.args.dataset:
+            x = torch.Tensor(batch)
+            y = x
+        else:
+            x, y, _ = list(zip(*batch))
+            x = torch.Tensor(x)
+            y = torch.Tensor(y)
 
         with torch.no_grad():
             self.net.reset()
+
             total_loss = torch.tensor(0.)
-            for j in range(x.shape[1]):
-                step_loss, _ = run_iteration(x[:,j], y[:,j])
-                total_loss += step_loss
+            if 'seq-goals' in self.args.dataset:
+                n_pts = x.shape[1]
+                n_trials = x.shape[0]
+                cur_indices = [0 for i in range(n_trials)]
+                for j in range(100):
+                    net_in = x[torch.arange(n_trials),cur_indices,:]
+                    net_out, step_loss, _ = self.run_iteration(net_in, net_in)
+                    dists = torch.norm(net_out - net_in, dim=1)
+                    done = 0
+                    for seq in range(n_trials):
+                        dist = dists[seq]
+                        if dist < 0.1 and cur_indices[seq] < n_pts:
+                            cur_indices[seq] += 1
+                            done += 1
+                    total_loss += step_loss
+
+            else:
+                for j in range(x.shape[1]):
+                    _, step_loss, _ = self.run_iteration(x[:,j], y[:,j])
+                    total_loss += step_loss
 
         return total_loss.item()
 
@@ -434,9 +471,13 @@ class Trainer:
                 if len(batch) < self.args.batch_size:
                     break
                 ix += 1
-                x, y, _ = list(zip(*batch))
-                x = torch.Tensor(x)
-                y = torch.Tensor(y)
+                if 'seq-goals' in self.args.dataset:
+                    x = torch.Tensor(batch)
+                    y = x
+                else:
+                    x, y, _ = list(zip(*batch))
+                    x = torch.Tensor(x)
+                    y = torch.Tensor(y)
 
                 loss, etc = self.train_iteration(x, y)
                 if ix_callback is not None:
@@ -488,7 +529,7 @@ class Trainer:
 
         if not self.args.no_log:
             # for later visualization of outputs over timesteps
-            with open(os.path.join(self.log.run_dir, 'checkpoints.pkl'), 'wb') as f:
+            with open(os.path.join(self.log.run_dir, f'checkpoints_{self.run_id}.pkl'), 'wb') as f:
                 pickle.dump(self.vis_samples, f)
 
             self.csv_path.close()

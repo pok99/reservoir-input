@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
+import matplotlib.cm as cm
 
 import random
 import pickle
@@ -45,35 +46,63 @@ if args.test_all:
     print('avg summed loss (all):', loss2)
 
 if not args.no_plot:
-    data, loss = test_model(net, dset, n_tests=12)
+    data, loss = test_model(net, dset, n_tests=12, params={'dset': args.dataset})
     print('avg summed loss (plotted):', loss)
 
     run_id = '/'.join(args.model.split('/')[-3:-1])
 
     fig, ax = plt.subplots(3,4,sharex=True, sharey=True, figsize=(12,7))
 
-    for i, ax in enumerate(fig.axes):
-        ix, x, y, z, loss = data[i]
-        xr = np.arange(len(x))
+    if 'seq-goals' in args.dataset:
+        for i, ax in enumerate(fig.axes):
+            ix, x, y, z, loss = data[i]
+            xr = np.arange(len(x))
 
-        ax.axvline(x=0, color='dimgray', alpha = 1)
-        ax.axhline(y=0, color='dimgray', alpha = 1)
-        ax.grid(True, which='major', lw=1, color='lightgray', alpha=0.4)
-        ax.spines['top'].set_visible(False)
-        ax.spines['right'].set_visible(False)
-        ax.spines['left'].set_visible(False)
-        ax.spines['bottom'].set_visible(False)
+            ax.axvline(x=0, color='dimgray', alpha = 1)
+            ax.axhline(y=0, color='dimgray', alpha = 1)
+            ax.grid(True, which='major', lw=1, color='lightgray', alpha=0.4)
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+            ax.spines['left'].set_visible(False)
+            ax.spines['bottom'].set_visible(False)
 
-        ax.plot(xr, x, color='coral', alpha=0.5, lw=1, label='input')
-        ax.plot(xr, y, color='coral', alpha=1, lw=1, label='target')
-        ax.plot(xr, z, color='cornflowerblue', alpha=1, lw=1.5, label='response')
+            n_pts = x.shape[0]
+            colors = iter(cm.rainbow(np.linspace(0, 1, n_pts)))
+            for j in range(n_pts):
+                ax.scatter(x[j][0], x[j][1], color=next(colors))
+            
+            n_timesteps = z.shape[0]
+            ts_colors = iter(cm.Blues(np.linspace(0, 1, n_timesteps)))
+            for j in range(n_timesteps):
+                ax.scatter(z[j][0], z[j][1], color=next(ts_colors), s=5)
 
-        ax.tick_params(axis='both', color='white')
-        ax.set_title(f'trial {ix}, avg loss {np.round(float(loss), 2)}', size='small')
-        ax.set_ylim([-2,3])
+            ax.tick_params(axis='both', color='white')
+            ax.set_title(f'trial {ix}, avg loss {np.round(float(loss), 2)}', size='small')
+            #ax.set_ylim([-2,3])
 
-    fig.text(0.5, 0.04, 'timestep', ha='center', va='center')
-    fig.text(0.06, 0.5, 'value', ha='center', va='center', rotation='vertical')
+    else:
+        for i, ax in enumerate(fig.axes):
+            ix, x, y, z, loss = data[i]
+            xr = np.arange(len(x))
+
+            ax.axvline(x=0, color='dimgray', alpha = 1)
+            ax.axhline(y=0, color='dimgray', alpha = 1)
+            ax.grid(True, which='major', lw=1, color='lightgray', alpha=0.4)
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+            ax.spines['left'].set_visible(False)
+            ax.spines['bottom'].set_visible(False)
+
+            ax.plot(xr, x, color='coral', alpha=0.5, lw=1, label='input')
+            ax.plot(xr, y, color='coral', alpha=1, lw=1, label='target')
+            ax.plot(xr, z, color='cornflowerblue', alpha=1, lw=1.5, label='response')
+
+            ax.tick_params(axis='both', color='white')
+            ax.set_title(f'trial {ix}, avg loss {np.round(float(loss), 2)}', size='small')
+            ax.set_ylim([-2,3])
+
+        fig.text(0.5, 0.04, 'timestep', ha='center', va='center')
+        fig.text(0.06, 0.5, 'value', ha='center', va='center', rotation='vertical')
 
     handles, labels = ax.get_legend_handles_labels()
     fig.suptitle(f'Final performance: {run_id}')
