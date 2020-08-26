@@ -10,6 +10,8 @@ import json
 from network import BasicNetwork, StateNet
 from utils import Bunch, load_rb
 
+from helpers import seq_goals_loss, update_seq_indices
+
 
 
 # extracts the correct parameters N, D, O, etc. in order to properly create a net to load into
@@ -92,30 +94,32 @@ def test_model(net, dset, n_tests=0, params={}):
         losses = []
         outs = []
 
-        total_loss = torch.tensor(0.)
         if is_seq_goals:
+            ins = []
             n_pts = x.shape[1]
             n_trials = x.shape[0]
             cur_indices = [0 for i in range(n_trials)]
             for j in range(100):
-                net_in = x[torch.arange(n_trials),cur_indices,:]
-
-                net_in = net_in.reshape(-1, net.args.L)
+                net_in = x[torch.arange(n_trials),cur_indices,:].reshape(-1, net.args.L)
+                ins.append(net_in)
                 net_out, extras = net(net_in, extras=True)
                 net_target = net_in.reshape(-1, net.args.Z)
 
-                dists = torch.norm(net_out - net_target, dim=1)
-                losses.append(dists.numpy())
-                outs.append(net_out)
-                step_loss = torch.sum(dists)
+                trial_losses = []
+                dones = []
+                for k in range(len(net_out)):
+                    step_loss, done = seq_goals_loss(net_out[k], net_target[k])
+                    trial_losses.append(step_loss)
+                    dones.append(done)
+                cur_indices = update_seq_indices(x, cur_indices, dones)
 
-                done = 0
-                for seq in range(n_trials):
-                    dist = dists[seq]
-                    if dist < 0.1 and cur_indices[seq] < n_pts:
-                        cur_indices[seq] += 1
-                        done += 1
-                total_loss += step_loss
+                losses.append(np.array(trial_losses))
+                outs.append(net_out)
+
+            goals = x
+            ins = torch.stack(ins, dim=1).squeeze()
+
+
         else:
             for j in range(x.shape[1]):
                 # run the step
@@ -130,10 +134,13 @@ def test_model(net, dset, n_tests=0, params={}):
                     trial_losses.append(step_loss)
                 losses.append(np.array(trial_losses))
 
+            ins = x
+            goals = x
+
     losses = np.sum(losses, axis=0)
     z = torch.stack(outs, dim=1).squeeze()
 
-    data = list(zip(dset_idx, x, y, z, losses))
+    data = list(zip(dset_idx, ins, goals, z, losses))
 
     final_loss = np.mean(losses, axis=0)
 

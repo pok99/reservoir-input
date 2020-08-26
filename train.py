@@ -19,7 +19,7 @@ import copy
 from network import BasicNetwork, StateNet, Reservoir
 
 from utils import log_this, load_rb
-from helpers import get_optimizer, get_criterion
+from helpers import get_optimizer, get_criterion, seq_goals_loss, update_seq_indices
 
 class Trainer:
     def __init__(self, args):
@@ -327,13 +327,7 @@ class Trainer:
                 ins.append(net_in)
                 goals.append(net_in)
                 net_out, step_loss, extras = self.run_iteration(net_in, net_in)
-                dists = torch.norm(net_out - net_in, dim=1)
-                done = 0
-                for seq in range(n_trials):
-                    dist = dists[seq]
-                    if dist < 0.1 and cur_indices[seq] < n_pts:
-                        cur_indices[seq] += 1
-                        done += 1
+                cur_indices = update_seq_indices(x, cur_indices, extras[-1])
                 # step_loss = sum([(n_pts + 1 - i) + dists[i] for i in cur_indices])
                 # step_loss = sum(dists)# - done
                 outs.append(net_out[-1].detach().numpy())
@@ -372,8 +366,10 @@ class Trainer:
         net_target = y.reshape(-1, self.args.Z)
         if 'seq-goals' in self.args.dataset:
             # calculate norm across batches
-            dists = torch.norm(net_out - net_target, dim=1)
-            step_loss = torch.sum(dists)
+            # dists = torch.norm(net_out - net_target, dim=1)
+            # step_loss = torch.sum(dists)
+            step_loss, done = seq_goals_loss(net_out, net_target)
+            extras.append(done)
         else:
             step_loss = self.criterion(net_out, net_target)
 
@@ -431,14 +427,8 @@ class Trainer:
                 cur_indices = [0 for i in range(n_trials)]
                 for j in range(100):
                     net_in = x[torch.arange(n_trials),cur_indices,:]
-                    net_out, step_loss, _ = self.run_iteration(net_in, net_in)
-                    dists = torch.norm(net_out - net_in, dim=1)
-                    done = 0
-                    for seq in range(n_trials):
-                        dist = dists[seq]
-                        if dist < 0.1 and cur_indices[seq] < n_pts:
-                            cur_indices[seq] += 1
-                            done += 1
+                    net_out, step_loss, extras = self.run_iteration(net_in, net_in)
+                    cur_indices = update_seq_indices(x, cur_indices, extras[-1])
                     total_loss += step_loss
 
             else:

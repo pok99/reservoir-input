@@ -22,6 +22,7 @@ parser.add_argument('--out_act', default=None, type=str)
 parser.add_argument('--stride', default=1, type=int)
 parser.add_argument('-a', '--test_all', action='store_true')
 parser.add_argument('-n', '--no_plot', action='store_true')
+parser.add_argument('--dists', action='store_true', help='to plot dists for seq-goals')
 args = parser.parse_args()
 
 with open(args.model, 'rb') as f:
@@ -66,15 +67,22 @@ if not args.no_plot:
             ax.spines['left'].set_visible(False)
             ax.spines['bottom'].set_visible(False)
 
-            n_pts = x.shape[0]
-            colors = iter(cm.rainbow(np.linspace(0, 1, n_pts)))
-            for j in range(n_pts):
-                ax.scatter(x[j][0], x[j][1], color=next(colors))
-            
-            n_timesteps = z.shape[0]
-            ts_colors = iter(cm.Blues(np.linspace(0, 1, n_timesteps)))
-            for j in range(n_timesteps):
-                ax.scatter(z[j][0], z[j][1], color=next(ts_colors), s=5)
+            # pdb.set_trace()
+            if args.dists:
+                dists = torch.norm(z - x, dim=1)
+                ax.plot(dists)
+
+            else:
+
+                n_pts = y.shape[0]
+                colors = iter(cm.Oranges(np.linspace(.2, 1, n_pts)))
+                for j in range(n_pts):
+                    ax.scatter(y[j][0], y[j][1], color=next(colors))
+                
+                n_timesteps = z.shape[0]
+                ts_colors = iter(cm.Blues(np.linspace(0, 1, n_timesteps)))
+                for j in range(n_timesteps):
+                    ax.scatter(z[j][0], z[j][1], color=next(ts_colors), s=5)
 
             ax.tick_params(axis='both', color='white')
             ax.set_title(f'trial {ix}, avg loss {np.round(float(loss), 2)}', size='small')

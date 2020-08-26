@@ -316,7 +316,7 @@ class StateNet(nn.Module):
         z = torch.clamp(z, -5, 5)
         self.s = self.s + z
         if extras:
-            return self.s, z
+            return self.s, [z]
         else:
             return self.s
 

@@ -4,6 +4,8 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
+import pdb
+
 import random
 
 def get_optimizer(args, train_params):
@@ -33,6 +35,27 @@ def get_output_activation(args):
     elif args.out_act == 'none':
         fn =  lambda x: x
     return fn
+
+def seq_goals_loss(out, target, threshold=.3, reward=5):
+    if len(out.shape) > 1:
+        dists = torch.norm(out - target, dim=1)
+    else:
+        # just one dimension so only one element in batch
+        dists = torch.norm(out - target, dim=0, keepdim=True)
+
+    done = (dists < threshold) * 1
+    done_count = done.sum()
+    loss = torch.sum(dists) - done_count * reward
+
+    return loss, done
+
+def update_seq_indices(targets, indices, done):
+    n_pts = len(targets)
+    n_trials = len(indices)
+    for seq in range(n_trials):
+        if indices[seq] < n_pts - 1 and done[seq]:
+            indices[seq] += 1
+    return indices
 
 
 def get_dim(a):
