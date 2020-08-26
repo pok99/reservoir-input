@@ -69,9 +69,7 @@ def load_model_path(path, params={}):
 
 # given a model and a dataset, see how well the model does on it
 # works with plot_trained.py
-def test_model(net, dset, n_tests=0, params={}):
-
-    is_seq_goals = 'dset' in params and 'seq-goals' in params['dset']
+def test_model(net, dset, n_tests=0, params={'dset': ''}):
 
     criterion = nn.MSELoss()
     dset_idx = range(len(dset))
@@ -80,13 +78,8 @@ def test_model(net, dset, n_tests=0, params={}):
 
     dset = [dset[i] for i in dset_idx]
 
-    if is_seq_goals:
-        x = torch.Tensor(dset)
-        y = x
-    else:
-        x, y, _ = list(zip(*dset))
-        x = torch.Tensor(x)
-        y = torch.Tensor(y)
+    is_seq_goals = 'seq-goals' in params['dset']
+    x, y = get_x_y(batch, params['dset'])
 
     with torch.no_grad():
         net.reset()
@@ -99,7 +92,7 @@ def test_model(net, dset, n_tests=0, params={}):
             n_pts = x.shape[1]
             n_trials = x.shape[0]
             cur_indices = [0 for i in range(n_trials)]
-            for j in range(100):
+            for j in range(200):
                 net_in = x[torch.arange(n_trials),cur_indices,:].reshape(-1, net.args.L)
                 ins.append(net_in)
                 net_out, extras = net(net_in, extras=True)

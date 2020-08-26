@@ -36,6 +36,7 @@ def get_output_activation(args):
         fn =  lambda x: x
     return fn
 
+# loss function for sequential goals
 def seq_goals_loss(out, target, threshold=.3, reward=5):
     if len(out.shape) > 1:
         dists = torch.norm(out - target, dim=1)
@@ -49,6 +50,7 @@ def seq_goals_loss(out, target, threshold=.3, reward=5):
 
     return loss, done
 
+# updating indices array to get the next targets for sequential goals
 def update_seq_indices(targets, indices, done):
     n_pts = len(targets)
     n_trials = len(indices)
@@ -57,6 +59,17 @@ def update_seq_indices(targets, indices, done):
             indices[seq] += 1
     return indices
 
+# given batch and dset name, get the x, y pairs
+def get_x_y(batch, dset):
+    if 'seq-goals' in dset:
+        x = torch.Tensor(batch)
+        y = x
+    else:
+        x, y, _ = list(zip(*batch))
+        x = torch.Tensor(x)
+        y = torch.Tensor(y)
+
+    return x, y
 
 def get_dim(a):
     if hasattr(a, '__iter__'):
