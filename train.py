@@ -55,12 +55,14 @@ class Trainer:
         # getting number of elements of every parameter
         self.n_params = {}
         self.train_params = []
+        logging.info('Training the following parameters:')
         for k,v in self.net.named_parameters():
             # k is name, v is weight
 
             # filtering just for the parts that will be trained
             for part in self.args.train_parts:
                 if part in k:
+                    logging.info(f'  {k}')
                     self.n_params[k] = (v.shape, v.numel())
                     self.train_params.append(v)
 
@@ -79,12 +81,13 @@ class Trainer:
         self.log_interval = self.args.log_interval
         if not self.args.no_log:
             self.log = self.args.log
+            self.run_id = self.args.log.run_id
             self.vis_samples = []
-            self.csv_path = open(os.path.join(self.log.run_dir, 'losses.csv'), 'a')
+            self.csv_path = open(os.path.join(self.log.run_dir, f'losses_{self.run_id}.csv'), 'a')
             self.writer = csv.writer(self.csv_path, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
             self.writer.writerow(['ix', 'avg_loss'])
-            self.plot_checkpoint_path = os.path.join(self.log.run_dir, 'checkpoints.pkl')
-            self.save_model_path = os.path.join(self.log.run_dir, 'model.pth')
+            self.plot_checkpoint_path = os.path.join(self.log.run_dir, f'checkpoints_{self.run_id}.pkl')
+            self.save_model_path = os.path.join(self.log.run_dir, f'model_{self.run_id}.pth')
 
     def optimize_lbfgs(self, mode):
         if mode == 'pytorch':
@@ -283,7 +286,7 @@ class Trainer:
 
             if not self.args.no_log:
                 self.log_model(ix='final')
-                with open(os.path.join(self.log.run_dir, 'checkpoints.pkl'), 'wb') as f:
+                with open(os.path.join(self.log.run_dir, f'checkpoints_{self.run_id}.pkl'), 'wb') as f:
                     pickle.dump(self.vis_samples, f)
                 self.csv_path.close()
 
@@ -496,14 +499,15 @@ class Trainer:
 
 def parse_args():
     parser = argparse.ArgumentParser(description='')
-    parser.add_argument('-L', type=int, default=1, help='')
-    parser.add_argument('-D', type=int, default=5, help='')
-    parser.add_argument('-N', type=int, default=50, help='')
-    parser.add_argument('-Z', type=int, default=1, help='')
+    parser.add_argument('-L', type=int, default=1, help='latent input dimension')
+    parser.add_argument('-T', type=int, default=1, help='task dimension')
+    parser.add_argument('-D', type=int, default=5, help='intermediate dimension')
+    parser.add_argument('-N', type=int, default=50, help='number of neurons in reservoir')
+    parser.add_argument('-Z', type=int, default=1, help='output dimension')
 
     parser.add_argument('--net', type=str, default='basic', choices=['basic', 'state'])
 
-    parser.add_argument('--train_parts', type=str, nargs='+', choices=['all', 'reservoir', 'W_ro', 'W_f'], default=['W_ro', 'W_f'])
+    parser.add_argument('--train_parts', type=str, nargs='+', default=['W_ro', 'W_f'])
     parser.add_argument('--stride', type=int, default=1, help='stride of the W_f')
     
     # make sure model_config path is specified if you use any paths! it ensures correct dimensions, bias, etc.
@@ -598,6 +602,7 @@ def adjust_args(args):
             args.out_act = 'none'
 
     # initializing logging
+    # do this last, because we will be logging previous parameters into the config file
     if not args.no_log:
         if args.slurm_id is not None:
             log = log_this(args, 'logs', os.path.join(args.name.split('_')[0], args.name.split('_')[1]), checkpoints=args.log_checkpoint_models)
@@ -630,7 +635,7 @@ if __name__ == '__main__':
     args = adjust_args(args)   
 
     trainer = Trainer(args)
-    logging.info(f'Initialized trainer. Using optimizer {args.optimizer}')
+    logging.info(f'Initialized trainer. Using optimizer {args.optimizer}.')
     n_iters = 0
     if args.optimizer == 'lbfgs-scipy':
         final_loss, n_iters = trainer.optimize_lbfgs('scipy')

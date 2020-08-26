@@ -50,6 +50,7 @@ def fill_undefined_args(args, default_args):
 # produce run id and create log directory
 def log_this(config, log_dir, log_name=None, checkpoints=False, use_id=True):
     run_id = str(int(time.time() * 100))[-7:]
+    config.run_id = run_id
     print('\n=== Logging ===', flush=True)
     
     if log_name is None or len(log_name) == 0:

@@ -22,7 +22,7 @@ default_arglist = {
     'reservoir_burn_steps': 200,
     'reservoir_noise': 0,
     'reservoir_path': None,
-    'bias': False,
+    'bias': True,
     'Wf_path': None,
     'Wro_path': None,
     'network_delay': 0,
@@ -199,10 +199,10 @@ class Hypothesizer(nn.Module):
 
         # simple one layer linear network for now, can generalize later
         # L dimensions for state, 2 dimensions for task (desired state)
-        self.W_sample = nn.Linear(self.args.L + 2, self.args.D)
+        self.W_sample = nn.Linear(self.args.L + self.args.T, self.args.D)
 
     def forward(self, t, s):
-        inp = torch.cat([t, s])
+        inp = torch.cat([t, s], axis=1)
         inp = inp + torch.normal(torch.zeros_like(inp), self.sample_std)
         pred = self.W_sample(inp)
 
@@ -303,15 +303,22 @@ class StateNet(nn.Module):
         self.s = torch.zeros(self.args.Z)
 
 
-    def forward(self, t):
+    def forward(self, t, extras=False):
+        # when we are using batches, we get different shapes with initial self.s
+        if len(t.shape) != len(self.s.shape):
+            mul = t.shape[0]
+            self.s = self.s.repeat((mul, 1))
         prop = self.hypothesizer(t, self.s)
         x = self.reservoir(prop)
 
         z = self.W_ro(x)
         # clipping so movements can't be too large
-        z = torch.clip(-1, 1)
+        z = torch.clamp(z, -1, 1)
         self.s = self.s + z
-        return z, self.s
+        if extras:
+            return z, self.s
+        else:
+            return self.s
 
     def reset(self, res_state_seed=None):
         self.reservoir.reset(res_state_seed=res_state_seed)

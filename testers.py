@@ -3,9 +3,11 @@ import torch
 import torch.nn as nn
 
 import random
+import os
 import pdb
+import json
 
-from network import BasicNetwork
+from network import BasicNetwork, StateNet
 from utils import Bunch, load_rb
 
 
@@ -13,12 +15,21 @@ from utils import Bunch, load_rb
 # extracts the correct parameters N, D, O, etc. in order to properly create a net to load into
 # TODO: load from config path instead it will be easier than wrestling with bugs
 def load_model_path(path, params={}):
+    path_folder = '/'.join(path.split('/')[:-1])
+    model_id = path.split('_')[-1][:-4]
+    config_path = os.path.join(path_folder, f'config_{model_id}.json')
+
+    with open(config_path, 'r') as f:
+        config = json.load(f)
+
     m_dict = torch.load(path)
     bunch = Bunch()
-    bunch.N = m_dict['reservoir.J.weight'].shape[0]
-    bunch.D = m_dict['reservoir.W_u.weight'].shape[1]
-    bunch.L = m_dict['W_f.weight'].shape[1]
-    bunch.Z = m_dict['W_ro.weight'].shape[0]
+    bunch.N = config['N']
+    bunch.D = config['D']
+    bunch.L = config['L']
+    bunch.Z = config['Z']
+    bunch.T = config['T']
+    bunch.bias = True
 
     #bunch.reservoir_burn_steps = 200
     bunch.reservoir_x_seed = 0
@@ -44,13 +55,16 @@ def load_model_path(path, params={}):
     if 'stride' in params and params['stride'] is not None:
         bunch.stride = params['stride']
 
-    bunch.bias = True
-    if 'W_f.bias' not in m_dict:
-        bunch.bias = False
-        # m_dict['W_f.bias'] = torch.zeros(bunch.D)
-        # m_dict['W_ro.bias'] = torch.zeros(bunch.Z)
+    # bunch.bias = True
+    # if 'W_f.bias' not in m_dict:
+    #     bunch.bias = False
+    #     # m_dict['W_f.bias'] = torch.zeros(bunch.D)
+    #     # m_dict['W_ro.bias'] = torch.zeros(bunch.Z)
 
-    net = BasicNetwork(bunch)
+    if config['net'] == 'basic':
+        net = BasicNetwork(bunch)
+    elif config['net'] == 'state':
+        net = StateNet(bunch)
     net.load_state_dict(m_dict)
     net.eval()
 
