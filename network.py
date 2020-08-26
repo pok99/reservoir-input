@@ -132,7 +132,7 @@ class BasicNetwork(nn.Module):
 
         self.reset()
 
-    def forward(self, o):
+    def forward(self, o, extras=False):
         u = self.W_f(o.reshape(-1, self.args.L))
 
         self.stride_step += 1
@@ -151,11 +151,15 @@ class BasicNetwork(nn.Module):
         z = fn(z)
         #z = nn.ReLU()(z)
         if self.network_delay == 0:
+            if not extras:
+                return z
             return z, x, u
         else:
             z2 = self.delay_output[self.delay_ind]
             self.delay_output[self.delay_ind] = z
             self.delay_ind = (self.delay_ind + 1) % self.network_delay
+            if not extras:
+                return z2
             return z2, x, u
 
 
@@ -283,4 +287,34 @@ class HypothesisNetwork(nn.Module):
             self.delay_output = [None] * self.network_delay
             self.delay_ind = 0
 
+
+class StateNet(nn.Module):
+    def __init__(self, args=BASIC_ARGS):
+        super().__init__()
+        args = fill_undefined_args(copy.deepcopy(args), BASIC_ARGS)
+        self.args = args
+
+        self.hypothesizer = Hypothesizer(args)
+        self.reservoir = Reservoir(args)
+
+        self.W_ro = nn.Linear(self.args.N, self.args.Z, bias=self.args.bias)
+
+        # initial condition
+        self.s = torch.zeros(self.args.Z)
+
+
+    def forward(self, t):
+        prop = self.hypothesizer(t, self.s)
+        x = self.reservoir(prop)
+
+        z = self.W_ro(x)
+        # clipping so movements can't be too large
+        z = torch.clip(-1, 1)
+        self.s = self.s + z
+        return z, self.s
+
+    def reset(self, res_state_seed=None):
+        self.reservoir.reset(res_state_seed=res_state_seed)
+        # initial condition
+        self.s = torch.zeros(self.args.Z)
 

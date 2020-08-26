@@ -82,7 +82,7 @@ def test_model(net, dset, n_tests=0):
         for j in range(x.shape[1]):
             # run the step
             net_in = x[:,j].reshape(-1, net.args.L)
-            net_out, val_thal, val_res = net(net_in)
+            net_out = net(net_in)
             outs.append(net_out)
             net_target = y[:,j].reshape(-1, net.args.Z)
 

@@ -225,9 +225,8 @@ def create_dataset(args):
 
     elif t_type == 'seq-goals':
         for n in range(n_trials):
-            # np.random.uniform(5, 20)
-
             n_goals = 10
+            config['n_goals'] = n_goals
             trial = []
             for i in range(n_goals):
                 trial.append(np.random.normal(loc=0, scale=5, size=2))
