@@ -65,6 +65,7 @@ class Trainer:
                     logging.info(f'  {k}')
                     self.n_params[k] = (v.shape, v.numel())
                     self.train_params.append(v)
+                    break
 
         self.criterion = get_criterion(self.args)
         
@@ -202,7 +203,6 @@ class Trainer:
                     self.net.zero_grad()
                     outs = []
                     total_loss = torch.tensor(0.)
-
 
                     if 'seq-goals' in self.args.dataset:
                         done = []
@@ -350,6 +350,7 @@ class Trainer:
         with torch.no_grad():
             self.net.reset()
             total_loss = torch.tensor(0.)
+
             if 'seq-goals' in self.args.dataset:
                 n_pts = x.shape[1]
                 n_trials = x.shape[0]
@@ -549,7 +550,7 @@ def adjust_args(args):
 
     # shortcut for specifying train everything including reservoir
     if args.train_parts == ['all']:
-        args.train_parts = ['W_ro', 'W_f', 'reservoir']
+        args.train_parts = ['']
 
     # output activation depends on the task / dataset used
     if args.out_act is None:
@@ -557,6 +558,15 @@ def adjust_args(args):
             args.out_act = 'exp'
         else:
             args.out_act = 'none'
+
+    if 'seq-goals' in args.dataset:
+        args.dset_type = 'seq-goals'
+    elif 'rsg' in args.dataset:
+        args.dset_type = 'rsg'
+    elif 'copy' in args.dataset:
+        args.dset_type = 'copy'
+    else:
+        args.dset_type = 'unknown'
 
     # initializing logging
     # do this last, because we will be logging previous parameters into the config file

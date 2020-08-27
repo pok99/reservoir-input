@@ -10,7 +10,7 @@ import json
 from network import BasicNetwork, StateNet
 from utils import Bunch, load_rb
 
-from helpers import seq_goals_loss, update_seq_indices
+from helpers import seq_goals_loss, update_seq_indices, get_x_y
 
 
 
@@ -79,7 +79,7 @@ def test_model(net, dset, n_tests=0, params={'dset': ''}):
     dset = [dset[i] for i in dset_idx]
 
     is_seq_goals = 'seq-goals' in params['dset']
-    x, y = get_x_y(batch, params['dset'])
+    x, y = get_x_y(dset, params['dset'])
 
     with torch.no_grad():
         net.reset()

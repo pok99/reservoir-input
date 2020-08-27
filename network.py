@@ -209,23 +209,56 @@ class Hypothesizer(nn.Module):
         return pred
 
 
-
-# captures the hypothesis generator and simulator into a single class
-class HypothesisNetwork(nn.Module):
+# doesn't have the simulator because the truth is just given to the network
+class StateNet(nn.Module):
     def __init__(self, args=BASIC_ARGS):
         super().__init__()
         args = fill_undefined_args(copy.deepcopy(args), BASIC_ARGS)
         self.args = args
-        self.simulator = Simulator(args)
+
         self.hypothesizer = Hypothesizer(args)
         self.reservoir = Reservoir(args)
 
-        self.stride = args.stride
-        self.stride_step = 0
+        self.W_ro = nn.Linear(self.args.N, self.args.Z, bias=self.args.bias)
 
-        self.W_ro = nn.Linear(args.N, args.Z, bias=args.bias)
+        self.reset()
 
-        self.network_delay = args.network_delay
+
+    def forward(self, t, extras=False):
+        # when we are using batches, we get different shapes with initial self.s
+        if len(t.shape) != len(self.s.shape):
+            mul = t.shape[0]
+            self.s = self.s.repeat((mul, 1))
+        prop = self.hypothesizer(t, self.s)
+        x = self.reservoir(prop)
+
+        z = self.W_ro(x)
+        # clipping so movements can't be too large
+        z = torch.clamp(z, -2, 2)
+        self.s = self.s + z
+        if extras:
+            return self.s, [z]
+        else:
+            return self.s
+
+    def reset(self, res_state_seed=None):
+        self.reservoir.reset(res_state_seed=res_state_seed)
+        # initial condition
+        self.s = torch.zeros(self.args.Z)
+
+
+# captures the hypothesis generator and simulator into a single class
+class HypothesisNet(nn.Module):
+    def __init__(self, args=BASIC_ARGS):
+        super().__init__()
+        args = fill_undefined_args(copy.deepcopy(args), BASIC_ARGS)
+        self.args = args
+
+        self.hypothesizer = Hypothesizer(args)
+        self.simulator = Simulator(args)
+        self.reservoir = Reservoir(args)
+
+        self.W_ro = nn.Linear(args.N, args.Z, bias=self.args.bias)
 
         self.reset()
 
@@ -237,12 +270,16 @@ class HypothesisNetwork(nn.Module):
 
 
             # test the sim here
-            cos_ang = torch.dot(sim/sim.norm(), t/t.norm())
+            #cos_ang = torch.dot(sim/sim.norm(), t/t.norm())
             cur_dist = torch.norm(t - self.s)
-            dx_ratio = (cur_dist - torch.norm(t - sim)) / cur_dist
+            prop_dist = torch.norm(t - sim)
 
-            if cos_ang * dx_ratio >= 1:
+            #dx_ratio = (cur_dist - torch.norm(t - sim)) / cur_dist
+            if prop_dist < cur_dist:
                 break
+
+            # if cos_ang * dx_ratio >= 1:
+            #     break
             fail_count += 1
             print('failed', cos_ang,dx_ratio)
             pdb.set_trace()
@@ -250,6 +287,7 @@ class HypothesisNetwork(nn.Module):
                 print('really failed here')
                 pdb.set_trace()
 
+        print('succeeded')
         pdb.set_trace()
         u = prop
 
@@ -280,48 +318,4 @@ class HypothesisNetwork(nn.Module):
 
     def reset(self, res_state_seed=None):
         self.reservoir.reset(res_state_seed=res_state_seed)
-        self.s = torch.zeros(2)
-        # set up network delay mechanism. essentially a queue of length network_delay
-        # with a pointer to the current index
-        if self.network_delay != 0:
-            self.delay_output = [None] * self.network_delay
-            self.delay_ind = 0
-
-
-class StateNet(nn.Module):
-    def __init__(self, args=BASIC_ARGS):
-        super().__init__()
-        args = fill_undefined_args(copy.deepcopy(args), BASIC_ARGS)
-        self.args = args
-
-        self.hypothesizer = Hypothesizer(args)
-        self.reservoir = Reservoir(args)
-
-        self.W_ro = nn.Linear(self.args.N, self.args.Z, bias=self.args.bias)
-
-        # initial condition
         self.s = torch.zeros(self.args.Z)
-
-
-    def forward(self, t, extras=False):
-        # when we are using batches, we get different shapes with initial self.s
-        if len(t.shape) != len(self.s.shape):
-            mul = t.shape[0]
-            self.s = self.s.repeat((mul, 1))
-        prop = self.hypothesizer(t, self.s)
-        x = self.reservoir(prop)
-
-        z = self.W_ro(x)
-        # clipping so movements can't be too large
-        z = torch.clamp(z, -5, 5)
-        self.s = self.s + z
-        if extras:
-            return self.s, [z]
-        else:
-            return self.s
-
-    def reset(self, res_state_seed=None):
-        self.reservoir.reset(res_state_seed=res_state_seed)
-        # initial condition
-        self.s = torch.zeros(self.args.Z)
-
