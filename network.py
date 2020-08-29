@@ -103,9 +103,14 @@ class Reservoir(nn.Module):
             # load specified hidden state from seed
             if res_state_seed is None:
                 res_state_seed = self.reservoir_x_seed
-            # reset to 0 if x seed is -1
-            if res_state_seed == -1:
+            
+            if res_state_seed == 'zero':
+                # reset to 0
                 self.x = torch.zeros((1, self.args.N))
+            elif res_state_seed == 'random':
+                # reset to totally random value without using reservoir seed
+                self.x = torch.normal(0, 1, (1, self.args.N))
+                self.burn_in(self.n_burn_in)
             else:
                 # if any other seed set, set the net to that seed and burn in
                 rng_pt = torch.get_rng_state()

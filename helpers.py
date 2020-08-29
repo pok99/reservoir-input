@@ -25,6 +25,8 @@ def get_criterion(args):
         criterion = nn.MSELoss()
     elif args.loss == 'bce':
         criterion = nn.BCEWithLogitsLoss()
+    elif args.loss == 'seq-goals':
+        criterion = seq_goals_loss
     return criterion
 
 def get_output_activation(args):

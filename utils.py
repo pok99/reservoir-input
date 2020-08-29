@@ -100,4 +100,3 @@ def load_rb(path):
 def lrange(l, p=0.1):
     return np.linspace(0, (l-1) * p, l)
 
-

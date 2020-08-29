@@ -125,7 +125,7 @@ class Trainer:
 
         elif mode == 'scipy':
 
-            if 'seq-goals' in self.args.dataset:
+            if self.args.dset_type == 'seq-goals':
                 targets = torch.Tensor(self.dset)
             else:
                 dset = np.asarray([x[:-1] for x in self.dset])
@@ -154,9 +154,8 @@ class Trainer:
                 self.net.zero_grad()
                 total_loss = torch.tensor(0.)
 
-
-                # testing with my random loss function
-                if 'seq-goals' in self.args.dataset:
+                # running through the dataset and getting gradients
+                if self.args.dset_type == 'seq-goals':
                     n_pts = len(self.dset[0])
                     cur_indices = [0 for i in range(len(self.dset))]
                     for j in range(self.args.seq_goals_timesteps):
@@ -165,25 +164,22 @@ class Trainer:
                         ins.append(net_in.numpy())
                         outs.append(net_out.detach().squeeze().numpy())
                         cur_indices = update_seq_indices(targets, cur_indices, extras[-1])
-                        total_loss += step_loss
 
                 else:
                     for j in range(x.shape[1]):
-                        net_in = x[:,j].reshape(-1, self.args.L)
-                        net_out = self.net(net_in)
-                        net_target = y[:,j].reshape(-1, self.args.Z)
-
-                        step_loss = self.criterion(net_out, net_target)
-                        total_loss += step_loss
-
+                        net_out, step_loss, _ = self.run_iteration(x[:,j], y[:,j])
+                
+                total_loss += step_loss
                 total_loss.backward()
 
+                # need to do this every time so we can reference parameters and grads by name
                 grad_list = []
                 for k,v in self.net.named_parameters():
                     for part in self.args.train_parts:
                         if part in k:
                             grad = v.grad.numpy().reshape(-1)
                             grad_list.append(grad)
+                            break
 
                 vec = np.concatenate(grad_list)
                 post = np.float64(vec)
@@ -199,42 +195,39 @@ class Trainer:
                     # W_f, W_ro = vec_to_param(xk)
                     sample_n = random.randrange(len(self.dset))
 
-                    self.net.reset(res_state_seed=0)
-                    self.net.zero_grad()
-                    outs = []
-                    total_loss = torch.tensor(0.)
+                    with torch.no_grad():
+                        self.net.reset(res_state_seed=0)
+                        self.net.zero_grad()
+                        outs = []
+                        total_loss = torch.tensor(0.)
 
-                    if 'seq-goals' in self.args.dataset:
-                        done = []
-                        ins = []
-                        n_pts = len(self.dset[0])
-                        cur_index = 0
-                        for j in range(self.args.seq_goals_timesteps):
-                            net_in = targets[sample_n,cur_index,:]
+                        if self.args.dset_type == 'seq-goals':
+                            done = []
+                            ins = []
+                            n_pts = len(self.dset[0])
+                            cur_index = 0
+                            for j in range(self.args.seq_goals_timesteps):
+                                net_in = targets[sample_n,cur_index,:]
+                                net_out, step_loss, extras = self.run_iteration(net_in, net_in)
+                                ins.append(net_in.numpy())
+                                outs.append(net_out.detach().squeeze().numpy())
+                                cur_index = update_seq_indices(x, cur_index, extras[-1])
+                                total_loss += step_loss
+                            pdb.set_trace()
+                            self.log_checkpoint(self.scipy_ix, np.array(ins), np.array(ins), np.array(outs), total_loss.item(), total_loss.item())
 
-                            net_out, step_loss, extras = self.run_iteration(net_in, net_in)
-                            ins.append(net_in.numpy())
-                            outs.append(net_out.detach().squeeze().numpy())
-                            cur_index = update_seq_indices(x, cur_index, extras[-1])
-                            total_loss += step_loss
-                        pdb.set_trace()
-                        self.log_checkpoint(self.scipy_ix, np.array(ins), np.array(ins), np.array(outs), total_loss.item(), total_loss.item())
+                        else:
+                            xs = x[sample_n,:]
+                            ys = y[sample_n,:]
+                            for j in range(xs.shape[0]):
+                                net_out, step_loss, _ = self.run_iteration(xs[j], ys[j])
+                                outs.append(net_out.item())
+                                total_loss += step_loss
 
-                    else:
-                        xs = x[sample_n,:]
-                        ys = y[sample_n,:]
-                        for j in range(xs.shape[0]):
-                            net_in = xs[j].reshape(-1, self.args.L)
-                            net_out = self.net(net_in)
-                            outs.append(net_out.item())
-                            net_target = ys[j].reshape(-1, self.args.Z)
-                            step_loss = self.criterion(net_out, net_target)
-                            total_loss += step_loss
+                            z = np.stack(outs).squeeze()
+                            self.log_checkpoint(self.scipy_ix, xs.numpy(), ys.numpy(), z, total_loss.item(), total_loss.item())
 
-                        z = np.stack(outs).squeeze()
-                        self.log_checkpoint(self.scipy_ix, xs.numpy(), ys.numpy(), z, total_loss.item(), total_loss.item())
-
-                    logging.info(f'iteration {self.scipy_ix}\t| loss {total_loss.item():.3f}')
+                        logging.info(f'iteration {self.scipy_ix}\t| loss {total_loss.item():.3f}')
 
             # getting the initial values to put into the algorithm
             init_list = []
@@ -286,13 +279,16 @@ class Trainer:
             pickle.dump(self.vis_samples, f)
 
     def train_iteration(self, x, y):
-        self.net.reset()
+        self.net.reset(self.args.reservoir_x_init)
         self.optimizer.zero_grad()
+
+        logging.info(self.net.reservoir.x)
+        pdb.set_trace()
         
         outs = []
         total_loss = torch.tensor(0.)
 
-        if 'seq-goals' in self.args.dataset:
+        if self.args.dset_type == 'seq-goals':
             ins = []
             goals = []
             n_pts = x.shape[1]
@@ -301,14 +297,13 @@ class Trainer:
             for j in range(self.args.seq_goals_timesteps):
                 net_in = x[torch.arange(n_trials),cur_indices,:]
                 ins.append(net_in)
-                goals.append(net_in)
                 net_out, step_loss, extras = self.run_iteration(net_in, net_in)
                 cur_indices = update_seq_indices(x, cur_indices, extras[-1])
                 outs.append(net_out[-1].detach().numpy())
                 total_loss += step_loss
 
             ins = torch.cat(ins)
-            goals = torch.cat(goals)
+            goals = x
 
         else:
             ins = x
@@ -329,7 +324,7 @@ class Trainer:
         net_in = x.reshape(-1, self.args.L)
         net_out, extras = self.net(net_in, extras=True)
         net_target = y.reshape(-1, self.args.Z)
-        if 'seq-goals' in self.args.dataset:
+        if self.args.dset_type == 'seq-goals':
             step_loss, done = seq_goals_loss(net_out, net_target)
             # hacky way to append whether we hit the target to returns
             extras.append(done)
@@ -348,10 +343,10 @@ class Trainer:
         x, y = get_x_y(batch, self.args.dataset)
 
         with torch.no_grad():
-            self.net.reset()
+            self.net.reset(self.args.reservoir_x_init)
             total_loss = torch.tensor(0.)
 
-            if 'seq-goals' in self.args.dataset:
+            if self.args.dset_type == 'seq-goals':
                 n_pts = x.shape[1]
                 n_trials = x.shape[0]
                 cur_indices = [0 for i in range(n_trials)]
@@ -482,7 +477,7 @@ def parse_args():
     parser.add_argument('--out_act', type=str, default=None, help='output activation')
 
     parser.add_argument('--dataset', type=str, default='datasets/rsg2.pkl')
-    parser.add_argument('--seq_goals_timesteps', type=int, defualt=200)
+    parser.add_argument('--seq_goals_timesteps', type=int, default=200)
 
     parser.add_argument('--optimizer', choices=['adam', 'sgd', 'rmsprop', 'lbfgs-scipy', 'lbfgs-pytorch'], default='lbfgs-scipy')
     parser.add_argument('--loss', type=str, default='mse')
@@ -502,6 +497,8 @@ def parse_args():
     parser.add_argument('--reservoir_seed', type=int, help='seed for reservoir')
     parser.add_argument('--reservoir_x_seed', type=int, default=0, help='seed for reservoir init hidden states. -1 for zero init')
     parser.add_argument('--reservoir_burn_steps', type=int, default=200, help='number of steps for reservoir to burn in')
+
+    parser.add_argument('--reservoir_x_init', type=str, default=None, help='other seed options for reservoir')
 
     parser.add_argument('--no_log', action='store_true')
     parser.add_argument('--log_interval', type=int, default=50)
@@ -567,6 +564,9 @@ def adjust_args(args):
         args.dset_type = 'copy'
     else:
         args.dset_type = 'unknown'
+
+    if args.dset_type == 'seq-goals':
+        args.loss = 'seq-goals'
 
     # initializing logging
     # do this last, because we will be logging previous parameters into the config file
