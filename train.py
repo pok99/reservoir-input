@@ -282,34 +282,27 @@ class Trainer:
         self.net.reset(self.args.reservoir_x_init)
         self.optimizer.zero_grad()
 
-        logging.info(self.net.reservoir.x)
-        pdb.set_trace()
-        
         outs = []
         total_loss = torch.tensor(0.)
 
         if self.args.dset_type == 'seq-goals':
             ins = []
-            goals = []
-            n_pts = x.shape[1]
-            n_trials = x.shape[0]
-            cur_indices = [0 for i in range(n_trials)]
+            goals = x
+            cur_idx = torch.zeros(x.shape[0], dtype=torch.long)
             for j in range(self.args.seq_goals_timesteps):
-                net_in = x[torch.arange(n_trials),cur_indices,:]
-                ins.append(net_in)
-                net_out, step_loss, extras = self.run_iteration(net_in, net_in)
-                cur_indices = update_seq_indices(x, cur_indices, extras[-1])
+                net_out, step_loss, extras, cur_idx = self.run_iter_goal(x, cur_idx)
+                # what we need to record for logging
+                ins.append(extras[-2])
                 outs.append(net_out[-1].detach().numpy())
                 total_loss += step_loss
 
             ins = torch.cat(ins)
-            goals = x
 
         else:
             ins = x
             goals = y
             for j in range(x.shape[1]):
-                net_out, step_loss, extras = self.run_iteration(x[:,j], y[:,j])
+                net_out, step_loss, extras = self.run_iter_traj(x[:,j], y[:,j])
                 if np.isnan(step_loss.item()):
                     return -1, (net_out, extras)
                 total_loss += step_loss
@@ -320,18 +313,28 @@ class Trainer:
         # extra Nones for legacy reasons. thals, res, sublosses
         return total_loss, (ins, goals, outs, None, None, None)
 
-    def run_iteration(self, x, y):
+    # runs an iteration where we want to match a certain trajectory
+    def run_iter_traj(self, x, y):
         net_in = x.reshape(-1, self.args.L)
         net_out, extras = self.net(net_in, extras=True)
         net_target = y.reshape(-1, self.args.Z)
-        if self.args.dset_type == 'seq-goals':
-            step_loss, done = seq_goals_loss(net_out, net_target)
-            # hacky way to append whether we hit the target to returns
-            extras.append(done)
-        else:
-            step_loss = self.criterion(net_out, net_target)
+        step_loss = self.criterion(net_out, net_target)
 
         return net_out, step_loss, extras
+
+    # runs an iteration where we want to hit a certain goal (dynamic input)
+    def run_iter_goal(self, x, indices):
+        x_goal = x[torch.arange(x.shape[0]),indices,:]
+        
+        net_in = x_goal.reshape(-1, self.args.L)
+        net_out, extras = self.net(net_in, extras=True)
+        # the target is actually the input
+        step_loss, done = seq_goals_loss(net_out, net_in)
+        # hacky way to append the net_in and whether we hit the target to returns
+        extras.extend([net_in, done])
+        new_indices = update_seq_indices(x_goal, indices, done)
+
+        return net_out, step_loss, extras, new_indices
 
     def test(self, n=0):
         if n != 0:
@@ -347,21 +350,17 @@ class Trainer:
             total_loss = torch.tensor(0.)
 
             if self.args.dset_type == 'seq-goals':
-                n_pts = x.shape[1]
-                n_trials = x.shape[0]
-                cur_indices = [0 for i in range(n_trials)]
+                cur_idx = torch.zeros(x.shape[0], dtype=torch.long)
                 for j in range(self.args.seq_goals_timesteps):
-                    net_in = x[torch.arange(n_trials),cur_indices,:]
-                    net_out, step_loss, extras = self.run_iteration(net_in, net_in)
-                    cur_indices = update_seq_indices(x, cur_indices, extras[-1])
+                    _, step_loss, _, cur_idx = self.run_iter_goal(x, cur_idx)
                     total_loss += step_loss
 
             else:
                 for j in range(x.shape[1]):
-                    _, step_loss, _ = self.run_iteration(x[:,j], y[:,j])
+                    _, step_loss, _ = self.run_iter_traj(x[:,j], y[:,j])
                     total_loss += step_loss
 
-        return total_loss.item()
+        return total_loss.item() / len(batch)
 
     def train(self, ix_callback=None):
         ix = 0
@@ -477,7 +476,7 @@ def parse_args():
     parser.add_argument('--out_act', type=str, default=None, help='output activation')
 
     parser.add_argument('--dataset', type=str, default='datasets/rsg2.pkl')
-    parser.add_argument('--seq_goals_timesteps', type=int, default=200)
+    parser.add_argument('--seq_goals_timesteps', type=int, default=200, help='num timesteps to run seq goals dataset for')
 
     parser.add_argument('--optimizer', choices=['adam', 'sgd', 'rmsprop', 'lbfgs-scipy', 'lbfgs-pytorch'], default='lbfgs-scipy')
     parser.add_argument('--loss', type=str, default='mse')
@@ -498,7 +497,7 @@ def parse_args():
     parser.add_argument('--reservoir_x_seed', type=int, default=0, help='seed for reservoir init hidden states. -1 for zero init')
     parser.add_argument('--reservoir_burn_steps', type=int, default=200, help='number of steps for reservoir to burn in')
 
-    parser.add_argument('--reservoir_x_init', type=str, default=None, help='other seed options for reservoir')
+    parser.add_argument('-x', '--reservoir_x_init', type=str, default=None, help='other seed options for reservoir')
 
     parser.add_argument('--no_log', action='store_true')
     parser.add_argument('--log_interval', type=int, default=50)

@@ -54,11 +54,7 @@ def seq_goals_loss(out, target, threshold=.3, reward=5):
 
 # updating indices array to get the next targets for sequential goals
 def update_seq_indices(targets, indices, done):
-    n_pts = len(targets)
-    n_trials = len(indices)
-    for seq in range(n_trials):
-        if indices[seq] < n_pts - 1 and done[seq]:
-            indices[seq] += 1
+    indices = torch.clamp(indices + done, 0, len(targets) - 1)
     return indices
 
 # given batch and dset name, get the x, y pairs

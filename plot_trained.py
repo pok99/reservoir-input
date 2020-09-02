@@ -20,8 +20,10 @@ parser.add_argument('dataset', help='path to a dataset of trials')
 parser.add_argument('--noise', default=0, help='noise to add to trained weights')
 parser.add_argument('--out_act', default=None, type=str)
 parser.add_argument('--stride', default=1, type=int)
+parser.add_argument('-x', '--reservoir_x_init', default=None, type=str)
 parser.add_argument('-a', '--test_all', action='store_true')
 parser.add_argument('-n', '--no_plot', action='store_true')
+parser.add_argument('-t', '--seq_goals_timesteps', type=int, default=200, help='number of steps to run seq-goals datasets for')
 parser.add_argument('--dists', action='store_true', help='to plot dists for seq-goals')
 args = parser.parse_args()
 
@@ -47,7 +49,11 @@ if args.test_all:
     print('avg summed loss (all):', loss2)
 
 if not args.no_plot:
-    data, loss = test_model(net, dset, n_tests=12, params={'dset': args.dataset})
+    data, loss = test_model(net, dset, n_tests=12, params={
+        'dset': args.dataset,
+        'reservoir_x_init': args.reservoir_x_init,
+        'seq_goals_timesteps': args.seq_goals_timesteps
+    })
     print('avg summed loss (plotted):', loss)
 
     run_id = '/'.join(args.model.split('/')[-3:-1])

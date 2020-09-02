@@ -61,6 +61,7 @@ def load_model_path(path, params={}):
         net = BasicNetwork(bunch)
     elif config['net'] == 'state':
         net = StateNet(bunch)
+
     net.load_state_dict(m_dict)
     net.eval()
 
@@ -69,7 +70,7 @@ def load_model_path(path, params={}):
 
 # given a model and a dataset, see how well the model does on it
 # works with plot_trained.py
-def test_model(net, dset, n_tests=0, params={'dset': ''}):
+def test_model(net, dset, n_tests=0, params={'dset': '', 'reservoir_x_init': None, 'seq_goals_timesteps': 200}):
 
     criterion = nn.MSELoss()
     dset_idx = range(len(dset))
@@ -82,7 +83,7 @@ def test_model(net, dset, n_tests=0, params={'dset': ''}):
     x, y = get_x_y(dset, params['dset'])
 
     with torch.no_grad():
-        net.reset()
+        net.reset(params['reservoir_x_init'])
 
         losses = []
         outs = []
@@ -90,21 +91,21 @@ def test_model(net, dset, n_tests=0, params={'dset': ''}):
         if is_seq_goals:
             ins = []
             n_pts = x.shape[1]
-            n_trials = x.shape[0]
-            cur_indices = [0 for i in range(n_trials)]
-            for j in range(200):
-                net_in = x[torch.arange(n_trials),cur_indices,:].reshape(-1, net.args.L)
+            cur_idx = torch.zeros(x.shape[0], dtype=torch.long)
+            for j in range(params['seq_goals_timesteps']):
+                net_in = x[torch.arange(x.shape[0]),cur_idx,:].reshape(-1, net.args.L)
                 ins.append(net_in)
                 net_out, extras = net(net_in, extras=True)
                 net_target = net_in.reshape(-1, net.args.Z)
 
                 trial_losses = []
-                dones = []
+                dones = torch.zeros(x.shape[0], dtype=torch.long)
+
                 for k in range(len(net_out)):
                     step_loss, done = seq_goals_loss(net_out[k], net_target[k])
                     trial_losses.append(step_loss)
-                    dones.append(done)
-                cur_indices = update_seq_indices(x, cur_indices, dones)
+                    dones[k] = done.item()
+                cur_idx = update_seq_indices(x, cur_idx, dones)
 
                 losses.append(np.array(trial_losses))
                 outs.append(net_out)
