@@ -6,6 +6,7 @@ import random
 import os
 import pdb
 import json
+import sys
 
 from network import BasicNetwork, StateNet
 from utils import Bunch, load_rb
@@ -24,7 +25,7 @@ def load_model_path(path, params={}):
     with open(config_path, 'r') as f:
         config = json.load(f)
 
-    m_dict = torch.load(path)
+    #m_dict = torch.load(path)
     bunch = Bunch()
     bunch.N = config['N']
     bunch.D = config['D']
@@ -35,14 +36,17 @@ def load_model_path(path, params={}):
 
     #bunch.reservoir_burn_steps = 200
     bunch.reservoir_x_seed = 0
+    bunch.reservoir_noise = config['reservoir_noise']
     #bunch.network_delay = 0
 
     #bunch.res_init_type = 'gaussian'
     #bunch.res_init_params = {'std': 1.5}
-    #bunch.reservoir_seed = 0
+    bunch.reservoir_seed = 0
+
+    bunch.model_path = path
 
     #bunch.reservoir_noise = 0
-    if 'reservoir_noise' in params:
+    if params['reservoir_noise'] is not None:
         bunch.reservoir_noise = params['reservoir_noise']
 
     #bunch.out_act = 'exp'
@@ -62,7 +66,7 @@ def load_model_path(path, params={}):
     elif config['net'] == 'state':
         net = StateNet(bunch)
 
-    net.load_state_dict(m_dict)
+    #net.load_state_dict(m_dict)
     net.eval()
 
 
@@ -102,14 +106,14 @@ def test_model(net, dset, n_tests=0, params={'dset': '', 'reservoir_x_init': Non
                 dones = torch.zeros(x.shape[0], dtype=torch.long)
 
                 for k in range(len(net_out)):
-                    step_loss, done = seq_goals_loss(net_out[k], net_target[k])
+                    step_loss, done = seq_goals_loss(net_out[k], net_target[k], threshold=params['seq_goals_threshold'])
                     trial_losses.append(step_loss)
                     dones[k] = done.item()
                 cur_idx = update_seq_indices(x, cur_idx, dones)
 
                 losses.append(np.array(trial_losses))
                 outs.append(net_out)
-
+            print(cur_idx)
             goals = x
             ins = torch.stack(ins, dim=1).squeeze()
 

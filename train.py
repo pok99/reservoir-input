@@ -72,6 +72,17 @@ class Trainer:
         self.optimizer = get_optimizer(self.args, self.train_params)
 
         self.dset = load_rb(self.args.dataset)
+
+        # if using separate training and test sets, separate them out
+        if self.args.separate_test:
+            np.random.shuffle(self.dset)
+            cutoff = round(.9 * len(self.dset))
+            self.train_set = self.dset[:cutoff]
+            self.test_set = self.dset[cutoff:]
+            logging.info(f'Using separate training ({cutoff}) and test ({len(self.dset) - cutoff}) sets.')
+        else:
+            self.train_set = self.dset
+            self.test_set = self.dset
         
         self.log_interval = self.args.log_interval
         if not self.args.no_log:
@@ -310,8 +321,14 @@ class Trainer:
 
         total_loss.backward()
 
-        # extra Nones for legacy reasons. thals, res, sublosses
-        return total_loss, (ins, goals, outs, None, None, None)
+        etc = {
+            'ins': ins,
+            'goals': goals,
+            'outs': outs
+        }
+        if self.args.dset_type == 'seq-goals':
+            etc['indices'] = cur_idx
+        return total_loss, etc
 
     # runs an iteration where we want to match a certain trajectory
     def run_iter_traj(self, x, y):
@@ -329,19 +346,19 @@ class Trainer:
         net_in = x_goal.reshape(-1, self.args.L)
         net_out, extras = self.net(net_in, extras=True)
         # the target is actually the input
-        step_loss, done = seq_goals_loss(net_out, net_in)
+        step_loss, done = seq_goals_loss(net_out, net_in, threshold=args.seq_goals_threshold)
         # hacky way to append the net_in and whether we hit the target to returns
         extras.extend([net_in, done])
-        new_indices = update_seq_indices(x_goal, indices, done)
+        new_indices = update_seq_indices(x, indices, done)
 
         return net_out, step_loss, extras, new_indices
 
     def test(self, n=0):
         if n != 0:
-            assert n <= len(self.dset)
-            batch = np.random.choice(self.dset, n)
+            assert n <= len(self.test_set)
+            batch = np.random.choice(self.test_set, n)
         else:
-            batch = self.dset
+            batch = self.test_set
 
         x, y = get_x_y(batch, self.args.dataset)
 
@@ -360,13 +377,17 @@ class Trainer:
                     _, step_loss, _ = self.run_iter_traj(x[:,j], y[:,j])
                     total_loss += step_loss
 
-        return total_loss.item() / len(batch)
+        etc = {}
+        if self.args.dset_type == 'seq-goals':
+            etc['indices'] = cur_idx
+
+        return total_loss.item() / len(batch), etc
 
     def train(self, ix_callback=None):
         ix = 0
 
-        its_p_epoch = len(self.dset) // self.args.batch_size
-        logging.info(f'Dataset size {len(self.dset)} | batch size {self.args.batch_size} --> {its_p_epoch} iterations / epoch')
+        its_p_epoch = len(self.train_set) // self.args.batch_size
+        logging.info(f'Training set size {len(self.train_set)} | batch size {self.args.batch_size} --> {its_p_epoch} iterations / epoch')
 
         # for convergence testing
         max_abs_grads = []
@@ -377,11 +398,11 @@ class Trainer:
         running_mag = 0.0
         ending = False
         for e in range(self.args.n_epochs):
-            np.random.shuffle(self.dset)
+            np.random.shuffle(self.train_set)
             epoch_idx = 0
             while epoch_idx < its_p_epoch:
                 epoch_idx += 1
-                batch = self.dset[(epoch_idx-1) * self.args.batch_size:epoch_idx * self.args.batch_size]
+                batch = self.train_set[(epoch_idx-1) * self.args.batch_size:epoch_idx * self.args.batch_size]
                 if len(batch) < self.args.batch_size:
                     break
                 ix += 1
@@ -404,16 +425,27 @@ class Trainer:
                 running_mag += mag             
 
                 if ix % self.log_interval == 0:
-                    outs = etc[2]
+                    outs = etc['outs']
                     z = np.stack(outs).squeeze()
                     # avg of the last 50 trials
                     avg_loss = running_loss / self.log_interval
-                    test_loss = self.test()
+                    test_loss, test_etc = self.test()
                     avg_max_grad = running_mag / self.log_interval
-                    logging.info(f'iteration {ix}\t| loss {avg_loss:.3f}\t| max abs grad {avg_max_grad:.3f} | test loss {test_loss:.3f}')
+                    log_arr = [
+                        f'iteration {ix}',
+                        f'loss {avg_loss:.3f}',
+                        # f'max abs grad {avg_max_grad:.3f}',
+                        f'test loss {test_loss:.3f}'
+                    ]
+                    # calculating average index reached for seq-goals task
+                    if self.args.dset_type == 'seq-goals':
+                        avg_index = test_etc['indices'].float().mean().item()
+                        log_arr.append(f'avg index {avg_index:.3f}')
+                    log_str = '\t| '.join(log_arr)
+                    logging.info(log_str)
 
                     if not self.args.no_log:
-                        self.log_checkpoint(ix, etc[0].numpy(), etc[1].numpy(), z, running_loss, avg_loss)
+                        self.log_checkpoint(ix, etc['ins'].numpy(), etc['goals'].numpy(), z, running_loss, avg_loss)
                     running_loss = 0.0
                     running_mag = 0.0
 
@@ -444,7 +476,7 @@ class Trainer:
 
             self.csv_path.close()
 
-        final_loss = self.test()
+        final_loss, etc = self.test()
         logging.info(f'END | iterations: {(ix // self.log_interval) * self.log_interval} | test loss: {final_loss}')
         return final_loss, ix
 
@@ -476,7 +508,11 @@ def parse_args():
     parser.add_argument('--out_act', type=str, default=None, help='output activation')
 
     parser.add_argument('--dataset', type=str, default='datasets/rsg2.pkl')
+    parser.add_argument('--separate_test', action='store_true', help='use separate test set')
+
+    # seq-goals parameters
     parser.add_argument('--seq_goals_timesteps', type=int, default=200, help='num timesteps to run seq goals dataset for')
+    parser.add_argument('--seq_goals_threshold', type=float, default=1, help='threshold for detection for seq goals')
 
     parser.add_argument('--optimizer', choices=['adam', 'sgd', 'rmsprop', 'lbfgs-scipy', 'lbfgs-pytorch'], default='lbfgs-scipy')
     parser.add_argument('--loss', type=str, default='mse')
@@ -555,6 +591,7 @@ def adjust_args(args):
         else:
             args.out_act = 'none'
 
+    # set the dataset
     if 'seq-goals' in args.dataset:
         args.dset_type = 'seq-goals'
     elif 'rsg' in args.dataset:
@@ -564,6 +601,7 @@ def adjust_args(args):
     else:
         args.dset_type = 'unknown'
 
+    # use custom seq-goals loss for seq-goals dataset, override default loss fn
     if args.dset_type == 'seq-goals':
         args.loss = 'seq-goals'
 

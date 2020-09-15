@@ -8,6 +8,7 @@ import pickle
 import pdb
 import random
 import copy
+import sys
 
 from utils import Bunch, load_rb, fill_undefined_args
 from helpers import get_output_activation
@@ -27,7 +28,8 @@ default_arglist = {
     'Wro_path': None,
     'network_delay': 0,
     'out_act': 'exp',
-    'stride': 1
+    'stride': 1,
+    'model_path': None
 }
 BASIC_ARGS = Bunch(**default_arglist)
 SIMULATOR_ARGS = copy.deepcopy(BASIC_ARGS)
@@ -55,7 +57,9 @@ class Reservoir(nn.Module):
 
         self.noise_std = args.reservoir_noise
 
-        if args.reservoir_path is not None:
+        if args.model_path is not None:
+            pass
+        elif args.reservoir_path is not None:
             J, W_u = load_rb(args.reservoir_path)
             self.J.weight.data = J
             self.W_u.weight.data = W_u
@@ -225,6 +229,10 @@ class StateNet(nn.Module):
         self.reservoir = Reservoir(args)
 
         self.W_ro = nn.Linear(self.args.N, self.args.Z, bias=self.args.bias)
+
+        if args.model_path is not None:
+            model = torch.load(args.model_path)
+            self.load_state_dict(model)
 
         self.reset()
 

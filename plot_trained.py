@@ -18,12 +18,14 @@ parser = argparse.ArgumentParser()
 parser.add_argument('model', help='path to a model file, to be loaded into pytorch')
 parser.add_argument('dataset', help='path to a dataset of trials')
 parser.add_argument('--noise', default=0, help='noise to add to trained weights')
+parser.add_argument('--reservoir_noise', default=None, type=float)
 parser.add_argument('--out_act', default=None, type=str)
 parser.add_argument('--stride', default=1, type=int)
 parser.add_argument('-x', '--reservoir_x_init', default=None, type=str)
 parser.add_argument('-a', '--test_all', action='store_true')
 parser.add_argument('-n', '--no_plot', action='store_true')
 parser.add_argument('-t', '--seq_goals_timesteps', type=int, default=200, help='number of steps to run seq-goals datasets for')
+parser.add_argument('--seq_goals_threshold', default=1, type=float, help='seq-goals-threshold')
 parser.add_argument('--dists', action='store_true', help='to plot dists for seq-goals')
 args = parser.parse_args()
 
@@ -41,19 +43,28 @@ if args.noise != 0:
     shp = J.shape
     model['W_ro.weight'] += torch.normal(0, v * .5, shp)
 
-net = load_model_path(args.model, params={'dset': args.dataset, 'out_act': args.out_act, 'stride': args.stride})
+net_params = {
+    'dset': args.dataset,
+    'out_act': args.out_act,
+    'stride': args.stride,
+    'reservoir_noise': args.reservoir_noise
+}
+net = load_model_path(args.model, params=net_params)
 dset = load_rb(args.dataset)
 
+params={
+    'dset': args.dataset,
+    'reservoir_x_init': args.reservoir_x_init,
+    'seq_goals_timesteps': args.seq_goals_timesteps,
+    'seq_goals_threshold': args.seq_goals_threshold
+}
+
 if args.test_all:
-    _, loss2 = test_model(net, dset)
+    _, loss2 = test_model(net, dset, params=params)
     print('avg summed loss (all):', loss2)
 
 if not args.no_plot:
-    data, loss = test_model(net, dset, n_tests=12, params={
-        'dset': args.dataset,
-        'reservoir_x_init': args.reservoir_x_init,
-        'seq_goals_timesteps': args.seq_goals_timesteps
-    })
+    data, loss = test_model(net, dset, n_tests=12, params=params)
     print('avg summed loss (plotted):', loss)
 
     run_id = '/'.join(args.model.split('/')[-3:-1])
@@ -86,7 +97,7 @@ if not args.no_plot:
                     ax.scatter(y[j][0], y[j][1], color=next(colors))
                 
                 n_timesteps = z.shape[0]
-                ts_colors = iter(cm.Blues(np.linspace(0, 1, n_timesteps)))
+                ts_colors = iter(cm.Blues(np.linspace(0.3, 1, n_timesteps)))
                 for j in range(n_timesteps):
                     ax.scatter(z[j][0], z[j][1], color=next(ts_colors), s=5)
 

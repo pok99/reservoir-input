@@ -175,16 +175,16 @@ def create_dataset(args):
             trials.append((y, z, delay))
 
     elif t_type == 'amplify':
-        for n in range(n_trials):
-            n_freqs = get_args_val(trial_args, 'n_freqs', 15, int)
-            f_range = get_args_val(trial_args, 'f_range', [3, 30], float, n_vals=2)
-            amp = get_args_val(trial_args, 'amp', 1, float)
-            mag = get_args_val(trial_args, 'mag', 1, float)
-            config['n_freqs'] = n_freqs
-            config['f_range'] = f_range
-            config['amp'] = amp
-            config['mag'] = mag
+        n_freqs = get_args_val(trial_args, 'n_freqs', 15, int)
+        f_range = get_args_val(trial_args, 'f_range', [3, 30], float, n_vals=2)
+        amp = get_args_val(trial_args, 'amp', 1, float)
+        mag = get_args_val(trial_args, 'mag', 1, float)
+        config['n_freqs'] = n_freqs
+        config['f_range'] = f_range
+        config['amp'] = amp
+        config['mag'] = mag
 
+        for n in range(n_trials):
             x = np.arange(0, t_len)
             y = np.zeros_like(x)
 
@@ -197,14 +197,14 @@ def create_dataset(args):
             trials.append((y, z, mag))
 
     elif t_type == 'integration':
-        for n in range(n_trials):
-            n_freqs = get_args_val(trial_args, 'n_freqs', 15, int)
-            f_range = get_args_val(trial_args, 'f_range', [3, 30], float, n_vals=2)
-            amp = get_args_val(trial_args, 'amp', 1, int)
-            config['n_freqs'] = n_freqs
-            config['f_range'] = f_range
-            config['amp'] = amp
+        n_freqs = get_args_val(trial_args, 'n_freqs', 15, int)
+        f_range = get_args_val(trial_args, 'f_range', [3, 30], float, n_vals=2)
+        amp = get_args_val(trial_args, 'amp', 1, int)
+        config['n_freqs'] = n_freqs
+        config['f_range'] = f_range
+        config['amp'] = amp
 
+        for n in range(n_trials):
             x = np.arange(0, t_len)
             y = np.zeros_like(x).astype(np.float32)
 
@@ -224,12 +224,17 @@ def create_dataset(args):
             trials.append((y, z, z_mag))
 
     elif t_type == 'seq-goals':
+        n_goals = get_args_val(trial_args, 'n_goals', 10, int)
+        scale = get_args_val(trial_args, 'scale', 5, float)
+        dim = get_args_val(trial_args, 'dim', 2, int)
+        config['n_goals'] = n_goals
+        config['scale'] = scale
+        config['dim'] = dim
+
         for n in range(n_trials):
-            n_goals = 10
-            config['n_goals'] = n_goals
             trial = []
             for i in range(n_goals):
-                trial.append(np.random.normal(loc=0, scale=5, size=2))
+                trial.append(np.random.normal(loc=0, scale=scale, size=dim))
 
             trials.append(trial)
 
@@ -266,7 +271,7 @@ if __name__ == '__main__':
     parser.add_argument('-t', '--trial_type', default='rsg')
     parser.add_argument('--rsg_intervals', nargs='*', type=int, default=None)
     parser.add_argument('--motifs', type=str, help='path to motifs')
-    parser.add_argument('--trial_args', nargs='*', help='terms to specify parameters of trial type')
+    parser.add_argument('-a', '--trial_args', nargs='*', help='terms to specify parameters of trial type')
     parser.add_argument('-l', '--trial_len', type=int, default=200)
     parser.add_argument('-n', '--n_trials', type=int, default=1000)
     args = parser.parse_args()
