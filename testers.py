@@ -34,9 +34,12 @@ def load_model_path(path, params={}):
     bunch.T = config['T']
     bunch.bias = True
 
+    bunch.res_frequency = config['res_frequency']
+    bunch.res_input_decay = config['res_input_decay']
+
     #bunch.reservoir_burn_steps = 200
     bunch.reservoir_x_seed = 0
-    bunch.reservoir_noise = config['reservoir_noise']
+    bunch.res_noise = config['res_noise']
     #bunch.network_delay = 0
 
     #bunch.res_init_type = 'gaussian'
@@ -45,9 +48,9 @@ def load_model_path(path, params={}):
 
     bunch.model_path = path
 
-    #bunch.reservoir_noise = 0
-    if params['reservoir_noise'] is not None:
-        bunch.reservoir_noise = params['reservoir_noise']
+    #bunch.res_noise = 0
+    if params['res_noise'] is not None:
+        bunch.res_noise = params['res_noise']
 
     #bunch.out_act = 'exp'
     if 'out_act' in params and params['out_act'] is not None:

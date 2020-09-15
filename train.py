@@ -502,8 +502,10 @@ def parse_args():
     
     parser.add_argument('--res_init_type', type=str, default='gaussian', help='')
     parser.add_argument('--res_init_gaussian_std', type=float, default=1.5)
+    parser.add_argument('--res_frequency', type=int, default=1, help='number of reservoir steps per high level step')
+    parser.add_argument('--res_input_decay', type=float, default=1, help='decay of proposal for each step without high level input')
     parser.add_argument('--network_delay', type=int, default=0)
-    parser.add_argument('--reservoir_noise', type=float, default=0)
+    parser.add_argument('--res_noise', type=float, default=0)
     parser.add_argument('--no_bias', action='store_true')
     parser.add_argument('--out_act', type=str, default=None, help='output activation')
 

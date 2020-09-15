@@ -21,7 +21,7 @@ default_arglist = {
     'res_init_type': 'gaussian',
     'res_init_params': {'std': 1.5},
     'reservoir_burn_steps': 200,
-    'reservoir_noise': 0,
+    'res_noise': 0,
     'reservoir_path': None,
     'bias': True,
     'Wf_path': None,
@@ -55,7 +55,7 @@ class Reservoir(nn.Module):
         self.n_burn_in = self.args.reservoir_burn_steps
         self.reservoir_x_seed = self.args.reservoir_x_seed
 
-        self.noise_std = args.reservoir_noise
+        self.noise_std = args.res_noise
 
         if args.model_path is not None:
             pass
@@ -243,7 +243,10 @@ class StateNet(nn.Module):
             mul = t.shape[0]
             self.s = self.s.repeat((mul, 1))
         prop = self.hypothesizer(t, self.s)
-        x = self.reservoir(prop)
+
+        for i in range(self.args.res_frequency):
+            x = self.reservoir(prop)
+            prop = prop * self.args.res_input_decay
 
         z = self.W_ro(x)
         # clipping so movements can't be too large

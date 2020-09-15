@@ -18,7 +18,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('model', help='path to a model file, to be loaded into pytorch')
 parser.add_argument('dataset', help='path to a dataset of trials')
 parser.add_argument('--noise', default=0, help='noise to add to trained weights')
-parser.add_argument('--reservoir_noise', default=None, type=float)
+parser.add_argument('--res_noise', default=None, type=float)
 parser.add_argument('--out_act', default=None, type=str)
 parser.add_argument('--stride', default=1, type=int)
 parser.add_argument('-x', '--reservoir_x_init', default=None, type=str)
@@ -47,7 +47,7 @@ net_params = {
     'dset': args.dataset,
     'out_act': args.out_act,
     'stride': args.stride,
-    'reservoir_noise': args.reservoir_noise
+    'res_noise': args.res_noise
 }
 net = load_model_path(args.model, params=net_params)
 dset = load_rb(args.dataset)
