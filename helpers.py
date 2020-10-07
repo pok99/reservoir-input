@@ -39,7 +39,7 @@ def get_output_activation(args):
     return fn
 
 # loss function for sequential goals
-def seq_goals_loss(out, target, threshold=1, reward=5):
+def seq_goals_loss(out, target, threshold=1, reward=5, fn=None):
     if len(out.shape) > 1:
         dists = torch.norm(out - target, dim=1)
     else:
@@ -48,6 +48,10 @@ def seq_goals_loss(out, target, threshold=1, reward=5):
 
     done = (dists < threshold) * 1
     done_count = done.sum()
+
+    # apply some potential function to weight the losses
+    if fn is not None:
+        dists = fn(dists)
     loss = torch.sum(dists) - done_count * reward
 
     return loss, done
