@@ -22,20 +22,18 @@ def get_optimizer(args, train_params):
 
 def get_criterion(args):
     if args.loss == 'mse':
-        criterion = nn.MSELoss()
+        criterion = nn.MSELoss(reduction='sum')
     elif args.loss == 'bce':
         criterion = nn.BCEWithLogitsLoss()
-    elif args.loss == 'seq-goals':
-        criterion = seq_goals_loss
     return criterion
 
 def get_output_activation(args):
     if args.out_act == 'exp':
-        fn =  torch.exp
+        fn = torch.exp
     elif args.out_act == 'relu':
-        fn =  nn.ReLU()
+        fn = nn.ReLU()
     elif args.out_act == 'none':
-        fn =  lambda x: x
+        fn = lambda x: x
     return fn
 
 # loss function for sequential goals
@@ -63,13 +61,9 @@ def update_seq_indices(targets, indices, done):
 
 # given batch and dset name, get the x, y pairs and turn them into Tensors
 def get_x_y(batch, dset):
-    if 'seq-goals' in dset:
-        x = torch.Tensor(batch)
-        y = x
-    else:
-        x, y, _ = list(zip(*batch))
-        x = torch.Tensor(x)
-        y = torch.Tensor(y)
+    x, y, _ = list(zip(*batch))
+    x = torch.as_tensor(x, dtype=torch.float)
+    y = torch.as_tensor(y, dtype=torch.float)
 
     return x, y
 

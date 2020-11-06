@@ -16,10 +16,10 @@ import math
 import json
 import copy
 
-from network import BasicNetwork, StateNet, Reservoir
+from network import BasicNetwork, Reservoir
 
 from utils import log_this, load_rb
-from helpers import get_optimizer, get_criterion, seq_goals_loss, update_seq_indices, get_x_y
+from helpers import get_optimizer, get_criterion, get_x_y
 
 class Trainer:
     def __init__(self, args):
@@ -27,50 +27,52 @@ class Trainer:
 
         self.args = args
 
-        if self.args.net == 'basic':
-            self.net = BasicNetwork(self.args)
-        elif self.args.net == 'state':
-            self.net = StateNet(self.args)
+        self.net = BasicNetwork(self.args)
 
         # load any specified model parameters into the network
-        if args.model_path is not None:
-            m_dict = torch.load(args.model_path)
-            self.net.load_state_dict(m_dict)
-            logging.info('Loaded model file.')
-        if args.Wf_path is not None:
-            m_dict = torch.load(args.Wf_path)
-            self.net.W_f.weight = m_dict['W_f.weight']
-            if 'W_f.bias' in m_dict:
-                self.net.W_f.bias = m_dict['W_f.bias']
-        if args.Wro_path is not None:
-            m_dict = torch.load(args.Wro_path)
-            self.net.W_ro.weight = m_dict['W_ro.weight']
-            if 'W_ro.bias' in m_dict:
-                self.net.W_ro.bias = m_dict['W_ro.bias']
-        if args.reservoir_path is not None:
-            m_dict = torch.load(args.Wro_path)
-            self.net.reservoir.J.weight = m_dict['reservoir.J.weight']
-            self.net.reservoir.W_u.weight = m_dict['reservoir.W_u.weight']
+        # if args.model_path is not None:
+        #     m_dict = torch.load(args.model_path)
+        #     self.net.load_state_dict(m_dict)
+        #     logging.info('Loaded model file.')
+        # if args.Wf_path is not None:
+        #     m_dict = torch.load(args.Wf_path)
+        #     self.net.W_f.weight = m_dict['W_f.weight']
+        #     if 'W_f.bias' in m_dict:
+        #         self.net.W_f.bias = m_dict['W_f.bias']
+        # if args.Wro_path is not None:
+        #     m_dict = torch.load(args.Wro_path)
+        #     self.net.W_ro.weight = m_dict['W_ro.weight']
+        #     if 'W_ro.bias' in m_dict:
+        #         self.net.W_ro.bias = m_dict['W_ro.bias']
+        # if args.reservoir_path is not None:
+        #     m_dict = torch.load(args.Wro_path)
+        #     self.net.reservoir.J.weight = m_dict['reservoir.J.weight']
+        #     self.net.reservoir.W_u.weight = m_dict['reservoir.W_u.weight']
 
         # getting number of elements of every parameter
         self.n_params = {}
         self.train_params = []
+        self.not_train_params = []
         logging.info('Training the following parameters:')
         for k,v in self.net.named_parameters():
             # k is name, v is weight
-
+            found = False
             # filtering just for the parts that will be trained
             for part in self.args.train_parts:
                 if part in k:
                     logging.info(f'  {k}')
                     self.n_params[k] = (v.shape, v.numel())
                     self.train_params.append(v)
+                    found = True
                     break
+            if not found:
+                self.not_train_params.append(k)
+        logging.info('Not training:')
+        for k in self.not_train_params:
+            logging.info(f'  {k}')
 
         self.criterion = get_criterion(self.args)
-        
         self.optimizer = get_optimizer(self.args, self.train_params)
-
         self.dset = load_rb(self.args.dataset)
 
         # if using separate training and test sets, separate them out
@@ -136,12 +138,9 @@ class Trainer:
 
         elif mode == 'scipy':
 
-            if self.args.dset_type == 'seq-goals':
-                targets = torch.Tensor(self.dset)
-            else:
-                dset = np.asarray([x[:-1] for x in self.dset])
-                x = torch.from_numpy(dset[:,0,:]).float()
-                y = torch.from_numpy(dset[:,1,:]).float()
+            dset = np.asarray([x[:-1] for x in self.dset])
+            x = torch.from_numpy(dset[:,0,:]).float()
+            y = torch.from_numpy(dset[:,1,:]).float()
 
             # so that the callback for scipy.optimize.minimize knows what step it is on
             self.scipy_ix = 0
@@ -165,20 +164,8 @@ class Trainer:
                 self.net.zero_grad()
                 total_loss = torch.tensor(0.)
 
-                # running through the dataset and getting gradients
-                if self.args.dset_type == 'seq-goals':
-                    n_pts = len(self.dset[0])
-                    cur_indices = [0 for i in range(len(self.dset))]
-                    for j in range(self.args.seq_goals_timesteps):
-                        net_in = targets[torch.arange(len(self.dset)),cur_indices,:]
-                        net_out, step_loss, extras = self.run_iteration(net_in, net_in)
-                        ins.append(net_in.numpy())
-                        outs.append(net_out.detach().squeeze().numpy())
-                        cur_indices = update_seq_indices(targets, cur_indices, extras[-1])
-
-                else:
-                    for j in range(x.shape[1]):
-                        net_out, step_loss, _ = self.run_iteration(x[:,j], y[:,j])
+                for j in range(x.shape[1]):
+                    net_out, step_loss, _ = self.run_iteration(x[:,j], y[:,j])
                 
                 total_loss += step_loss
                 total_loss.backward()
@@ -212,31 +199,15 @@ class Trainer:
                         outs = []
                         total_loss = torch.tensor(0.)
 
-                        if self.args.dset_type == 'seq-goals':
-                            done = []
-                            ins = []
-                            n_pts = len(self.dset[0])
-                            cur_index = 0
-                            for j in range(self.args.seq_goals_timesteps):
-                                net_in = targets[sample_n,cur_index,:]
-                                net_out, step_loss, extras = self.run_iteration(net_in, net_in)
-                                ins.append(net_in.numpy())
-                                outs.append(net_out.detach().squeeze().numpy())
-                                cur_index = update_seq_indices(x, cur_index, extras[-1])
-                                total_loss += step_loss
-                            pdb.set_trace()
-                            self.log_checkpoint(self.scipy_ix, np.array(ins), np.array(ins), np.array(outs), total_loss.item(), total_loss.item())
+                        xs = x[sample_n,:]
+                        ys = y[sample_n,:]
+                        for j in range(xs.shape[0]):
+                            net_out, step_loss, _ = self.run_iteration(xs[j], ys[j])
+                            outs.append(net_out.item())
+                            total_loss += step_loss
 
-                        else:
-                            xs = x[sample_n,:]
-                            ys = y[sample_n,:]
-                            for j in range(xs.shape[0]):
-                                net_out, step_loss, _ = self.run_iteration(xs[j], ys[j])
-                                outs.append(net_out.item())
-                                total_loss += step_loss
-
-                            z = np.stack(outs).squeeze()
-                            self.log_checkpoint(self.scipy_ix, xs.numpy(), ys.numpy(), z, total_loss.item(), total_loss.item())
+                        z = np.stack(outs).squeeze()
+                        self.log_checkpoint(self.scipy_ix, xs.numpy(), ys.numpy(), z, total_loss.item(), total_loss.item())
 
                         logging.info(f'iteration {self.scipy_ix}\t| loss {total_loss.item():.3f}')
 
@@ -289,46 +260,6 @@ class Trainer:
         with open(self.plot_checkpoint_path, 'wb') as f:
             pickle.dump(self.vis_samples, f)
 
-    def train_iteration(self, x, y):
-        self.net.reset(self.args.reservoir_x_init)
-        self.optimizer.zero_grad()
-
-        outs = []
-        total_loss = torch.tensor(0.)
-
-        if self.args.dset_type == 'seq-goals':
-            ins = []
-            goals = x
-            cur_idx = torch.zeros(x.shape[0], dtype=torch.long)
-            for j in range(self.args.seq_goals_timesteps):
-                net_out, step_loss, extras, cur_idx = self.run_iter_goal(x, cur_idx)
-                # what we need to record for logging
-                ins.append(extras[-2])
-                outs.append(net_out[-1].detach().numpy())
-                total_loss += step_loss
-
-            ins = torch.cat(ins)
-
-        else:
-            ins = x
-            goals = y
-            for j in range(x.shape[1]):
-                net_out, step_loss, extras = self.run_iter_traj(x[:,j], y[:,j])
-                if np.isnan(step_loss.item()):
-                    return -1, (net_out, extras)
-                total_loss += step_loss
-                outs.append(net_out[-1].item())
-
-        total_loss.backward()
-
-        etc = {
-            'ins': ins,
-            'goals': goals,
-            'outs': outs
-        }
-        if self.args.dset_type == 'seq-goals':
-            etc['indices'] = cur_idx
-        return total_loss, etc
 
     # runs an iteration where we want to match a certain trajectory
     def run_iter_traj(self, x, y):
@@ -339,47 +270,49 @@ class Trainer:
 
         return net_out, step_loss, extras
 
-    # runs an iteration where we want to hit a certain goal (dynamic input)
-    def run_iter_goal(self, x, indices):
-        x_goal = x[torch.arange(x.shape[0]),indices,:]
-        
-        net_in = x_goal.reshape(-1, self.args.L)
-        net_out, extras = self.net(net_in, extras=True)
-        # the target is actually the input
-        step_loss, done = seq_goals_loss(net_out, net_in, threshold=args.seq_goals_threshold)
-        # hacky way to append the net_in and whether we hit the target to returns
-        extras.extend([net_in, done])
-        new_indices = update_seq_indices(x, indices, done)
+    def train_iteration(self, x, y):
+        self.net.reset(self.args.res_x_init)
+        self.optimizer.zero_grad()
 
-        return net_out, step_loss, extras, new_indices
+        outs = []
+        iter_loss = torch.tensor(0.)
+
+        ins = x
+        goals = y
+        for j in range(x.shape[1]):
+            net_out, step_loss, extras = self.run_iter_traj(x[:,j], y[:,j])
+            if np.isnan(step_loss.item()):
+                return -1, (net_out, extras)
+            iter_loss += step_loss
+            outs.append(net_out[-1].item())
+
+        iter_loss.backward()
+
+        etc = {
+            'ins': ins,
+            'goals': goals,
+            'outs': outs
+        }
+        return iter_loss.item(), etc
 
     def test(self, n=0):
         if n != 0:
             assert n <= len(self.test_set)
-            batch = np.random.choice(self.test_set, n)
+            batch_idxs = np.random.choice(len(self.test_set), n)
+            batch = [self.test_set[i] for i in batch_idxs]
         else:
             batch = self.test_set
 
         x, y = get_x_y(batch, self.args.dataset)
 
         with torch.no_grad():
-            self.net.reset(self.args.reservoir_x_init)
+            self.net.reset(self.args.res_x_init)
             total_loss = torch.tensor(0.)
-
-            if self.args.dset_type == 'seq-goals':
-                cur_idx = torch.zeros(x.shape[0], dtype=torch.long)
-                for j in range(self.args.seq_goals_timesteps):
-                    _, step_loss, _, cur_idx = self.run_iter_goal(x, cur_idx)
-                    total_loss += step_loss
-
-            else:
-                for j in range(x.shape[1]):
-                    _, step_loss, _ = self.run_iter_traj(x[:,j], y[:,j])
-                    total_loss += step_loss
+            for j in range(x.shape[1]):
+                _, step_loss, _ = self.run_iter_traj(x[:,j], y[:,j])
+                total_loss += step_loss
 
         etc = {}
-        if self.args.dset_type == 'seq-goals':
-            etc['indices'] = cur_idx
 
         return total_loss.item() / len(batch), etc
 
@@ -408,19 +341,18 @@ class Trainer:
                 ix += 1
 
                 x, y = get_x_y(batch, self.args.dataset)
-
-                loss, etc = self.train_iteration(x, y)
+                iter_loss, etc = self.train_iteration(x, y)
 
                 if ix_callback is not None:
-                    ix_callback(loss, etc)
+                    ix_callback(iter_loss, etc)
                 self.optimizer.step()
 
-                if loss == -1:
+                if iter_loss == -1:
                     logging.info(f'iteration {ix}: is nan. ending')
                     ending = True
                     break
 
-                running_loss += loss.item()
+                running_loss += iter_loss
                 mag = max([torch.max(torch.abs(p.grad)) for p in self.train_params])
                 running_mag += mag             
 
@@ -428,8 +360,8 @@ class Trainer:
                     outs = etc['outs']
                     z = np.stack(outs).squeeze()
                     # avg of the last 50 trials
-                    avg_loss = running_loss / self.log_interval
-                    test_loss, test_etc = self.test()
+                    avg_loss = running_loss / self.args.batch_size / self.log_interval
+                    test_loss, test_etc = self.test(n=50)
                     avg_max_grad = running_mag / self.log_interval
                     log_arr = [
                         f'iteration {ix}',
@@ -437,10 +369,6 @@ class Trainer:
                         # f'max abs grad {avg_max_grad:.3f}',
                         f'test loss {test_loss:.3f}'
                     ]
-                    # calculating average index reached for seq-goals task
-                    if self.args.dset_type == 'seq-goals':
-                        avg_index = test_etc['indices'].float().mean().item()
-                        log_arr.append(f'avg index {avg_index:.3f}')
                     log_str = '\t| '.join(log_arr)
                     logging.info(log_str)
 
@@ -488,33 +416,27 @@ def parse_args():
     parser.add_argument('-N', type=int, default=50, help='number of neurons in reservoir')
     parser.add_argument('-Z', type=int, default=1, help='output dimension')
 
-    parser.add_argument('--net', type=str, default='basic', choices=['basic', 'state'])
+    parser.add_argument('--net', type=str, default='basic', choices=['basic'])
 
     parser.add_argument('--train_parts', type=str, nargs='+', default=['W_ro', 'W_f'])
-    parser.add_argument('--stride', type=int, default=1, help='stride of the W_f')
+    # parser.add_argument('--stride', type=int, default=1, help='stride of the W_f')
     
     # make sure model_config path is specified if you use any paths! it ensures correct dimensions, bias, etc.
     parser.add_argument('--model_config_path', type=str, default=None, help='config path corresponding to model load path')
     parser.add_argument('--model_path', type=str, default=None, help='start training from certain model. superseded by below')
     parser.add_argument('--Wro_path', type=str, default=None, help='start training from certain Wro')
     parser.add_argument('--Wf_path', type=str, default=None, help='start training from certain Wf')
-    parser.add_argument('--reservoir_path', type=str, default=None, help='saved reservoir. should be saved with seed tho')
+    parser.add_argument('--J_path', type=str, default=None, help='saved reservoir. should be saved with seed tho')
     
     parser.add_argument('--res_init_type', type=str, default='gaussian', help='')
     parser.add_argument('--res_init_gaussian_std', type=float, default=1.5)
-    parser.add_argument('--res_frequency', type=int, default=1, help='number of reservoir steps per high level step')
-    parser.add_argument('--res_input_decay', type=float, default=1, help='decay of proposal for each step without high level input')
-    parser.add_argument('--network_delay', type=int, default=0)
+    # parser.add_argument('--network_delay', type=int, default=0)
     parser.add_argument('--res_noise', type=float, default=0)
     parser.add_argument('--no_bias', action='store_true')
     parser.add_argument('--out_act', type=str, default=None, help='output activation')
 
-    parser.add_argument('--dataset', type=str, default='datasets/rsg2.pkl')
+    parser.add_argument('--dataset', type=str, default='datasets/rsg.pkl')
     parser.add_argument('--separate_test', action='store_true', help='use separate test set')
-
-    # seq-goals parameters
-    parser.add_argument('--seq_goals_timesteps', type=int, default=200, help='num timesteps to run seq goals dataset for')
-    parser.add_argument('--seq_goals_threshold', type=float, default=1, help='threshold for detection for seq goals')
 
     parser.add_argument('--optimizer', choices=['adam', 'sgd', 'rmsprop', 'lbfgs-scipy', 'lbfgs-pytorch'], default='lbfgs-scipy')
     parser.add_argument('--loss', type=str, default='mse')
@@ -531,11 +453,11 @@ def parse_args():
     parser.add_argument('--n_epochs', type=int, default=10, help='number of epochs to train for. adam only')
 
     parser.add_argument('--seed', type=int, help='seed for most of network')
-    parser.add_argument('--reservoir_seed', type=int, help='seed for reservoir')
-    parser.add_argument('--reservoir_x_seed', type=int, default=0, help='seed for reservoir init hidden states. -1 for zero init')
-    parser.add_argument('--reservoir_burn_steps', type=int, default=200, help='number of steps for reservoir to burn in')
+    parser.add_argument('--res_seed', type=int, help='seed for reservoir')
+    parser.add_argument('--res_x_seed', type=int, default=0, help='seed for reservoir init hidden states. -1 for zero init')
+    parser.add_argument('--res_burn_steps', type=int, default=200, help='number of steps for reservoir to burn in')
 
-    parser.add_argument('-x', '--reservoir_x_init', type=str, default=None, help='other seed options for reservoir')
+    parser.add_argument('-x', '--res_x_init', type=str, default=None, help='other seed options for reservoir')
 
     parser.add_argument('--no_log', action='store_true')
     parser.add_argument('--log_interval', type=int, default=50)
@@ -556,8 +478,8 @@ def adjust_args(args):
     # don't use logging.info before we initialize the logger!! or else stuff is gonna fail
 
     # setting seeds
-    if args.reservoir_seed is None:
-        args.reservoir_seed = random.randrange(1e6)
+    if args.res_seed is None:
+        args.res_seed = random.randrange(1e6)
     if args.seed is None:
         args.seed = random.randrange(1e6)
 
@@ -572,15 +494,25 @@ def adjust_args(args):
 
     # in case we are loading from a model
     # if we don't use this we might end up with an error when loading model
-    if args.model_path is not None and args.model_config_path is not None:
-        with open(args.model_config_path) as f:
-            config = json.load(f)
-        args.N = config['N']
-        args.D = config['D']
-        args.L = config['L']
-        args.Z = config['Z']
-        args.bias = config['bias']
-        args.reservoir_seed = config['reservoir_seed']
+    # in case we are loading from a model
+    # if we don't use this we might end up with an error when loading model
+    if args.model_path is not None:
+        config = get_config(args.model_path)
+        args = fill_undefined_args(args, config, overwrite_none=True)
+        enforce_same = ['N', 'D', 'L', 'Z', 'T', 'net', 'bias', 'use_reservoir']
+        for v in enforce_same:
+            if v in config and args.__dict__[v] != config[v]:
+                print(f'Warning: based on config, changed {v} from {args.__dict__[v]} -> {config[v]}')
+                args.__dict__[v] = config[v]
+    # if args.model_path is not None and args.model_config_path is not None:
+    #     with open(args.model_config_path) as f:
+    #         config = json.load(f)
+    #     args.N = config['N']
+    #     args.D = config['D']
+    #     args.L = config['L']
+    #     args.Z = config['Z']
+    #     args.bias = config['bias']
+    #     args.reservoir_seed = config['reservoir_seed']
 
     # shortcut for specifying train everything including reservoir
     if args.train_parts == ['all']:
@@ -594,18 +526,12 @@ def adjust_args(args):
             args.out_act = 'none'
 
     # set the dataset
-    if 'seq-goals' in args.dataset:
-        args.dset_type = 'seq-goals'
-    elif 'rsg' in args.dataset:
+    if 'rsg' in args.dataset:
         args.dset_type = 'rsg'
     elif 'copy' in args.dataset:
         args.dset_type = 'copy'
     else:
         args.dset_type = 'unknown'
-
-    # use custom seq-goals loss for seq-goals dataset, override default loss fn
-    if args.dset_type == 'seq-goals':
-        args.loss = 'seq-goals'
 
     # initializing logging
     # do this last, because we will be logging previous parameters into the config file
@@ -659,7 +585,7 @@ if __name__ == '__main__':
             labels_csv = ['slurm_id', 'D', 'N', 'bias', 'seed', 'rseed', 'xseed', 'rnoise', 'dset', 'niter', 'loss']
             vals_csv = [
                 args.slurm_id, args.D, args.N, args.bias, args.seed,
-                args.reservoir_seed, args.reservoir_x_seed, args.reservoir_noise,
+                args.res_seed, args.res_x_seed, args.res_noise,
                 args.dataset, n_iters, final_loss
             ]
             if args.optimizer == 'adam':

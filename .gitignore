@@ -1,10 +1,11 @@
+__pycache__/
 playground/
-*.pkl
 logs/
+archive/
 
 **slurm**
-
-__pycache__/
 sshfs_ri/
+
+*.pkl
 
 ._*

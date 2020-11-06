@@ -9,6 +9,7 @@ import time
 import json
 import csv
 import pickle
+import copy
 # import pandas as pd
 
 
@@ -34,16 +35,25 @@ def add_yaml_args(args, config_file):
 
 # fills an argument dictionary with keys from a default dictionary
 # also works with dicts now
-def fill_undefined_args(args, default_args):
+def fill_undefined_args(args, default_args, overwrite_none=False, to_bunch=False):
+    # so we don't overwrite the original args
+    args = copy.deepcopy(args)
+    # takes care of default args not being a dict
+    if type(default_args) is not dict:
+        default_args = default_args.__dict__
+    # only change the args dictionary
     if type(args) is dict:
-        for k in default_args.keys():
-            if k not in args:
-                args[k] = default_args[k]
+        args_dict = args
     else:
-        # either Bunch or argparse namespace
-        for k in default_args.__dict__.keys():
-            if k not in args.__dict__:
-                args.__dict__[k] = default_args.__dict__[k]
+        args_dict = args.__dict__
+    for k in default_args.keys():
+        if k not in args_dict:
+            args_dict[k] = default_args[k]
+        elif overwrite_none and args_dict[k] is None:
+            args_dict[k] = default_args[k]
+
+    if to_bunch:
+        args = Bunch(**args_dict)
     return args
 
 

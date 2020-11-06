@@ -1,0 +1,13 @@
+{
+  "argv": [
+    "dataset.py",
+    "create",
+    "rsg"
+  ],
+  "t_type": "rsg",
+  "n_trials": 1000,
+  "t_len": 200,
+  "min_t": 15,
+  "max_t": 85,
+  "scale": 1
+}

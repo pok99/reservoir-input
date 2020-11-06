@@ -27,6 +27,7 @@ def create_dataset(args):
     trial_args = args.trial_args
 
     config = {}
+    config['argv'] = sys.argv
     config['t_type'] = t_type
     config['n_trials'] = n_trials
     config['t_len'] = t_len
@@ -89,7 +90,7 @@ def create_dataset(args):
                 trial_x = norm.pdf(trial_range, loc=ready_time, scale=1)
                 trial_x += norm.pdf(trial_range, loc=set_time, scale=1)
                 # scaling by `scale` so the height of the middle is always the same
-                trial_y = 4 * scale * norm.pdf(trial_range, loc=go_time, scale=scale)
+                trial_y = 2 * scale * norm.pdf(trial_range, loc=go_time, scale=scale)
 
             info = (ready_time, set_time, go_time)
 
@@ -123,32 +124,6 @@ def create_dataset(args):
                 for i in range(n_freqs):
                     y = y + amps[i] * fn(1/freqs[i] * x)
 
-                ys.append(y)
-
-        elif t_type == 'copy_gp':
-            interval = get_args_val(trial_args, 'interval', 10, int)
-            scale = get_args_val(trial_args, 'scale', 1, float)
-            kernel = RBF(length_scale=5)
-            config['interval'] = interval
-            config['scale'] = scale
-
-            x_list = x[..., np.newaxis]
-            x_filter = x_list[::interval]
-            n_pts = x_filter.squeeze().shape[0]
-
-            for n in range(n_trials):
-                y_filter = np.zeros((n_pts, dim))
-                y_filter[0] = 0
-                for i in range(1, n_pts):
-                    if 'smoothing' in trial_args:
-                        y_filter[i] = np.random.multivariate_normal(y_filter[i-1]/2, cov=scale*np.eye(dim))
-                    else:
-                        y_filter[i] = np.random.multivariate_normal(np.zeros(dim), cov=scale*np.eye(dim))
-
-                gp = gpr(kernel=kernel, normalize_y=False).fit(x_filter, y_filter)
-                y_prediction, y_std = gp.predict(x_list, return_std=True)
-
-                y = y_prediction.reshape(-1)
                 ys.append(y)
 
         elif t_type == 'copy_motifs':
@@ -195,48 +170,6 @@ def create_dataset(args):
 
             z = y * mag
             trials.append((y, z, mag))
-
-    elif t_type == 'integration':
-        n_freqs = get_args_val(trial_args, 'n_freqs', 15, int)
-        f_range = get_args_val(trial_args, 'f_range', [3, 30], float, n_vals=2)
-        amp = get_args_val(trial_args, 'amp', 1, int)
-        config['n_freqs'] = n_freqs
-        config['f_range'] = f_range
-        config['amp'] = amp
-
-        for n in range(n_trials):
-            x = np.arange(0, t_len)
-            y = np.zeros_like(x).astype(np.float32)
-
-            xp = t_len//2
-
-            freqs = np.random.uniform(f_range[0], f_range[1], (n_freqs))
-            amps = np.random.uniform(-amp, amp, (n_freqs))
-            for i in range(n_freqs):
-                y[:xp] = y[:xp] + amps[i] * np.cos(1/freqs[i] * x[:xp])
-
-            y[:xp] = y[:xp] * np.cos(np.pi/2 * x[:xp] / x[xp])
-
-            z_mag = np.sum(y)
-            trial_range = np.arange(t_len)
-            z = z_mag / 2 * norm.pdf(trial_range, loc=int(xp * 3/2), scale=2)
-
-            trials.append((y, z, z_mag))
-
-    elif t_type == 'seq-goals':
-        n_goals = get_args_val(trial_args, 'n_goals', 10, int)
-        scale = get_args_val(trial_args, 'scale', 5, float)
-        dim = get_args_val(trial_args, 'dim', 2, int)
-        config['n_goals'] = n_goals
-        config['scale'] = scale
-        config['dim'] = dim
-
-        for n in range(n_trials):
-            trial = []
-            for i in range(n_goals):
-                trial.append(np.random.normal(loc=0, scale=scale, size=dim))
-
-            trials.append(trial)
 
     return trials, config
 
