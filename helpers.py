@@ -22,6 +22,7 @@ def get_optimizer(args, train_params):
 
 def get_criterion(args):
     if args.loss == 'mse':
+        # criterion = nn.MSELoss()
         criterion = nn.MSELoss(reduction='sum')
     elif args.loss == 'bce':
         criterion = nn.BCEWithLogitsLoss()
@@ -35,29 +36,6 @@ def get_output_activation(args):
     elif args.out_act == 'none':
         fn = lambda x: x
     return fn
-
-# loss function for sequential goals
-def seq_goals_loss(out, target, threshold=1, reward=5, fn=None):
-    if len(out.shape) > 1:
-        dists = torch.norm(out - target, dim=1)
-    else:
-        # just one dimension so only one element in batch
-        dists = torch.norm(out - target, dim=0, keepdim=True)
-
-    done = (dists < threshold) * 1
-    done_count = done.sum()
-
-    # apply some potential function to weight the losses
-    if fn is not None:
-        dists = fn(dists)
-    loss = torch.sum(dists) - done_count * reward
-
-    return loss, done
-
-# updating indices array to get the next targets for sequential goals
-def update_seq_indices(targets, indices, done):
-    indices = torch.clamp(indices + done, 0, len(targets[0]) - 1)
-    return indices
 
 # given batch and dset name, get the x, y pairs and turn them into Tensors
 def get_x_y(batch, dset):

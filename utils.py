@@ -10,6 +10,7 @@ import json
 import csv
 import pickle
 import copy
+import re
 # import pandas as pd
 
 
@@ -109,4 +110,14 @@ def load_rb(path):
 
 def lrange(l, p=0.1):
     return np.linspace(0, (l-1) * p, l)
+
+
+# get config dictionary from the model path
+def get_config(model_path):
+    head, tail = os.path.split(model_path)
+    run_id = re.split('_|\.', tail)[1]
+    config_path = os.path.join(head, 'config_'+run_id+'.json')
+    with open(config_path, 'r') as f:
+        config = json.load(f)
+    return config
 

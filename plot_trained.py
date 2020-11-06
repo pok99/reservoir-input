@@ -9,14 +9,14 @@ import pickle
 import argparse
 import pdb
 
-from utils import load_rb
+from utils import load_rb, get_config, fill_undefined_args
 from testers import load_model_path, test_model
 
 # for plotting some instances of a trained model on a specified dataset
 
 parser = argparse.ArgumentParser()
 parser.add_argument('model', help='path to a model file, to be loaded into pytorch')
-parser.add_argument('dataset', help='path to a dataset of trials')
+parser.add_argument('-d', '--dataset', help='path to a dataset of trials')
 parser.add_argument('--noise', default=0, help='noise to add to trained weights')
 parser.add_argument('--res_noise', default=None, type=float)
 parser.add_argument('--out_act', default=None, type=str)
@@ -29,105 +29,74 @@ parser.add_argument('--seq_goals_threshold', default=1, type=float, help='seq-go
 parser.add_argument('--dists', action='store_true', help='to plot dists for seq-goals')
 args = parser.parse_args()
 
-with open(args.model, 'rb') as f:
-    model = torch.load(f)
+config = get_config(args.model)
+config = fill_undefined_args(args, config, overwrite_none=True)
 
-if args.noise != 0:
-    J = model['W_f.weight']
-    v = J.std()
-    shp = J.shape
-    model['W_f.weight'] += torch.normal(0, v * .5, shp)
+net = load_model_path(args.model, config=config)
+# dset = load_rb(args.dataset)
+# assuming config is in the same folder as the model
 
-    J = model['W_ro.weight']
-    v = J.std()
-    shp = J.shape
-    model['W_ro.weight'] += torch.normal(0, v * .5, shp)
 
-net_params = {
-    'dset': args.dataset,
-    'out_act': args.out_act,
-    'stride': args.stride,
-    'res_noise': args.res_noise
-}
-net = load_model_path(args.model, params=net_params)
-dset = load_rb(args.dataset)
+# if args.noise != 0:
+#     J = model['W_f.weight']
+#     v = J.std()
+#     shp = J.shape
+#     model['W_f.weight'] += torch.normal(0, v * .5, shp)
 
-params={
-    'dset': args.dataset,
-    'reservoir_x_init': args.reservoir_x_init,
-    'seq_goals_timesteps': args.seq_goals_timesteps,
-    'seq_goals_threshold': args.seq_goals_threshold
-}
+#     J = model['W_ro.weight']
+#     v = J.std()
+#     shp = J.shape
+#     model['W_ro.weight'] += torch.normal(0, v * .5, shp)
+
+# net_params = {
+#     'dset': args.dataset,
+#     'out_act': args.out_act,
+#     'stride': args.stride,
+#     'res_noise': args.res_noise
+# }
+
+
+# params={
+#     'dset': args.dataset,
+#     'reservoir_x_init': args.reservoir_x_init,
+#     'seq_goals_timesteps': args.seq_goals_timesteps,
+#     'seq_goals_threshold': args.seq_goals_threshold
+# }
 
 if args.test_all:
-    _, loss2 = test_model(net, dset, params=params)
-    print('avg summed loss (all):', loss2)
+    _, loss = test_model(net, config)
+    print('avg summed loss (all):', loss)
 
 if not args.no_plot:
-    data, loss = test_model(net, dset, n_tests=12, params=params)
+    data, loss = test_model(net, config, n_tests=12)
     print('avg summed loss (plotted):', loss)
 
     run_id = '/'.join(args.model.split('/')[-3:-1])
 
     fig, ax = plt.subplots(3,4,sharex=True, sharey=True, figsize=(12,7))
 
-    if 'seq-goals' in args.dataset:
-        for i, ax in enumerate(fig.axes):
-            ix, x, y, z, loss = data[i]
-            xr = np.arange(len(x))
+    for i, ax in enumerate(fig.axes):
+        ix, x, y, z, loss = data[i]
+        xr = np.arange(len(x))
 
-            ax.axvline(x=0, color='dimgray', alpha = 1)
-            ax.axhline(y=0, color='dimgray', alpha = 1)
-            ax.grid(True, which='major', lw=1, color='lightgray', alpha=0.4)
-            ax.spines['top'].set_visible(False)
-            ax.spines['right'].set_visible(False)
-            ax.spines['left'].set_visible(False)
-            ax.spines['bottom'].set_visible(False)
+        ax.axvline(x=0, color='dimgray', alpha = 1)
+        ax.axhline(y=0, color='dimgray', alpha = 1)
+        ax.grid(True, which='major', lw=1, color='lightgray', alpha=0.4)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['left'].set_visible(False)
+        ax.spines['bottom'].set_visible(False)
 
-            # pdb.set_trace()
-            if args.dists:
-                dists = torch.norm(z - x, dim=1)
-                ax.plot(dists)
+        ax.plot(xr, x, color='coral', alpha=0.5, lw=1, label='input')
+        ax.plot(xr, y, color='coral', alpha=1, lw=1, label='target')
+        ax.plot(xr, z, color='cornflowerblue', alpha=1, lw=1.5, label='response')
 
-            else:
+        ax.tick_params(axis='both', color='white')
+        ax.set_title(f'trial {ix}, avg loss {np.round(float(loss), 2)}', size='small')
+        ax.set_ylim([-.5,2])
 
-                n_pts = y.shape[0]
-                colors = iter(cm.Oranges(np.linspace(.2, 1, n_pts)))
-                for j in range(n_pts):
-                    ax.scatter(y[j][0], y[j][1], color=next(colors))
-                
-                n_timesteps = z.shape[0]
-                ts_colors = iter(cm.Blues(np.linspace(0.3, 1, n_timesteps)))
-                for j in range(n_timesteps):
-                    ax.scatter(z[j][0], z[j][1], color=next(ts_colors), s=5)
-
-            ax.tick_params(axis='both', color='white')
-            ax.set_title(f'trial {ix}, avg loss {np.round(float(loss), 2)}', size='small')
-            #ax.set_ylim([-2,3])
-
-    else:
-        for i, ax in enumerate(fig.axes):
-            ix, x, y, z, loss = data[i]
-            xr = np.arange(len(x))
-
-            ax.axvline(x=0, color='dimgray', alpha = 1)
-            ax.axhline(y=0, color='dimgray', alpha = 1)
-            ax.grid(True, which='major', lw=1, color='lightgray', alpha=0.4)
-            ax.spines['top'].set_visible(False)
-            ax.spines['right'].set_visible(False)
-            ax.spines['left'].set_visible(False)
-            ax.spines['bottom'].set_visible(False)
-
-            ax.plot(xr, x, color='coral', alpha=0.5, lw=1, label='input')
-            ax.plot(xr, y, color='coral', alpha=1, lw=1, label='target')
-            ax.plot(xr, z, color='cornflowerblue', alpha=1, lw=1.5, label='response')
-
-            ax.tick_params(axis='both', color='white')
-            ax.set_title(f'trial {ix}, avg loss {np.round(float(loss), 2)}', size='small')
-            ax.set_ylim([-2,3])
-
-        fig.text(0.5, 0.04, 'timestep', ha='center', va='center')
-        fig.text(0.06, 0.5, 'value', ha='center', va='center', rotation='vertical')
+    fig.text(0.5, 0.04, 'timestep', ha='center', va='center')
+    fig.text(0.06, 0.5, 'value', ha='center', va='center', rotation='vertical')
 
     handles, labels = ax.get_legend_handles_labels()
     fig.suptitle(f'Final performance: {run_id}')

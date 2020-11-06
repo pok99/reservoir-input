@@ -1,0 +1,13 @@
+{
+  "argv": [
+    "dataset.py",
+    "create",
+    "rsg_20",
+    "--rsg_intervals",
+    "20"
+  ],
+  "t_type": "rsg",
+  "n_trials": 1000,
+  "t_len": 200,
+  "scale": 1
+}

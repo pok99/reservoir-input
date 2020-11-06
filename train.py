@@ -18,7 +18,7 @@ import copy
 
 from network import BasicNetwork, Reservoir
 
-from utils import log_this, load_rb
+from utils import log_this, load_rb, get_config, fill_undefined_args
 from helpers import get_optimizer, get_criterion, get_x_y
 
 class Trainer:
@@ -76,15 +76,15 @@ class Trainer:
         self.dset = load_rb(self.args.dataset)
 
         # if using separate training and test sets, separate them out
-        if self.args.separate_test:
+        if self.args.same_test:
+            self.train_set = self.dset
+            self.test_set = self.dset
+        else:
             np.random.shuffle(self.dset)
             cutoff = round(.9 * len(self.dset))
             self.train_set = self.dset[:cutoff]
             self.test_set = self.dset[cutoff:]
             logging.info(f'Using separate training ({cutoff}) and test ({len(self.dset) - cutoff}) sets.')
-        else:
-            self.train_set = self.dset
-            self.test_set = self.dset
         
         self.log_interval = self.args.log_interval
         if not self.args.no_log:
@@ -142,6 +142,8 @@ class Trainer:
             x = torch.from_numpy(dset[:,0,:]).float()
             y = torch.from_numpy(dset[:,1,:]).float()
 
+            # pdb.set_trace()
+
             # so that the callback for scipy.optimize.minimize knows what step it is on
             self.scipy_ix = 0
             vis_samples = []
@@ -160,25 +162,21 @@ class Trainer:
 
                 # need to do this so that burn in works
                 # res state starting from same random seed for each iteration
-                self.net.reset(res_state_seed=0)
+                self.net.reset()
                 self.net.zero_grad()
                 total_loss = torch.tensor(0.)
 
                 for j in range(x.shape[1]):
-                    net_out, step_loss, _ = self.run_iteration(x[:,j], y[:,j])
-                
-                total_loss += step_loss
+                    _, loss, _ = self.run_iteration(x[:,j], y[:,j])
+                    total_loss += loss
+
                 total_loss.backward()
 
-                # need to do this every time so we can reference parameters and grads by name
+                # turn param grads into list
                 grad_list = []
-                for k,v in self.net.named_parameters():
-                    for part in self.args.train_parts:
-                        if part in k:
-                            grad = v.grad.numpy().reshape(-1)
-                            grad_list.append(grad)
-                            break
-
+                for v in self.train_params:
+                    grad = v.grad.numpy().reshape(-1)
+                    grad_list.append(grad)
                 vec = np.concatenate(grad_list)
                 post = np.float64(vec)
 
@@ -194,7 +192,7 @@ class Trainer:
                     sample_n = random.randrange(len(self.dset))
 
                     with torch.no_grad():
-                        self.net.reset(res_state_seed=0)
+                        self.net.reset()
                         self.net.zero_grad()
                         outs = []
                         total_loss = torch.tensor(0.)
@@ -213,23 +211,23 @@ class Trainer:
 
             # getting the initial values to put into the algorithm
             init_list = []
-            for k,_ in self.n_params.items():
-                init = self.net.state_dict()[k].numpy().reshape(-1)
-                init_list.append(init)
+            for v in self.train_params:
+                init_list.append(v.detach().numpy().reshape(-1))
 
             init = np.concatenate(init_list)
+            # pdb.set_trace()
             optim_options = {
                 'iprint': self.log_interval,
                 'maxiter': self.args.maxiter,
                 'ftol': 1e-12
             }
             optim = minimize(closure, init, method='L-BFGS-B', jac=True, callback=callback, options=optim_options)
+            # optim = minimize(closure, init, method='L-BFGS-B', jac=True, options=optim_options)
 
             # W_f_final, W_ro_final = vec_to_param(optim.x)
             error_final = optim.fun
             n_iters = optim.nit
             # error_final = self.test()
-            
 
             if not self.args.no_log:
                 self.log_model(ix='final')
@@ -262,7 +260,7 @@ class Trainer:
 
 
     # runs an iteration where we want to match a certain trajectory
-    def run_iter_traj(self, x, y):
+    def run_iteration(self, x, y):
         net_in = x.reshape(-1, self.args.L)
         net_out, extras = self.net(net_in, extras=True)
         net_target = y.reshape(-1, self.args.Z)
@@ -280,7 +278,7 @@ class Trainer:
         ins = x
         goals = y
         for j in range(x.shape[1]):
-            net_out, step_loss, extras = self.run_iter_traj(x[:,j], y[:,j])
+            net_out, step_loss, extras = self.run_iteration(x[:,j], y[:,j])
             if np.isnan(step_loss.item()):
                 return -1, (net_out, extras)
             iter_loss += step_loss
@@ -309,7 +307,7 @@ class Trainer:
             self.net.reset(self.args.res_x_init)
             total_loss = torch.tensor(0.)
             for j in range(x.shape[1]):
-                _, step_loss, _ = self.run_iter_traj(x[:,j], y[:,j])
+                _, step_loss, _ = self.run_iteration(x[:,j], y[:,j])
                 total_loss += step_loss
 
         etc = {}
@@ -436,9 +434,9 @@ def parse_args():
     parser.add_argument('--out_act', type=str, default=None, help='output activation')
 
     parser.add_argument('--dataset', type=str, default='datasets/rsg.pkl')
-    parser.add_argument('--separate_test', action='store_true', help='use separate test set')
+    parser.add_argument('--same_test', action='store_true', help='use entire dataset for both training and testing')
 
-    parser.add_argument('--optimizer', choices=['adam', 'sgd', 'rmsprop', 'lbfgs-scipy', 'lbfgs-pytorch'], default='lbfgs-scipy')
+    parser.add_argument('--optimizer', choices=['adam', 'sgd', 'rmsprop', 'lbfgs', 'lbfgs-scipy', 'lbfgs-pytorch'], default='lbfgs-scipy')
     parser.add_argument('--loss', type=str, default='mse')
 
     # lbfgs-scipy arguments
@@ -569,7 +567,7 @@ if __name__ == '__main__':
     trainer = Trainer(args)
     logging.info(f'Initialized trainer. Using optimizer {args.optimizer}.')
     n_iters = 0
-    if args.optimizer == 'lbfgs-scipy':
+    if args.optimizer == 'lbfgs-scipy' or args.optimizer == 'lbfgs':
         final_loss, n_iters = trainer.optimize_lbfgs('scipy')
     elif args.optimizer == 'lbfgs-pytorch':
         final_loss, n_iters = trainer.optimize_lbfgs('pytorch')

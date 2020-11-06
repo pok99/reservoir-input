@@ -44,7 +44,6 @@ class Reservoir(nn.Module):
             self.args.res_x_seed = np.random.randint(1e6)
 
         self.tau_x = 10
-        self.x_seed = self.args.res_x_seed
         self.noise_std = self.args.res_noise
 
         self._init_vars()
@@ -94,7 +93,7 @@ class Reservoir(nn.Module):
     def reset(self, res_state=None, burn_in=True):
         if res_state is None:
             # load specified hidden state from seed
-            res_state = self.x_seed
+            res_state = self.args.res_x_seed
 
         if type(res_state) is np.ndarray:
             # load an actual particular hidden state
