@@ -19,7 +19,7 @@ import copy
 from network import BasicNetwork, Reservoir
 
 from utils import log_this, load_rb, get_config, fill_undefined_args
-from helpers import get_optimizer, get_criterion, get_x_y
+from helpers import get_optimizer, get_criterion, get_x_y_info, mse2_loss
 
 class Trainer:
     def __init__(self, args):
@@ -116,9 +116,10 @@ class Trainer:
                     self.net.load_state_dict(best_loss_params)
 
         elif mode == 'scipy':
-            dset = np.asarray([x[:-1] for x in self.dset])
-            x = torch.from_numpy(dset[:,0,:]).float()
-            y = torch.from_numpy(dset[:,1,:]).float()
+            # x = torch.Tensor([i[0] for i in self.dset])
+            # y = torch.Tensor([i[1] for i in self.dset])
+            # info = [i[2] for i in self.dset]
+            x, y, info = get_x_y_info(self.dset)
 
             # so that the callback for scipy.optimize.minimize knows what step it is on
             self.scipy_ix = 0
@@ -140,10 +141,19 @@ class Trainer:
                 self.net.reset()
                 self.net.zero_grad()
 
-                total_loss = torch.tensor(0.)
-                for j in range(x.shape[1]):
-                    _, step_loss, _ = self.run_iteration(x[:,j], y[:,j])
-                    total_loss += step_loss
+                # total_loss = torch.tensor(0.)
+                total_loss, etc = self.run_trial(x, y=y, extras=True)
+                
+                # for j in range(x.shape[1]):
+                #     if self.args.dset_type == 'rsg-gaussian':
+                #         _, step_loss, _ = self.run_iteration(x[:,j], y[:,j])
+                #     elif self.args.dset_type == 'rsg-pulse':
+                #         _, step_loss, _ = self.run_iteration(x[:,j])
+                #     total_loss += step_loss
+                if self.args.dset_type == 'rsg-pulse':
+                    outs = etc['outs']
+                    m_loss = mse2_loss(x, outs, info, self.args.mse2_l1, self.args.mse2_l2)
+                    total_loss += m_loss
                 total_loss.backward()
 
                 # turn param grads into list
@@ -172,6 +182,7 @@ class Trainer:
 
                         xs = x[sample_n,:]
                         ys = y[sample_n,:]
+                        pdb.set_trace()
                         for j in range(xs.shape[0]):
                             net_out, step_loss, _ = self.run_iteration(xs[j], ys[j])
                             outs.append(net_out.item())
@@ -229,38 +240,54 @@ class Trainer:
 
 
     # runs an iteration where we want to match a certain trajectory
-    def run_iteration(self, x, y):
-        net_in = x.reshape(-1, self.args.L)
-        net_out, extras = self.net(net_in, extras=True)
-        net_target = y.reshape(-1, self.args.Z)
-        step_loss = self.criterion(net_out, net_target)
+    def run_trial(self, x, y=None, extras=False):
+        total_loss = 0.
+        outs = []
+        for j in range(x.shape[1]):
+            net_in = x[:,j].reshape(-1, self.args.L)
+            net_out, extras = self.net(net_in, extras=True)
+            if self.args.loss == 'mse2':
+                net_target = torch.zeros_like(net_out)
+            else:
+                assert y is not None
+                net_target = y[:,j].reshape(-1, self.args.Z)
+            step_loss = self.criterion(net_out, net_target)
+            total_loss += step_loss
+            outs.append(net_out)
 
-        return net_out, step_loss, extras
+        outs = torch.cat(outs, dim=1)
 
-    def train_iteration(self, x, y):
+        if extras:
+            etc = {'outs': outs,}
+            return total_loss, etc
+        return total_loss
+
+    def train_iteration(self, x, y, info):
         self.net.reset(self.args.res_x_init)
         self.optimizer.zero_grad()
 
-        outs = []
-        iter_loss = torch.tensor(0.)
-
         ins = x
         goals = y
-        for j in range(x.shape[1]):
-            net_out, step_loss, extras = self.run_iteration(x[:,j], y[:,j])
-            if np.isnan(step_loss.item()):
-                return -1, (net_out, extras)
-            iter_loss += step_loss
-            outs.append(net_out[-1].item())
+        # for j in range(x.shape[1]):
+        #     net_out, step_loss, extras = self.run_iteration(x[:,j], y[:,j])
+        #     if np.isnan(step_loss.item()):
+        #         return -1, (net_out, extras)
+        #     total_loss += step_loss
+        #     outs.append(net_out[-1].item())
+        total_loss, etc = self.run_trial(x, y=y, extras=True)
+        if self.args.dset_type == 'rsg-pulse':
+            outs = etc['outs']
+            m_loss = mse2_loss(x, outs, info, self.args.mse2_l1, self.args.mse2_l2)
+            total_loss += m_loss
 
-        iter_loss.backward()
+        total_loss.backward()
 
         etc = {
             'ins': ins,
             'goals': goals,
-            'outs': outs
+            'outs': etc['outs'].detach()
         }
-        return iter_loss.item(), etc
+        return total_loss.item(), etc
 
     def test(self, n=0):
         if n != 0:
@@ -270,16 +297,21 @@ class Trainer:
         else:
             batch = self.test_set
 
-        x, y = get_x_y(batch, self.args.dataset)
+        x, y, info = get_x_y_info(batch)
+        etc = {}
 
         with torch.no_grad():
             self.net.reset(self.args.res_x_init)
-            total_loss = torch.tensor(0.)
-            for j in range(x.shape[1]):
-                _, step_loss, _ = self.run_iteration(x[:,j], y[:,j])
-                total_loss += step_loss
-
-        etc = {}
+            total_loss, etc = self.run_trial(x, y=y, extras=True)
+            if self.args.dset_type == 'rsg-pulse':
+                outs = etc['outs']
+                m_loss, fta = mse2_loss(x, outs, info, self.args.mse2_l1, self.args.mse2_l2, extras=True)
+                total_loss += m_loss
+                etc['fta'] = fta
+            # total_loss = torch.tensor(0.)
+            # for j in range(x.shape[1]):
+            #     _, step_loss, _ = self.run_iteration(x[:,j], y[:,j])
+            #     total_loss += step_loss
 
         return total_loss.item() / len(batch), etc
 
@@ -307,8 +339,8 @@ class Trainer:
                     break
                 ix += 1
 
-                x, y = get_x_y(batch, self.args.dataset)
-                iter_loss, etc = self.train_iteration(x, y)
+                x, y, info = get_x_y_info(batch)
+                iter_loss, etc = self.train_iteration(x, y, info)
 
                 if ix_callback is not None:
                     ix_callback(iter_loss, etc)
@@ -324,17 +356,19 @@ class Trainer:
                 running_mag += mag             
 
                 if ix % self.log_interval == 0:
-                    outs = etc['outs']
-                    z = np.stack(outs).squeeze()
+                    z = etc['outs'].numpy().squeeze()
                     # avg of the last 50 trials
                     avg_loss = running_loss / self.args.batch_size / self.log_interval
-                    test_loss, test_etc = self.test(n=50)
+
+                    test_loss, test_etc = self.test(n=100)
+                    fta = test_etc['fta']
                     avg_max_grad = running_mag / self.log_interval
                     log_arr = [
                         f'iteration {ix}',
                         f'loss {avg_loss:.3f}',
                         # f'max abs grad {avg_max_grad:.3f}',
-                        f'test loss {test_loss:.3f}'
+                        f'test loss {test_loss:.3f}',
+                        f'fta {fta:.3f}'
                     ]
                     log_str = '\t| '.join(log_arr)
                     logging.info(log_str)
@@ -400,13 +434,17 @@ def parse_args():
     # parser.add_argument('--network_delay', type=int, default=0)
     parser.add_argument('--res_noise', type=float, default=0)
     parser.add_argument('--no_bias', action='store_true')
-    parser.add_argument('--out_act', type=str, default=None, help='output activation')
+    parser.add_argument('--out_act', type=str, default='exp', help='output activation')
 
     parser.add_argument('--dataset', type=str, default='datasets/rsg.pkl')
     parser.add_argument('--same_test', action='store_true', help='use entire dataset for both training and testing')
 
     parser.add_argument('--optimizer', choices=['adam', 'sgd', 'rmsprop', 'lbfgs', 'lbfgs-scipy', 'lbfgs-pytorch'], default='lbfgs-scipy')
     parser.add_argument('--loss', type=str, default='mse')
+
+    parser.add_argument('--mse_l1', type=float, default=.1, help='default relative weight of mse loss. want this to be small for rsg-pulse, large for rsg-gaussian')
+    parser.add_argument('--mse2_l1', type=float, default=.5, help='threshold for mse2 loss')
+    parser.add_argument('--mse2_l2', type=float, default=10, help='default relative weight of mse2 loss')
 
     # lbfgs-scipy arguments
     parser.add_argument('--maxiter', type=int, default=10000, help='limit to # iterations. lbfgs-scipy only')
@@ -493,12 +531,16 @@ def adjust_args(args):
             args.out_act = 'none'
 
     # set the dataset
-    if 'rsg' in args.dataset:
-        args.dset_type = 'rsg'
+    if 'rsg-gaussian' in args.dataset:
+        args.dset_type = 'rsg-gaussian'
+    elif 'rsg-pulse' in args.dataset:
+        args.dset_type = 'rsg-pulse'
+        args.loss = 'mse2'
     elif 'copy' in args.dataset:
         args.dset_type = 'copy'
     else:
         args.dset_type = 'unknown'
+
 
     # initializing logging
     # do this last, because we will be logging previous parameters into the config file

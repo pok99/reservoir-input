@@ -236,7 +236,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('mode', default='load')
     parser.add_argument('name')
-    parser.add_argument('-t', '--trial_type', default='rsg')
+    parser.add_argument('-t', '--trial_type', default='rsg-pulse')
     parser.add_argument('--rsg_intervals', nargs='*', type=int, default=None)
     parser.add_argument('--motifs', type=str, help='path to motifs')
     parser.add_argument('-a', '--trial_args', nargs='*', help='terms to specify parameters of trial type')

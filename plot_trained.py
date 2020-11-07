@@ -79,9 +79,14 @@ if not args.no_plot:
         ax.spines['left'].set_visible(False)
         ax.spines['bottom'].set_visible(False)
 
-        ax.plot(xr, x, color='coral', alpha=0.5, lw=1, label='input')
-        ax.plot(xr, y, color='coral', alpha=1, lw=1, label='target')
-        ax.plot(xr, z, color='cornflowerblue', alpha=1, lw=1.5, label='response')
+        if config.dset_type == 'rsg-gaussian':
+            ax.plot(xr, x, color='coral', alpha=0.5, lw=1, label='input')
+            ax.plot(xr, y, color='coral', alpha=1, lw=1, label='target')
+            ax.plot(xr, z, color='cornflowerblue', alpha=1, lw=1.5, label='response')
+        elif config.dset_type == 'rsg-pulse':
+            ax.scatter(xr, x, color='coral', alpha=1, s=3, label='input')
+            ax.scatter(y, 1, color='forestgreen', alpha=1, s=5, label='target')
+            ax.plot(xr, z, color='cornflowerblue', alpha=1, lw=1.5, label='response')
 
         ax.tick_params(axis='both', color='white')
         ax.set_title(f'trial {ix}, avg loss {np.round(float(loss), 2)}', size='small')
