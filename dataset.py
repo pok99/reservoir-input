@@ -10,6 +10,7 @@ import pdb
 import random
 
 import matplotlib.pyplot as plt
+from matplotlib import collections as matcoll
 
 import argparse
 
@@ -34,7 +35,7 @@ def create_dataset(args):
 
     trials = []
 
-    if t_type == 'rsg':
+    if t_type == 'rsg-gaussian':
         '''
         trial_args options:
         - use_ints
@@ -95,6 +96,40 @@ def create_dataset(args):
             info = (ready_time, set_time, go_time)
 
             trials.append((trial_x, trial_y, info))
+
+    elif t_type == 'rsg-pulse':
+        '''
+        trial_args options:
+        '''
+        pulse_len = get_args_val(trial_args, 'plen', 3, int)
+        config['pulse_len'] = pulse_len
+        if args.rsg_intervals is None:
+            # amount of time in between ready and set cues
+            min_t = get_args_val(trial_args, 'gt', 15, int)
+            max_t = get_args_val(trial_args, 'lt', t_len // 2 - 15, int)
+            config['min_t'] = min_t
+            config['max_t'] = max_t
+        for n in range(n_trials):
+            if args.rsg_intervals is None:
+                t_p = np.random.randint(min_t, max_t)
+            else:
+                # use one of the intervals that we desire
+                num = random.choice(args.rsg_intervals)
+                assert num < t_len / 2
+                t_p = num
+
+            ready_time = np.random.randint(5, t_len - t_p * 2 - 10)
+                
+            set_time = ready_time + t_p
+            go_time = set_time + t_p
+
+            trial_x = np.zeros((t_len))
+            trial_x[ready_time:ready_time+pulse_len] = 1
+            trial_x[set_time:set_time+pulse_len] = 1
+
+            info = (ready_time, set_time, go_time)
+
+            trials.append((trial_x, go_time, info))
 
 
     elif t_type.startswith('copy'):
@@ -218,13 +253,19 @@ if __name__ == '__main__':
     elif args.mode == 'load':
         dset = load_rb(args.name)
 
+        # all for getting config path to get dataset type
+        dset_path_tmp = args.name.split('/')
+        config_path_tmp = '/'.join(dset_path_tmp[:-1] + ['configs'] + [dset_path_tmp[-1]])
+        config_path = config_path_tmp[:-4] + '.json'
+        with open(config_path, 'r') as f:
+            config = json.load(f)
+        dset_type = config['t_type']
+
         dset_len = len(dset)
         sample = random.sample(dset, 6)
         dset_range = range(len(sample[0][0]))
         fig, ax = plt.subplots(2,3,sharex=True, sharey=True, figsize=(8,4))
         for i, ax in enumerate(fig.axes):
-            ax.plot(dset_range, sample[i][0], color='coral', label='ready/set', lw=2)
-            ax.plot(dset_range, sample[i][1], color='dodgerblue', label='go', lw=2)
             ax.axvline(x=0, color='dimgray', alpha = 1)
             ax.axhline(y=0, color='dimgray', alpha = 1)
             ax.grid(True, which='major', lw=1, color='lightgray', alpha=0.4)
@@ -234,6 +275,16 @@ if __name__ == '__main__':
             ax.spines['right'].set_visible(False)
             ax.spines['left'].set_visible(False)
             ax.spines['bottom'].set_visible(False)
+
+            if dset_type == 'rsg' or dset_type == 'rsg-gaussian':
+                ax.plot(dset_range, sample[i][0], color='coral', label='ready/set', lw=2)
+                ax.plot(dset_range, sample[i][1], color='dodgerblue', label='go', lw=2)
+            elif dset_type == 'rsg-pulse':
+                ml, sl, bl = ax.stem(dset_range, sample[i][0], use_line_collection=True, linefmt='coral', label='ready/set')
+                ml.set_markerfacecolor('coral')
+                ml.set_markeredgecolor('coral')
+                ml.set_markersize(3)
+                sl.set_linewidth(.5)
 
         handles, labels = ax.get_legend_handles_labels()
         #fig.legend(handles, labels, loc='lower center')

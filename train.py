@@ -26,28 +26,7 @@ class Trainer:
         super().__init__()
 
         self.args = args
-
         self.net = BasicNetwork(self.args)
-
-        # load any specified model parameters into the network
-        # if args.model_path is not None:
-        #     m_dict = torch.load(args.model_path)
-        #     self.net.load_state_dict(m_dict)
-        #     logging.info('Loaded model file.')
-        # if args.Wf_path is not None:
-        #     m_dict = torch.load(args.Wf_path)
-        #     self.net.W_f.weight = m_dict['W_f.weight']
-        #     if 'W_f.bias' in m_dict:
-        #         self.net.W_f.bias = m_dict['W_f.bias']
-        # if args.Wro_path is not None:
-        #     m_dict = torch.load(args.Wro_path)
-        #     self.net.W_ro.weight = m_dict['W_ro.weight']
-        #     if 'W_ro.bias' in m_dict:
-        #         self.net.W_ro.bias = m_dict['W_ro.bias']
-        # if args.reservoir_path is not None:
-        #     m_dict = torch.load(args.Wro_path)
-        #     self.net.reservoir.J.weight = m_dict['reservoir.J.weight']
-        #     self.net.reservoir.W_u.weight = m_dict['reservoir.W_u.weight']
 
         # getting number of elements of every parameter
         self.n_params = {}
@@ -137,12 +116,9 @@ class Trainer:
                     self.net.load_state_dict(best_loss_params)
 
         elif mode == 'scipy':
-
             dset = np.asarray([x[:-1] for x in self.dset])
             x = torch.from_numpy(dset[:,0,:]).float()
             y = torch.from_numpy(dset[:,1,:]).float()
-
-            # pdb.set_trace()
 
             # so that the callback for scipy.optimize.minimize knows what step it is on
             self.scipy_ix = 0
@@ -160,16 +136,14 @@ class Trainer:
                     self.net.state_dict()[k][:] = torch.Tensor(weight)
                     ind += nums[1]
 
-                # need to do this so that burn in works
                 # res state starting from same random seed for each iteration
                 self.net.reset()
                 self.net.zero_grad()
+
                 total_loss = torch.tensor(0.)
-
                 for j in range(x.shape[1]):
-                    _, loss, _ = self.run_iteration(x[:,j], y[:,j])
-                    total_loss += loss
-
+                    _, step_loss, _ = self.run_iteration(x[:,j], y[:,j])
+                    total_loss += step_loss
                 total_loss.backward()
 
                 # turn param grads into list
@@ -188,7 +162,6 @@ class Trainer:
                     return
                 self.scipy_ix += 1
                 if self.scipy_ix % self.log_interval == 0:
-                    # W_f, W_ro = vec_to_param(xk)
                     sample_n = random.randrange(len(self.dset))
 
                     with torch.no_grad():
@@ -213,21 +186,17 @@ class Trainer:
             init_list = []
             for v in self.train_params:
                 init_list.append(v.detach().numpy().reshape(-1))
-
             init = np.concatenate(init_list)
-            # pdb.set_trace()
+
             optim_options = {
                 'iprint': self.log_interval,
                 'maxiter': self.args.maxiter,
-                'ftol': 1e-12
+                'ftol': 1e-16
             }
             optim = minimize(closure, init, method='L-BFGS-B', jac=True, callback=callback, options=optim_options)
-            # optim = minimize(closure, init, method='L-BFGS-B', jac=True, options=optim_options)
 
-            # W_f_final, W_ro_final = vec_to_param(optim.x)
             error_final = optim.fun
             n_iters = optim.nit
-            # error_final = self.test()
 
             if not self.args.no_log:
                 self.log_model(ix='final')

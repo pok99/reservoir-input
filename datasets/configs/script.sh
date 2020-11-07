@@ -1,0 +1,1 @@
+for x in *.json;do mv $x rsg-gaussian${x#*rsg};done

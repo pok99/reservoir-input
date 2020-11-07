@@ -55,14 +55,6 @@ net = load_model_path(args.model, config=config)
 #     'res_noise': args.res_noise
 # }
 
-
-# params={
-#     'dset': args.dataset,
-#     'reservoir_x_init': args.reservoir_x_init,
-#     'seq_goals_timesteps': args.seq_goals_timesteps,
-#     'seq_goals_threshold': args.seq_goals_threshold
-# }
-
 if args.test_all:
     _, loss = test_model(net, config)
     print('avg summed loss (all):', loss)

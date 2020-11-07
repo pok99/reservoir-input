@@ -26,6 +26,9 @@ def get_criterion(args):
         criterion = nn.MSELoss(reduction='sum')
     elif args.loss == 'bce':
         criterion = nn.BCEWithLogitsLoss()
+    elif 'zero-mse' in args.loss:
+        criterion == nn.MSELoss(reduction='sum')
+
     return criterion
 
 def get_output_activation(args):
