@@ -48,17 +48,17 @@ def test_model(net, config, n_tests=0):
             net_in = x[:,j].reshape(-1, net.args.L)
             net_out = net(net_in)
             outs.append(net_out)
-            if config.dset_type == 'rsg-gaussian':
-                net_target = y[:,j].reshape(-1, net.args.Z)
-            elif config.dset_type == 'rsg-pulse':
-                net_target = torch.zeros_like(net_out)
+            # if config.dset_type == 'rsg-gaussian':
+            net_target = y[:,j].reshape(-1, net.args.Z)
+            # elif config.dset_type == 'rsg-pulse':
+            #     net_target = torch.zeros_like(net_out)
 
             for k in range(len(test_set)):
                 step_loss = criterion(net_out[k], net_target[k])
                 losses[k, j] = step_loss.item()
 
         outs = torch.cat(outs, dim=1)
-        if config.dset_type == 'rsg-pulse':
+        if config.loss == 'mse2':
             m_losses = np.zeros(len(test_set))
             for j in range(len(test_set)):
                 m_loss = mse2_loss(x[j], outs[j], info[j], config.mse2_l1, config.mse2_l2)
@@ -68,7 +68,8 @@ def test_model(net, config, n_tests=0):
     goals = y
 
     losses = np.sum(losses, axis=1)
-    losses = losses + m_losses
+    if config.loss == 'mse2':
+        losses = losses + m_losses
 
     data = list(zip(dset_idx, ins, goals, outs, losses))
 

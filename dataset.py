@@ -73,25 +73,15 @@ def create_dataset(args):
             set_time = ready_time + t_p
             go_time = set_time + t_p
 
-            # output 0s and 1s instead of pdf, use with CrossEntropyLoss
-            if 'delta' in trial_args:
-                config['scale'] = 'DELTA'
-                trial_x = np.zeros((t_len))
-                trial_y = np.zeros((t_len))
-                
-                trial_x[ready_time-1:ready_time+2] = 1
-                trial_x[set_time-1:set_time+2] = 1
-                trial_y[go_time-2:go_time+3] = 1
-            else:
-                # check if width of gaussian is changed from default
-                scale = get_args_val(trial_args, 'scale', 1, float)
-                config['scale'] = scale
+            # check if width of gaussian is changed from default
+            scale = get_args_val(trial_args, 'scale', 1, float)
+            config['scale'] = scale
 
-                trial_range = np.arange(t_len)
-                trial_x = norm.pdf(trial_range, loc=ready_time, scale=1)
-                trial_x += norm.pdf(trial_range, loc=set_time, scale=1)
-                # scaling by `scale` so the height of the middle is always the same
-                trial_y = 2 * scale * norm.pdf(trial_range, loc=go_time, scale=scale)
+            trial_range = np.arange(t_len)
+            trial_x = norm.pdf(trial_range, loc=ready_time, scale=1)
+            trial_x += norm.pdf(trial_range, loc=set_time, scale=1)
+            # scaling by `scale` so the height of the middle is always the same
+            trial_y = 2 * scale * norm.pdf(trial_range, loc=go_time, scale=scale)
 
             info = (ready_time, set_time, go_time)
 
@@ -101,7 +91,7 @@ def create_dataset(args):
         '''
         trial_args options:
         '''
-        pulse_len = get_args_val(trial_args, 'plen', 3, int)
+        pulse_len = get_args_val(trial_args, 'plen', 4, int)
         config['pulse_len'] = pulse_len
         if args.rsg_intervals is None:
             # amount of time in between ready and set cues
@@ -124,12 +114,14 @@ def create_dataset(args):
             go_time = set_time + t_p
 
             trial_x = np.zeros((t_len))
+            trial_y = np.zeros((t_len))
             trial_x[ready_time:ready_time+pulse_len] = 1
             trial_x[set_time:set_time+pulse_len] = 1
+            trial_y[go_time:go_time+pulse_len] = 1
 
             info = (ready_time, set_time, go_time)
 
-            trials.append((trial_x, go_time, info))
+            trials.append((trial_x, trial_y, info))
 
 
     elif t_type.startswith('copy'):
@@ -283,6 +275,11 @@ if __name__ == '__main__':
                 ml, sl, bl = ax.stem(dset_range, sample[i][0], use_line_collection=True, linefmt='coral', label='ready/set')
                 ml.set_markerfacecolor('coral')
                 ml.set_markeredgecolor('coral')
+                ml.set_markersize(3)
+                sl.set_linewidth(.5)
+                ml, sl, bl = ax.stem(dset_range, sample[i][1], use_line_collection=True, linefmt='dodgerblue', label='ready/set')
+                ml.set_markerfacecolor('dodgerblue')
+                ml.set_markeredgecolor('dodgerblue')
                 ml.set_markersize(3)
                 sl.set_linewidth(.5)
 

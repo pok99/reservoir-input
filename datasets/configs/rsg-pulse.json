@@ -9,7 +9,7 @@
   "t_type": "rsg-pulse",
   "n_trials": 1000,
   "t_len": 200,
-  "pulse_len": 3,
+  "pulse_len": 4,
   "min_t": 15,
   "max_t": 85
 }

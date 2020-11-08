@@ -8,6 +8,9 @@ import pdb
 
 import random
 
+def sigmoid(x):
+    return 1/(1 + np.exp(-x))
+
 def get_optimizer(args, train_params):
     op = None
     if args.optimizer == 'adam':
@@ -26,6 +29,9 @@ def get_criterion(args):
         criterion = nn.MSELoss(reduction='sum')
     elif args.loss == 'bce':
         criterion = nn.BCEWithLogitsLoss()
+    elif args.loss == 'bce-pulse':
+        weights = args.bce_pulse_l1 * torch.ones(1)
+        criterion = nn.BCEWithLogitsLoss(reduction='sum', pos_weight=weights)
     elif args.loss == 'mse2':
         criterion = nn.MSELoss(reduction='sum')
 
@@ -53,6 +59,7 @@ def get_dim(a):
     else:
         return 1
 
+
 def mse2_loss(x, outs, info, l1, l2, extras=False):
     total_loss = 0.
     first_ts = []
@@ -62,17 +69,26 @@ def mse2_loss(x, outs, info, l1, l2, extras=False):
         info = [info]
     for j in range(len(x)):
         ready, go = info[j][0], info[j][2]
-        first_t = torch.argmax(outs[j][ready:]) + ready
-        # first_t = torch.nonzero(outs[j][ready:] > l1)
-        # if len(first_t) == 0:
-        #     first_t = torch.tensor(len(x[j]))
-        # else:
-        #     first_t = first_t[0][0]
+        # first_t = torch.argmax(outs[j][ready:]) + ready
+        first_t = torch.nonzero(outs[j][ready:] > l1)
+        if len(first_t) == 0:
+            first_t = torch.tensor(len(x[j])) - 1
+        else:
+            first_t = first_t[0][0] + ready
+        targets = None
+        if go > first_t:
+            relevant_outs = 2 * outs[j][first_t:go+1]
+            targets = torch.zeros_like(relevant_outs)
+        elif go < first_t:
+            relevant_outs = outs[j][go:first_t + 1]
+            targets = 2 * l1 * torch.ones_like(relevant_outs)
         first_ts.append(first_t)
-        mse2_loss = torch.square(first_t - go)
-        total_loss += mse2_loss
+        # mse2_loss = torch.square(first_t - go)
+        # pdb.set_trace()
+        if targets is not None:
+            mse2_loss = nn.MSELoss(reduction='sum')(targets, relevant_outs)
+            total_loss += mse2_loss
     if extras:
         first_t_avg = sum(first_ts) / len(first_ts)
         return l2 * total_loss, first_t_avg
-    # pdb.set_trace()
     return l2 * total_loss

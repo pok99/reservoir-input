@@ -9,6 +9,7 @@ import pickle
 import argparse
 import pdb
 
+from helpers import sigmoid
 from utils import load_rb, get_config, fill_undefined_args
 from testers import load_model_path, test_model
 
@@ -79,14 +80,25 @@ if not args.no_plot:
         ax.spines['left'].set_visible(False)
         ax.spines['bottom'].set_visible(False)
 
-        if config.dset_type == 'rsg-gaussian':
+        # if config.dset_type == 'rsg-gaussian':
+        if config.loss == 'mse':
             ax.plot(xr, x, color='coral', alpha=0.5, lw=1, label='input')
             ax.plot(xr, y, color='coral', alpha=1, lw=1, label='target')
             ax.plot(xr, z, color='cornflowerblue', alpha=1, lw=1.5, label='response')
-        elif config.dset_type == 'rsg-pulse':
+        elif config.loss == 'bce-pulse':
+            ax.plot(xr, x, color='coral', alpha=0.5, lw=1, label='input')
+            ax.plot(xr, sigmoid(z), color='cornflowerblue', alpha=1, lw=1.5, label='response')
+        elif config.loss == 'mse2':
             ax.scatter(xr, x, color='coral', alpha=1, s=3, label='input')
-            ax.scatter(y, 1, color='forestgreen', alpha=1, s=5, label='target')
+            yr = torch.nonzero(y)[0]
+            ax.scatter(yr, 1, color='forestgreen', alpha=1, s=5, label='target')
             ax.plot(xr, z, color='cornflowerblue', alpha=1, lw=1.5, label='response')
+            indx = torch.nonzero(z >= 1)
+            if len(indx) > 0:
+                indx = indx[0,0]
+                # pdb.set_trace()
+                ml, sl, bl = ax.stem([indx], [z[indx]], use_line_collection=True, linefmt='cornflowerblue', markerfmt=' ')
+                sl.set_linewidth(1)
 
         ax.tick_params(axis='both', color='white')
         ax.set_title(f'trial {ix}, avg loss {np.round(float(loss), 2)}', size='small')
