@@ -44,7 +44,6 @@ class Reservoir(nn.Module):
             self.args.res_x_seed = np.random.randint(1e6)
 
         self.tau_x = 10
-        self.noise_std = self.args.res_noise
 
         self._init_vars()
         self.reset()
@@ -54,9 +53,9 @@ class Reservoir(nn.Module):
         torch.manual_seed(self.args.res_seed)
         self.W_u = nn.Linear(self.args.D, self.args.N, bias=False)
         self.W_u.weight.data = torch.normal(0, self.args.res_init_std, self.W_u.weight.shape) / np.sqrt(self.args.D)
-        self.J = nn.Linear(self.args.N, self.args.N, bias=False)
+        self.J = nn.Linear(self.args.N, self.args.N, bias=self.args.bias)
         self.J.weight.data = torch.normal(0, self.args.res_init_std, self.J.weight.shape) / np.sqrt(self.args.N)
-        self.W_ro = nn.Linear(self.args.N, self.args.Z, bias=False)
+        self.W_ro = nn.Linear(self.args.N, self.args.Z, bias=self.args.bias)
         # print(self.J.weight.data[0])
         torch.set_rng_state(rng_pt)
 
@@ -77,8 +76,8 @@ class Reservoir(nn.Module):
     def forward(self, u, extras=False):
         g = torch.tanh(self.J(self.x) + self.W_u(u))
         # adding any inherent reservoir noise
-        if self.noise_std > 0:
-            gn = g + torch.normal(torch.zeros_like(g), self.noise_std)
+        if self.args.res_noise > 0:
+            gn = g + torch.normal(torch.zeros_like(g), self.args.res_noise)
         else:
             gn = g
         delta_x = (-self.x + gn) / self.tau_x

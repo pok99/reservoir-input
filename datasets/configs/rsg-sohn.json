@@ -2,7 +2,7 @@
   "argv": [
     "dataset.py",
     "create",
-    "rsg-pulse_test",
+    "rsg-sohn",
     "-t",
     "rsg-sohn"
   ],

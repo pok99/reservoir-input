@@ -63,30 +63,33 @@ def get_dim(a):
 def mse2_loss(x, outs, info, l1, l2, extras=False):
     total_loss = 0.
     first_ts = []
-    if len(x.shape) == 1:
+    if len(outs.shape) == 1:
         x = x.unsqueeze(0)
         outs = outs.unsqueeze(0)
         info = [info]
     for j in range(len(x)):
+        # pdb.set_trace()
         ready, go = info[j][0], info[j][2]
-        # first_t = torch.argmax(outs[j][ready:]) + ready
+        # getting the index of the first timestep where output is above threshold
         first_t = torch.nonzero(outs[j][ready:] > l1)
         if len(first_t) == 0:
             first_t = torch.tensor(len(x[j])) - 1
         else:
-            first_t = first_t[0][0] + ready
+            first_t = first_t[0,0] + ready
         targets = None
+        # losses defined on interval b/w go and first_t
         if go > first_t:
-            relevant_outs = 2 * outs[j][first_t:go+1]
+            relevant_outs = outs[j][first_t:go+1]
             targets = torch.zeros_like(relevant_outs)
+            weights = torch.arange(go+1-first_t,0,-1)
         elif go < first_t:
             relevant_outs = outs[j][go:first_t + 1]
             targets = 2 * l1 * torch.ones_like(relevant_outs)
+            weights = torch.arange(0,first_t+1-go,1)
         first_ts.append(first_t)
-        # mse2_loss = torch.square(first_t - go)
-        # pdb.set_trace()
         if targets is not None:
-            mse2_loss = nn.MSELoss(reduction='sum')(targets, relevant_outs)
+            mse2_loss = torch.sum(weights * torch.square(targets - relevant_outs))
+            # mse2_loss = diff * nn.MSELoss(reduction='sum')(targets, relevant_outs)
             total_loss += mse2_loss
     if extras:
         first_t_avg = sum(first_ts) / len(first_ts)

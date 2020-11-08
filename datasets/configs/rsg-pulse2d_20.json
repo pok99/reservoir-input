@@ -1,0 +1,17 @@
+{
+  "argv": [
+    "dataset.py",
+    "create",
+    "rsg-pulse2d_20",
+    "-t",
+    "rsg-pulse2d",
+    "-n",
+    "2000",
+    "-i",
+    "20"
+  ],
+  "t_type": "rsg-pulse2d",
+  "n_trials": 2000,
+  "t_len": 200,
+  "pulse_len": 5
+}

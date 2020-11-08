@@ -2,12 +2,14 @@
   "argv": [
     "dataset.py",
     "create",
-    "rsg-pulse_test",
+    "rsg-pulse2d",
     "-t",
-    "rsg-sohn"
+    "rsg-pulse2d",
+    "-n",
+    "2000"
   ],
-  "t_type": "rsg-sohn",
-  "n_trials": 1000,
+  "t_type": "rsg-pulse2d",
+  "n_trials": 2000,
   "t_len": 200,
   "pulse_len": 5,
   "min_t": 15,

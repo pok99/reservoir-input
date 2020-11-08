@@ -20,14 +20,9 @@ parser.add_argument('model', help='path to a model file, to be loaded into pytor
 parser.add_argument('-d', '--dataset', help='path to a dataset of trials')
 parser.add_argument('--noise', default=0, help='noise to add to trained weights')
 parser.add_argument('--res_noise', default=None, type=float)
-parser.add_argument('--out_act', default=None, type=str)
-parser.add_argument('--stride', default=1, type=int)
 parser.add_argument('-x', '--reservoir_x_init', default=None, type=str)
 parser.add_argument('-a', '--test_all', action='store_true')
 parser.add_argument('-n', '--no_plot', action='store_true')
-parser.add_argument('-t', '--seq_goals_timesteps', type=int, default=200, help='number of steps to run seq-goals datasets for')
-parser.add_argument('--seq_goals_threshold', default=1, type=float, help='seq-goals-threshold')
-parser.add_argument('--dists', action='store_true', help='to plot dists for seq-goals')
 args = parser.parse_args()
 
 config = get_config(args.model)
@@ -36,25 +31,6 @@ config = fill_undefined_args(args, config, overwrite_none=True)
 net = load_model_path(args.model, config=config)
 # dset = load_rb(args.dataset)
 # assuming config is in the same folder as the model
-
-
-# if args.noise != 0:
-#     J = model['W_f.weight']
-#     v = J.std()
-#     shp = J.shape
-#     model['W_f.weight'] += torch.normal(0, v * .5, shp)
-
-#     J = model['W_ro.weight']
-#     v = J.std()
-#     shp = J.shape
-#     model['W_ro.weight'] += torch.normal(0, v * .5, shp)
-
-# net_params = {
-#     'dset': args.dataset,
-#     'out_act': args.out_act,
-#     'stride': args.stride,
-#     'res_noise': args.res_noise
-# }
 
 if args.test_all:
     _, loss = test_model(net, config)
@@ -89,14 +65,20 @@ if not args.no_plot:
             ax.plot(xr, x, color='coral', alpha=0.5, lw=1, label='input')
             ax.plot(xr, sigmoid(z), color='cornflowerblue', alpha=1, lw=1.5, label='response')
         elif config.loss == 'mse2':
-            ax.scatter(xr, x, color='coral', alpha=1, s=3, label='input')
+            if config.dset_type == 'rsg-pulse':
+                ax.scatter(xr, x, color='coral', alpha=1, s=3, label='input')
+                start = torch.nonzero(x)[0,0]
+            elif config.dset_type == 'rsg-pulse2d':
+                # pdb.set_trace()
+                ax.scatter(xr, x[:,0], color='coral', alpha=1, s=3, label='input')
+                ax.scatter(xr, x[:,1], color='coral', alpha=1, s=3, label='input')
+                start = torch.nonzero(x[:,0])[0,0]
             yr = torch.nonzero(y)[0]
             ax.scatter(yr, 1, color='forestgreen', alpha=1, s=5, label='target')
             ax.plot(xr, z, color='cornflowerblue', alpha=1, lw=1.5, label='response')
-            indx = torch.nonzero(z >= 1)
+            indx = torch.nonzero(z[start:] >= 1)
             if len(indx) > 0:
-                indx = indx[0,0]
-                # pdb.set_trace()
+                indx = indx[0,0] + start
                 ml, sl, bl = ax.stem([indx], [z[indx]], use_line_collection=True, linefmt='cornflowerblue', markerfmt=' ')
                 sl.set_linewidth(1)
 

@@ -116,9 +116,6 @@ class Trainer:
                     self.net.load_state_dict(best_loss_params)
 
         elif mode == 'scipy':
-            # x = torch.Tensor([i[0] for i in self.dset])
-            # y = torch.Tensor([i[1] for i in self.dset])
-            # info = [i[2] for i in self.dset]
             x, y, info = get_x_y_info(self.dset)
 
             # so that the callback for scipy.optimize.minimize knows what step it is on
@@ -143,14 +140,7 @@ class Trainer:
 
                 # total_loss = torch.tensor(0.)
                 total_loss, etc = self.run_trial(x, y=y, extras=True)
-                # pdb.set_trace()
-                
-                # for j in range(x.shape[1]):
-                #     if self.args.dset_type == 'rsg-gaussian':
-                #         _, step_loss, _ = self.run_iteration(x[:,j], y[:,j])
-                #     elif self.args.dset_type == 'rsg-pulse':
-                #         _, step_loss, _ = self.run_iteration(x[:,j])
-                #     total_loss += step_loss
+
                 if self.args.loss == 'mse2':
                     outs = etc['outs']
                     m_loss = mse2_loss(x, outs, info, self.args.mse2_l1, self.args.mse2_l2)
@@ -269,12 +259,6 @@ class Trainer:
 
         ins = x
         goals = y
-        # for j in range(x.shape[1]):
-        #     net_out, step_loss, extras = self.run_iteration(x[:,j], y[:,j])
-        #     if np.isnan(step_loss.item()):
-        #         return -1, (net_out, extras)
-        #     total_loss += step_loss
-        #     outs.append(net_out[-1].item())
         total_loss, etc = self.run_trial(x, y=y, extras=True)
         if self.args.loss == 'mse2':
             outs = etc['outs']
@@ -282,7 +266,6 @@ class Trainer:
             total_loss += m_loss
 
         total_loss.backward()
-        # pdb.set_trace()
 
         etc = {
             'ins': ins,
@@ -310,10 +293,6 @@ class Trainer:
                 m_loss, fta = mse2_loss(x, outs, info, self.args.mse2_l1, self.args.mse2_l2, extras=True)
                 total_loss += m_loss
                 etc['fta'] = fta
-            # total_loss = torch.tensor(0.)
-            # for j in range(x.shape[1]):
-            #     _, step_loss, _ = self.run_iteration(x[:,j], y[:,j])
-            #     total_loss += step_loss
 
         return total_loss.item() / len(batch), etc
 
@@ -362,7 +341,7 @@ class Trainer:
                     # avg of the last 50 trials
                     avg_loss = running_loss / self.args.batch_size / self.log_interval
 
-                    test_loss, test_etc = self.test(n=100)
+                    test_loss, test_etc = self.test()
                     # fta = test_etc['fta']
                     avg_max_grad = running_mag / self.log_interval
                     log_arr = [
@@ -447,7 +426,7 @@ def parse_args():
     parser.add_argument('--bce_pulse_l1', type=float, default=20, help='default relative weight of positive examples')
     parser.add_argument('--mse_l1', type=float, default=1, help='default relative weight of mse loss. want this to be small for rsg-pulse, large for rsg-gaussian')
     parser.add_argument('--mse2_l1', type=float, default=1, help='threshold for mse2 loss')
-    parser.add_argument('--mse2_l2', type=float, default=10, help='default relative weight of mse2 loss')
+    parser.add_argument('--mse2_l2', type=float, default=.5, help='default relative weight of mse2 loss')
 
     # lbfgs-scipy arguments
     parser.add_argument('--maxiter', type=int, default=10000, help='limit to # iterations. lbfgs-scipy only')
@@ -455,8 +434,8 @@ def parse_args():
     # adam arguments
     parser.add_argument('--batch_size', type=int, default=1, help='size of minibatch used')
     parser.add_argument('--conv_type', type=str, choices=['patience', 'grad'], default='patience', help='how to determine convergence. adam only')
-    parser.add_argument('--patience', type=int, default=1000, help='stop training if loss doesn\'t decrease. adam only')
-    parser.add_argument('--grad_threshold', type=float, default=1e-4, help='stop training if grad is less than certain amount. adam only')
+    parser.add_argument('--patience', type=int, default=2000, help='stop training if loss doesn\'t decrease. adam only')
+    # parser.add_argument('--grad_threshold', type=float, default=1e-4, help='stop training if grad is less than certain amount. adam only')
     parser.add_argument('--lr', type=float, default=1e-4, help='learning rate. adam only')
     parser.add_argument('--n_epochs', type=int, default=10, help='number of epochs to train for. adam only')
 
@@ -530,6 +509,12 @@ def adjust_args(args):
     if 'rsg-gaussian' in args.dataset:
         args.dset_type = 'rsg-gaussian'
         args.loss = 'mse'
+    elif 'rsg-sohn' in args.dataset:
+        args.dset_type = 'rsg-sohn'
+        args.loss = 'mse'
+    elif 'rsg-pulse2d' in args.dataset:
+        args.dset_type = 'rsg-pulse2d'
+        # args.loss = 'mse2'
     elif 'rsg-pulse' in args.dataset:
         args.dset_type = 'rsg-pulse'
         # args.loss = 'mse2'

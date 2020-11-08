@@ -7,12 +7,12 @@ import pdb
 import torch
 
 import argparse
-from utils import Bunch, load_rb
-from testers import load_model
+from utils import Bunch, load_rb, get_config
 
 # for plotting some instances over the course of training
 
-from network import Network, Reservoir
+from testers import load_model_path
+from network import Reservoir
 
 # args = Bunch(N=250, D=100, O=1, res_init_type='gaussian', res_init_params={'std': 2}, reservoir_seed=0)
 
@@ -65,13 +65,26 @@ from network import Network, Reservoir
 
 # plt.show()
 
+def main(args):
+    config = get_config(args.model)
+    net = load_model_path(args.model, config)
 
-p = argparse.ArgumentParser()
-p.add_argument('model')
+    t_len = 200
+    
+    with torch.no_grad():
+        net.reset()
 
-args = p.parse_args()
+        ins = torch.zeros((12))
 
-m_dict = torch.load(args.model)
-#pdb.set_trace()
-net = load_model(m_dict)
-pdb.set_trace()
+        for j in range(t_len):
+            
+
+
+if __name__ == '__main__':
+    p = argparse.ArgumentParser()
+    p.add_argument('model')
+    args = p.parse_args()
+
+    
+
+    main(args)
