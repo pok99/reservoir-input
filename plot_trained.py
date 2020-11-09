@@ -25,11 +25,10 @@ parser.add_argument('-a', '--test_all', action='store_true')
 parser.add_argument('-n', '--no_plot', action='store_true')
 args = parser.parse_args()
 
-config = get_config(args.model)
+config = get_config(args.model, ctype='model')
 config = fill_undefined_args(args, config, overwrite_none=True)
 
 net = load_model_path(args.model, config=config)
-# dset = load_rb(args.dataset)
 # assuming config is in the same folder as the model
 
 if args.test_all:
@@ -39,11 +38,9 @@ if args.test_all:
 if not args.no_plot:
     data, loss = test_model(net, config, n_tests=12)
     print('avg summed loss (plotted):', loss)
-
     run_id = '/'.join(args.model.split('/')[-3:-1])
 
     fig, ax = plt.subplots(3,4,sharex=True, sharey=True, figsize=(12,7))
-
     for i, ax in enumerate(fig.axes):
         ix, x, y, z, loss = data[i]
         xr = np.arange(len(x))
@@ -56,33 +53,13 @@ if not args.no_plot:
         ax.spines['left'].set_visible(False)
         ax.spines['bottom'].set_visible(False)
 
-        # if config.dset_type == 'rsg-gaussian':
+        ax.scatter(xr, x, color='coral', alpha=0.5, s=3, label='input')
         if 'mse' in config.losses:
-            ax.plot(xr, x, color='coral', alpha=0.5, lw=1, label='input')
             ax.plot(xr, y, color='coral', alpha=1, lw=1, label='target')
             ax.plot(xr, z, color='cornflowerblue', alpha=1, lw=1.5, label='response')
         elif 'bce' in config.losses:
-            # ax.plot(xr, x, color='coral', alpha=0.5, lw=1, label='input')
-            ax.scatter(xr, x, color='coral', alpha=1, s=3, label='input')
             ax.scatter(xr, y, color='coral', alpha=0.5, s=3, label='target')
             ax.plot(xr, z, color='cornflowerblue', alpha=1, lw=1.5, label='response')
-        # elif config.loss == 'mse2':
-        #     if config.dset_type == 'rsg-pulse':
-        #         ax.scatter(xr, x, color='coral', alpha=1, s=3, label='input')
-        #         start = torch.nonzero(x)[0,0]
-        #     elif config.dset_type == 'rsg-pulse2d':
-        #         # pdb.set_trace()
-        #         ax.scatter(xr, x[:,0], color='coral', alpha=1, s=3, label='input')
-        #         ax.scatter(xr, x[:,1], color='coral', alpha=1, s=3, label='input')
-        #         start = torch.nonzero(x[:,0])[0,0]
-        #     yr = torch.nonzero(y)[0]
-        #     ax.scatter(yr, 1, color='forestgreen', alpha=1, s=5, label='target')
-        #     ax.plot(xr, z, color='cornflowerblue', alpha=1, lw=1.5, label='response')
-        #     indx = torch.nonzero(z[start:] >= 1)
-        #     if len(indx) > 0:
-        #         indx = indx[0,0] + start
-        #         ml, sl, bl = ax.stem([indx], [z[indx]], use_line_collection=True, linefmt='cornflowerblue', markerfmt=' ')
-        #         sl.set_linewidth(1)
 
         ax.tick_params(axis='both', color='white')
         ax.set_title(f'trial {ix}, avg loss {np.round(float(loss), 2)}', size='small')

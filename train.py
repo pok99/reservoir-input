@@ -139,7 +139,7 @@ class Trainer:
                 self.net.zero_grad()
 
                 # total_loss = torch.tensor(0.)
-                total_loss, etc = self.run_trial(x, y=y, extras=True)
+                total_loss, etc = self.run_trial(x, y, info, extras=True)
 
                 if self.args.loss == 'mse2':
                     outs = etc['outs']
@@ -231,25 +231,18 @@ class Trainer:
 
 
     # runs an iteration where we want to match a certain trajectory
-    def run_trial(self, x, y=None, extras=False):
+    def run_trial(self, x, y, info, extras=False):
         total_loss = 0.
         outs = []
         for j in range(x.shape[1]):
             net_in = x[:,j].reshape(-1, self.args.L)
             net_out, extras = self.net(net_in, extras=True)
-            # if self.args.loss == 'mse2':
-            #     net_target = torch.zeros_like(net_out)
-            # else:
-            #     assert y is not None
-            #     net_target = y[:,j].reshape(-1, self.args.Z)
-            # step_loss = self.args.mse_l1 * self.criterion(net_out, net_target)
-            # total_loss += step_loss
             outs.append(net_out)
 
         net_outs = torch.cat(outs, dim=1)
         net_targets = y
         for c in self.criteria:
-            total_loss += c(net_outs, net_targets)
+            total_loss += c(net_outs, net_targets, info)
 
         if extras:
             etc = {'outs': net_outs,}
@@ -262,12 +255,7 @@ class Trainer:
 
         ins = x
         goals = y
-        total_loss, etc = self.run_trial(x, y=y, extras=True)
-        # if self.args.loss == 'mse2':
-        #     outs = etc['outs']
-        #     m_loss = mse2_loss(x, outs, info, self.args.mse2_l1, self.args.mse2_l2)
-        #     total_loss += m_loss
-
+        total_loss, etc = self.run_trial(x, y, info, extras=True)
         total_loss.backward()
 
         etc = {
@@ -290,12 +278,7 @@ class Trainer:
 
         with torch.no_grad():
             self.net.reset(self.args.res_x_init)
-            total_loss, etc = self.run_trial(x, y=y, extras=True)
-            # if self.args.loss == 'mse2':
-            #     outs = etc['outs']
-            #     m_loss, fta = mse2_loss(x, outs, info, self.args.mse2_l1, self.args.mse2_l2, extras=True)
-            #     total_loss += m_loss
-            #     etc['fta'] = fta
+            total_loss, etc = self.run_trial(x, y, info, extras=True)
 
         return total_loss.item() / len(batch), etc
 
@@ -426,11 +409,13 @@ def parse_args():
     parser.add_argument('--optimizer', choices=['adam', 'sgd', 'rmsprop', 'lbfgs', 'lbfgs-scipy', 'lbfgs-pytorch'], default='lbfgs-scipy')
     parser.add_argument('--losses', type=str, nargs='+', choices=['mse', 'bce', 'mse-w', 'bce-w'], default=[])
 
-    parser.add_argument('--bce_l1', type=float, default=1, help='default relative weight of bce loss')
-    parser.add_argument('--bce_l2', type=float, default=50, help='default relative weight of positive examples')
-    parser.add_argument('--mse_l1', type=float, default=1, help='default relative weight of mse loss')
-    # parser.add_argument('--mse2_l1', type=float, default=1, help='threshold for mse2 loss')
-    # parser.add_argument('--mse2_l2', type=float, default=2, help='default relative weight of mse2 loss')
+    parser.add_argument('--l1', type=float, default=1, help='weight of normal loss')
+    parser.add_argument('--l2', type=float, default=1, help='weight of secondary (windowed) loss')
+    parser.add_argument('--l3', type=float, default=100, help='bce: weight of positive examples')
+    parser.add_argument('--l4', type=float, default=10, help='bce-w: weight of positive examples')
+    # parser.add_argument('--bcew_l1', type=float, default=1, help='default relative weight of bce loss within window')
+    # parser.add_argument('--mse_l1', type=float, default=1, help='default relative weight of mse loss')
+    # parser.add_argument('--msew_l1', type=float, default=1, help='default relative weight of mse loss within window')
 
     # lbfgs-scipy arguments
     parser.add_argument('--maxiter', type=int, default=10000, help='limit to # iterations. lbfgs-scipy only')
@@ -495,15 +480,6 @@ def adjust_args(args):
             if v in config and args.__dict__[v] != config[v]:
                 print(f'Warning: based on config, changed {v} from {args.__dict__[v]} -> {config[v]}')
                 args.__dict__[v] = config[v]
-    # if args.model_path is not None and args.model_config_path is not None:
-    #     with open(args.model_config_path) as f:
-    #         config = json.load(f)
-    #     args.N = config['N']
-    #     args.D = config['D']
-    #     args.L = config['L']
-    #     args.Z = config['Z']
-    #     args.bias = config['bias']
-    #     args.reservoir_seed = config['reservoir_seed']
 
     # shortcut for specifying train everything including reservoir
     if args.train_parts == ['all']:
@@ -556,7 +532,6 @@ def adjust_args(args):
 
 if __name__ == '__main__':
     args = parse_args()
-
     args = adjust_args(args)   
 
     trainer = Trainer(args)

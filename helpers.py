@@ -28,13 +28,13 @@ def get_criteria(args):
     if 'mse' in args.losses:
         fn = nn.MSELoss(reduction='sum')
         def mse(t, o, i=None):
-            return args.mse_l1 * fn(t, o)
+            return args.l1 * fn(t, o)
         criteria.append(mse)
     if 'bce' in args.losses:
-        weights = args.bce_l2 * torch.ones(1)
+        weights = args.l3 * torch.ones(1)
         fn = nn.BCEWithLogitsLoss(reduction='sum', pos_weight=weights)
         def bce(t, o, i=None):
-            return args.bce_l1 * fn(t, o)
+            return args.l1 * fn(t, o)
         criteria.append(bce)
     if 'mse-w' in args.losses:
         fn = nn.MSELoss(reduction='sum')
@@ -45,13 +45,14 @@ def get_criteria(args):
                 t = t.unsqueeze(0)
                 i = [i]
             for j in range(len(t)):
-                t_set, t_go = i[j][0], i[j][2]
+                t_set, t_go = i[j][1], i[j][2]
+                t_p = t_go - t_set
                 # using interval from t_set to t_go + t_p
-                loss += fn(t[j,t_set:2*t_go-t_set+1], o[j,t_set:2*t_go-t_set+1])
-            return args.mse_l1 * loss
+                loss += t.shape[1] / t_p * fn(t[j,t_set:t_go+t_p+1], o[j,t_set:t_go+t_p+1])
+            return args.l2 * loss
         criteria.append(mse_w)
     if 'bce-w' in args.losses:
-        weights = args.bce_l2 * torch.ones(1)
+        weights = args.l4 * torch.ones(1)
         fn = nn.BCEWithLogitsLoss(reduction='sum', pos_weight=weights)
         def bce_w(t, o, i):
             loss = 0.
@@ -60,10 +61,12 @@ def get_criteria(args):
                 t = t.unsqueeze(0)
                 i = [i]
             for j in range(len(t)):
-                t_set, t_go = i[j][0], i[j][2]
+                t_set, t_go = i[j][1], i[j][2]
+                t_p = t_go - t_set
                 # using interval from t_set to t_go + t_p
-                loss += fn(t[j,t_set:2*t_go-t_set+1], o[j,t_set:2*t_go-t_set+1])
-            return args.bce_l1 * loss
+                # normalizing by length of the whole trial over length of penalized window
+                loss += t.shape[1] / t_p * fn(t[j,t_set:t_set+t_p+1], o[j,t_set:t_go+t_p+1])
+            return args.l2 * loss
         criteria.append(bce_w)
     if len(criteria) == 0:
         raise NotImplementedError

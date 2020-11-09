@@ -9,31 +9,39 @@ def create_parameters(name):
     mapping = {}
     ix = 1
 
-    Ds = [5, 10, 50]
-    Ns = [50, 100]
+    Ds = [30, 100, 200]
+    Ns = [100, 200]
 
     lr = 1e-4
-    n_epochs = 40
+    n_epochs = 20
     patience = 4000
 
     # keep the same network seeds
     preserve_seed = False
 
-    n_seeds = 2
-    n_rseeds = 2
+    n_seeds = 1
+    n_rseeds = 3
 
-    # biases = [True]
-    noises = [0, 0.1, 0.01]
-    #noises = [0]
+    # noises = [0, 0.1, 0.01]
+    noises = [0]
+    train_parts = ['W_f', 'W_ro']
+
+    debug = False
+    if debug:
+        Ns = [100]
+        Ds = [30]
+        n_seeds = 1
+        n_rseeds = 1
+        noises = [0]
+        n_epochs = 5
+        patience = 1000
 
     datasets = [
-        'datasets/copy_cos.pkl',
-        'datasets/copy_cos_d50.pkl',
-        'datasets/motifs_s1.pkl',
-        'datasets/motifs_s1_d50.pkl'
+        'datasets/rsg-bin.pkl'
     ]
-
-    #n_commands = len(Ds) * len(Ns) * len(trial_lens) * len(singles) * len(lrs) * n_seeds
+    losses = [
+        'bce'
+    ]
 
     if preserve_seed:
         seed_samples = random.sample(range(1000), n_seeds)
@@ -45,29 +53,27 @@ def create_parameters(name):
             continue
         run_params = {}
         run_params['dataset'] = d
+        run_params['losses'] = losses
         run_params['D'] = nD
         run_params['N'] = nN
-
-        run_params['bias'] = True
 
         # these parameters only useful when training with adam
         run_params['lr'] = lr
         run_params['n_epochs'] = n_epochs
         run_params['patience'] = patience
 
-        # run with lbfgs instead - it's better
         # run_params['optimizer'] = 'lbfgs-scipy'
         run_params['optimizer'] = 'adam'
 
-        run_params['train_parts'] = ['W_ro', 'W_f', 'reservoir']
+        run_params['train_parts'] = train_parts
 
-        run_params['reservoir_noise'] = noise
+        run_params['res_noise'] = noise
 
         # keep the seed the same across all runs sharing network seeds
         # but use a totally random one otherwise. train.py will take care of it
         if preserve_seed:
             run_params['seed'] = seed_samples[seed]
-        run_params['reservoir_seed'] = rseed_samples[rseed]
+        run_params['res_seed'] = rseed_samples[rseed]
 
         mapping[ix] = run_params
         ix += 1

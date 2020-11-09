@@ -53,20 +53,18 @@ def test_model(net, config, n_tests=0):
         net_targets = y
         for c in criteria:
             for k in range(len(test_set)):
-                losses[k] = c(net_outs[k], net_targets[k]).item()
+                losses[k] = c(net_outs[k], net_targets[k], info[k]).item()
 
     ins = x
     goals = y
 
     if 'bce' in config.losses or 'bce-w' in config.losses:
-        outs = np.exp(net_outs)
+        outs = torch.sigmoid(net_outs)
     else:
         outs = net_outs
 
     data = list(zip(dset_idx, ins, goals, outs, losses))
-
     final_loss = np.mean(losses)
-
     return data, final_loss
 
 
