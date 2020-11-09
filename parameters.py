@@ -13,7 +13,7 @@ def create_parameters(name):
     Ns = [200]
 
     lr = 1e-4
-    n_epochs = 15
+    n_epochs = 10
     patience = 4000
 
     # keep the same network seeds
@@ -37,7 +37,8 @@ def create_parameters(name):
         patience = 1000
 
     datasets = [
-        'datasets/rsg-sohn-d2.pkl'
+        'datasets/rsg-sohn-d2.pkl',
+        'datasets/rsg-sohn.pkl'
     ]
     losses = [
         'mse'
@@ -64,6 +65,7 @@ def create_parameters(name):
 
         # run_params['optimizer'] = 'lbfgs-scipy'
         run_params['optimizer'] = 'adam'
+        run_params['s_rate'] = 0.2
 
         run_params['train_parts'] = train_parts
 

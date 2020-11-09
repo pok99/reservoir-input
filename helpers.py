@@ -23,6 +23,11 @@ def get_optimizer(args, train_params):
         op = optim.LBFGS(train_params, lr=0.75)
     return op
 
+def get_scheduler(args, op):
+    if args.s_rate is not None:
+        return optim.lr_scheduler.MultiStepLR(op, milestones=[1,2,3], gamma=args.s_rate)
+    return None
+
 def get_criteria(args):
     criteria = []
     if 'mse' in args.losses:

@@ -53,6 +53,9 @@ if not args.no_plot:
         ax.spines['left'].set_visible(False)
         ax.spines['bottom'].set_visible(False)
 
+        # quick fix to 2d
+        if len(x.shape) > 1:
+            x = x[:,0] + x[:,1]
         ax.scatter(xr, x, color='coral', alpha=0.5, s=3, label='input')
         if 'mse' in config.losses:
             ax.plot(xr, y, color='coral', alpha=1, lw=1, label='target')
