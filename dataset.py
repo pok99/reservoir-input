@@ -120,39 +120,6 @@ def create_dataset(args):
 
             trials.append((trial_x, trial_y, info))
 
-    elif t_type == 'rsg-pulse2d':
-        pulse_len = get_args_val(trial_args, 'plen', 5, int)
-        config['pulse_len'] = pulse_len
-        if args.rsg_intervals is None:
-            # amount of time in between ready and set cues
-            min_t = get_args_val(trial_args, 'gt', 15, int)
-            max_t = get_args_val(trial_args, 'lt', t_len // 2 - 15, int)
-            config['min_t'] = min_t
-            config['max_t'] = max_t
-        for n in range(n_trials):
-            if args.rsg_intervals is None:
-                t_p = np.random.randint(min_t, max_t)
-            else:
-                # use one of the intervals that we desire
-                num = random.choice(args.rsg_intervals)
-                assert num < t_len / 2
-                t_p = num
-
-            ready_time = np.random.randint(5, t_len - t_p * 2 - 10)
-                
-            set_time = ready_time + t_p
-            go_time = set_time + t_p
-
-            trial_x = np.zeros((t_len, 2))
-            trial_y = np.zeros((t_len))
-            trial_x[ready_time:ready_time+pulse_len, 0] = 1
-            trial_x[set_time:set_time+pulse_len, 1] = 1
-            trial_y[go_time:go_time+pulse_len] = 1
-
-            info = (ready_time, set_time, go_time)
-
-            trials.append((trial_x, trial_y, info))
-
     elif t_type == 'rsg-sohn':
         pulse_len = get_args_val(trial_args, 'plen', 5, int)
         config['pulse_len'] = pulse_len
@@ -264,6 +231,9 @@ def create_dataset(args):
 
             z = y * mag
             trials.append((y, z, mag))
+
+    else:
+        raise NotImplementedError
 
     return trials, config
 

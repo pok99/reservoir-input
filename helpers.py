@@ -84,7 +84,7 @@ def mse2_loss(x, outs, info, l1, l2, extras=False):
             weights = torch.arange(go+1-first_t,0,-1)
         elif go < first_t:
             relevant_outs = outs[j][go:first_t + 1]
-            targets = 2 * l1 * torch.ones_like(relevant_outs)
+            targets = l1 * torch.ones_like(relevant_outs)
             weights = torch.arange(0,first_t+1-go,1)
         first_ts.append(first_t)
         if targets is not None:

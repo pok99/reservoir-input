@@ -423,10 +423,10 @@ def parse_args():
     parser.add_argument('--optimizer', choices=['adam', 'sgd', 'rmsprop', 'lbfgs', 'lbfgs-scipy', 'lbfgs-pytorch'], default='lbfgs-scipy')
     parser.add_argument('--loss', type=str, default='mse')
 
-    parser.add_argument('--bce_pulse_l1', type=float, default=20, help='default relative weight of positive examples')
+    parser.add_argument('--bce_pulse_l1', type=float, default=50, help='default relative weight of positive examples')
     parser.add_argument('--mse_l1', type=float, default=1, help='default relative weight of mse loss. want this to be small for rsg-pulse, large for rsg-gaussian')
     parser.add_argument('--mse2_l1', type=float, default=1, help='threshold for mse2 loss')
-    parser.add_argument('--mse2_l2', type=float, default=.5, help='default relative weight of mse2 loss')
+    parser.add_argument('--mse2_l2', type=float, default=2, help='default relative weight of mse2 loss')
 
     # lbfgs-scipy arguments
     parser.add_argument('--maxiter', type=int, default=10000, help='limit to # iterations. lbfgs-scipy only')
@@ -509,15 +509,9 @@ def adjust_args(args):
     if 'rsg-gaussian' in args.dataset:
         args.dset_type = 'rsg-gaussian'
         args.loss = 'mse'
-    elif 'rsg-sohn' in args.dataset:
-        args.dset_type = 'rsg-sohn'
-        args.loss = 'mse'
-    elif 'rsg-pulse2d' in args.dataset:
-        args.dset_type = 'rsg-pulse2d'
-        # args.loss = 'mse2'
     elif 'rsg-pulse' in args.dataset:
         args.dset_type = 'rsg-pulse'
-        # args.loss = 'mse2'
+        args.loss = 'mse2'
     elif 'copy' in args.dataset:
         args.dset_type = 'copy'
     else:

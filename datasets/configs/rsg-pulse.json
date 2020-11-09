@@ -5,11 +5,11 @@
     "rsg-pulse",
     "-t",
     "rsg-pulse",
-    "-n",
-    "2000"
+    "-l",
+    "200"
   ],
   "t_type": "rsg-pulse",
-  "n_trials": 2000,
+  "n_trials": 1000,
   "t_len": 200,
   "pulse_len": 5,
   "min_t": 15,
