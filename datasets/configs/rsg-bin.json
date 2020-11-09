@@ -2,15 +2,15 @@
   "argv": [
     "dataset.py",
     "create",
-    "rsg-sohn",
+    "rsg-bin",
     "-t",
-    "rsg-sohn",
+    "rsg-bin",
     "-n",
     "2000",
     "-l",
     "500"
   ],
-  "t_type": "rsg-sohn",
+  "t_type": "rsg-bin",
   "n_trials": 2000,
   "t_len": 500,
   "pulse_len": 5,

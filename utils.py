@@ -113,11 +113,20 @@ def lrange(l, p=0.1):
 
 
 # get config dictionary from the model path
-def get_config(model_path):
+def get_config(model_path, ctype='model', to_bunch=False):
     head, tail = os.path.split(model_path)
-    run_id = re.split('_|\.', tail)[1]
-    config_path = os.path.join(head, 'config_'+run_id+'.json')
+    if ctype == 'data':
+        fname = tail.split('.')[0] + '.json'
+        config_path = os.path.join(head, 'configs', fname)
+    elif ctype == 'model':
+        run_id = re.split('_|\.', tail)[1]
+        config_path = os.path.join(head, 'config_'+run_id+'.json')
+    else:
+        raise NotImplementedError
     with open(config_path, 'r') as f:
         config = json.load(f)
-    return config
+    if to_bunch:
+        return Bunch(**config)
+    else:
+        return config
 

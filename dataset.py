@@ -10,6 +10,7 @@ import pdb
 import random
 
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 from matplotlib import collections as matcoll
 
 import argparse
@@ -18,6 +19,10 @@ from motifs import gen_fn_motifs
 from utils import load_rb
 
 eps = 1e-6
+
+mpl.rcParams['lines.markersize'] = 2
+mpl.rcParams['lines.linewidth'] = .5
+
 
 # toy ready set go dataset
 def create_dataset(args):
@@ -35,65 +40,65 @@ def create_dataset(args):
 
     trials = []
 
-    if t_type == 'rsg-gaussian':
-        '''
-        trial_args options:
-        - use_ints
-        - lt [x]
-        - gt [x]
-        - scale [x]
+    # if t_type == 'rsg-gaussian':
+    #     '''
+    #     trial_args options:
+    #     - use_ints
+    #     - lt [x]
+    #     - gt [x]
+    #     - scale [x]
 
-        '''
-        # use_ints is overridden by rsg_intervals
-        use_ints = 'use_ints' in trial_args
-        if args.rsg_intervals is None:
-            # amount of time in between ready and set cues
-            min_t = get_args_val(trial_args, 'gt', 15, int)
-            max_t = get_args_val(trial_args, 'lt', t_len // 2 - 15, int)
-            config['min_t'] = min_t
-            config['max_t'] = max_t
-        for n in range(n_trials):
-            if args.rsg_intervals is None:
-                if use_ints:
-                    t_p = np.random.randint(min_t, max_t)
-                else:
-                    t_p = np.round(np.random.uniform(min_t, max_t), 2)
-            else:
-                # use one of the intervals that we desire
-                # overrides use_ints
-                num = random.choice(args.rsg_intervals)
-                assert num < t_len / 2
-                t_p = num
+    #     '''
+    #     # use_ints is overridden by rsg_intervals
+    #     use_ints = 'use_ints' in trial_args
+    #     if args.rsg_intervals is None:
+    #         # amount of time in between ready and set cues
+    #         min_t = get_args_val(trial_args, 'gt', 15, int)
+    #         max_t = get_args_val(trial_args, 'lt', t_len // 2 - 15, int)
+    #         config['min_t'] = min_t
+    #         config['max_t'] = max_t
+    #     for n in range(n_trials):
+    #         if args.rsg_intervals is None:
+    #             if use_ints:
+    #                 t_p = np.random.randint(min_t, max_t)
+    #             else:
+    #                 t_p = np.round(np.random.uniform(min_t, max_t), 2)
+    #         else:
+    #             # use one of the intervals that we desire
+    #             # overrides use_ints
+    #             num = random.choice(args.rsg_intervals)
+    #             assert num < t_len / 2
+    #             t_p = num
 
-            if use_ints:
-                ready_time = np.random.randint(5, t_len - t_p * 2 - 10)
-            else:
-                ready_time = np.round(np.random.uniform(5, t_len - t_p * 2 - 10), 2)
+    #         if use_ints:
+    #             ready_time = np.random.randint(5, t_len - t_p * 2 - 10)
+    #         else:
+    #             ready_time = np.round(np.random.uniform(5, t_len - t_p * 2 - 10), 2)
                 
-            set_time = ready_time + t_p
-            go_time = set_time + t_p
+    #         set_time = ready_time + t_p
+    #         go_time = set_time + t_p
 
-            # check if width of gaussian is changed from default
-            scale = get_args_val(trial_args, 'scale', 1, float)
-            config['scale'] = scale
+    #         # check if width of gaussian is changed from default
+    #         scale = get_args_val(trial_args, 'scale', 1, float)
+    #         config['scale'] = scale
 
-            trial_range = np.arange(t_len)
-            trial_x = norm.pdf(trial_range, loc=ready_time, scale=1)
-            trial_x += norm.pdf(trial_range, loc=set_time, scale=1)
-            # scaling by `scale` so the height of the middle is always the same
-            trial_y = 2 * scale * norm.pdf(trial_range, loc=go_time, scale=scale)
+    #         trial_range = np.arange(t_len)
+    #         trial_x = norm.pdf(trial_range, loc=ready_time, scale=1)
+    #         trial_x += norm.pdf(trial_range, loc=set_time, scale=1)
+    #         # scaling by `scale` so the height of the middle is always the same
+    #         trial_y = 2 * scale * norm.pdf(trial_range, loc=go_time, scale=scale)
 
-            info = (ready_time, set_time, go_time)
+    #         info = (ready_time, set_time, go_time)
 
-            trials.append((trial_x, trial_y, info))
+    #         trials.append((trial_x, trial_y, info))
 
-    elif t_type == 'rsg-pulse':
-        pulse_len = get_args_val(trial_args, 'plen', 5, int)
-        config['pulse_len'] = pulse_len
+    if t_type.startswith('rsg'):
+        p_len = get_args_val(trial_args, 'plen', 5, int)
+        config['p_len'] = p_len
         if args.rsg_intervals is None:
             # amount of time in between ready and set cues
-            min_t = get_args_val(trial_args, 'gt', 15, int)
-            max_t = get_args_val(trial_args, 'lt', t_len // 2 - 15, int)
+            min_t = get_args_val(trial_args, 'gt', p_len * 4, int)
+            max_t = get_args_val(trial_args, 'lt', t_len // 2 - p_len * 4, int)
             config['min_t'] = min_t
             config['max_t'] = max_t
         for n in range(n_trials):
@@ -105,58 +110,26 @@ def create_dataset(args):
                 assert num < t_len / 2
                 t_p = num
 
-            ready_time = np.random.randint(5, t_len - t_p * 2 - 10)
-                
+            ready_time = np.random.randint(p_len * 4, t_len - t_p * 2 - p_len * 4)
             set_time = ready_time + t_p
             go_time = set_time + t_p
 
             trial_x = np.zeros((t_len))
+            
+            trial_x[ready_time:ready_time+p_len] = 1
+            trial_x[set_time:set_time+p_len] = 1
+
             trial_y = np.zeros((t_len))
-            trial_x[ready_time:ready_time+pulse_len] = 1
-            trial_x[set_time:set_time+pulse_len] = 1
-            trial_y[go_time:go_time+pulse_len] = 1
+            if t_type == 'rsg-bin':
+                trial_y[go_time:go_time+p_len] = 1
+            elif t_type == 'rsg-sohn':
+                trial_y_temp = np.arange(t_len - set_time - p_len)
+                trial_y_fn = lambda t: 1 / (t_p - p_len) * t
+                trial_y[set_time+p_len:] = trial_y_fn(trial_y_temp)
+                trial_y = np.clip(trial_y, 0, 2)
 
             info = (ready_time, set_time, go_time)
-
             trials.append((trial_x, trial_y, info))
-
-    elif t_type == 'rsg-sohn':
-        pulse_len = get_args_val(trial_args, 'plen', 5, int)
-        config['pulse_len'] = pulse_len
-        if args.rsg_intervals is None:
-            # amount of time in between ready and set cues
-            min_t = get_args_val(trial_args, 'gt', 15, int)
-            max_t = get_args_val(trial_args, 'lt', t_len // 2 - 15, int)
-            config['min_t'] = min_t
-            config['max_t'] = max_t
-        for n in range(n_trials):
-            if args.rsg_intervals is None:
-                t_p = np.random.randint(min_t, max_t)
-            else:
-                # use one of the intervals that we desire
-                num = random.choice(args.rsg_intervals)
-                assert num < t_len / 2
-                t_p = num
-
-            ready_time = np.random.randint(5, t_len - t_p * 2 - 10)
-                
-            set_time = ready_time + t_p
-            go_time = set_time + t_p
-
-            trial_x = np.zeros(t_len)
-            trial_y = np.zeros(t_len)
-            trial_x[ready_time:ready_time+pulse_len] = 1
-            trial_x[set_time:set_time+pulse_len] = 1
-            trial_y[go_time:go_time+pulse_len] = 1
-            trial_y_temp = np.arange(t_len - set_time)
-            trial_y_fn = lambda t: 1 / (t_p - pulse_len) * t
-            trial_y[set_time:] = trial_y_fn(trial_y_temp)
-            trial_y = np.clip(trial_y, 0, 2)
-
-            info = (ready_time, set_time, go_time)
-
-            trials.append((trial_x, trial_y, info))
-
 
     elif t_type.startswith('copy'):
         delay = get_args_val(trial_args, 'delay', 0, int)
@@ -305,43 +278,23 @@ if __name__ == '__main__':
             ax.spines['left'].set_visible(False)
             ax.spines['bottom'].set_visible(False)
 
-            if dset_type == 'rsg' or dset_type == 'rsg-gaussian' or dset_type == 'rsg-sohn':
-                ax.plot(dset_range, sample[i][0], color='coral', label='ready/set', lw=2)
-                ax.plot(dset_range, sample[i][1], color='dodgerblue', label='go', lw=2)
-            elif dset_type == 'rsg-pulse':
+            if dset_type.startswith('rsg'):
+                # ax.scatter(dset_range, sample[i][0], color='coral', label='ready/set', lw=2)
+                # ax.scatter(dset_range, sample[i][1], color='dodgerblue', label='go', lw=2)
                 ml, sl, bl = ax.stem(dset_range, sample[i][0], use_line_collection=True, linefmt='coral', label='ready/set')
                 ml.set_markerfacecolor('coral')
                 ml.set_markeredgecolor('coral')
-                ml.set_markersize(3)
-                sl.set_linewidth(.5)
-                ml, sl, bl = ax.stem(dset_range, sample[i][1], use_line_collection=True, linefmt='dodgerblue', label='ready/set')
-                ml.set_markerfacecolor('dodgerblue')
-                ml.set_markeredgecolor('dodgerblue')
-                ml.set_markersize(3)
-                sl.set_linewidth(.5)
-            elif dset_type == 'rsg-pulse2d':
-                ml, sl, bl = ax.stem(dset_range, sample[i][0][:,0], use_line_collection=True, linefmt='coral', label='ready/set')
-                ml.set_markerfacecolor('coral')
-                ml.set_markeredgecolor('coral')
-                ml.set_markersize(3)
-                sl.set_linewidth(.5)
-                ml, sl, bl = ax.stem(dset_range, sample[i][0][:,1], use_line_collection=True, linefmt='coral', label='ready/set')
-                ml.set_markerfacecolor('coral')
-                ml.set_markeredgecolor('coral')
-                ml.set_markersize(3)
-                sl.set_linewidth(.5)
-                ml, sl, bl = ax.stem(dset_range, sample[i][1], use_line_collection=True, linefmt='dodgerblue', label='ready/set')
-                ml.set_markerfacecolor('dodgerblue')
-                ml.set_markeredgecolor('dodgerblue')
-                ml.set_markersize(3)
-                sl.set_linewidth(.5)
+                # ml.set_markersize(2)
+                # sl.set_linewidth(.5)
+                if dset_type == 'rsg-bin':
+                    ml, sl, bl = ax.stem(dset_range, sample[i][1], use_line_collection=True, linefmt='dodgerblue', label='go')
+                    ml.set_markerfacecolor('dodgerblue')
+                    ml.set_markeredgecolor('dodgerblue')
+                elif dset_type == 'rsg-sohn':
+                    ax.plot(dset_range, sample[i][1], color='dodgerblue', label='go', lw=2)
 
             ax.set_ylim([-.5, 2.5])
 
         handles, labels = ax.get_legend_handles_labels()
         #fig.legend(handles, labels, loc='lower center')
         plt.show()
-    # confirm ready set go works
-    # for i in range(5):
-    #     np.random.shuffle(dset)
-    #     print(np.where(dset[i][0] == 1), np.argmax(dset[i][1]))

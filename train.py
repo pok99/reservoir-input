@@ -19,7 +19,7 @@ import copy
 from network import BasicNetwork, Reservoir
 
 from utils import log_this, load_rb, get_config, fill_undefined_args
-from helpers import get_optimizer, get_criterion, get_x_y_info, mse2_loss
+from helpers import get_optimizer, get_criteria, get_x_y_info, mse2_loss
 
 class Trainer:
     def __init__(self, args):
@@ -50,7 +50,7 @@ class Trainer:
         for k in self.not_train_params:
             logging.info(f'  {k}')
 
-        self.criterion = get_criterion(self.args)
+        self.criteria = get_criteria(self.args)
         self.optimizer = get_optimizer(self.args, self.train_params)
         self.dset = load_rb(self.args.dataset)
 
@@ -237,19 +237,22 @@ class Trainer:
         for j in range(x.shape[1]):
             net_in = x[:,j].reshape(-1, self.args.L)
             net_out, extras = self.net(net_in, extras=True)
-            if self.args.loss == 'mse2':
-                net_target = torch.zeros_like(net_out)
-            else:
-                assert y is not None
-                net_target = y[:,j].reshape(-1, self.args.Z)
-            step_loss = self.args.mse_l1 * self.criterion(net_out, net_target)
-            total_loss += step_loss
+            # if self.args.loss == 'mse2':
+            #     net_target = torch.zeros_like(net_out)
+            # else:
+            #     assert y is not None
+            #     net_target = y[:,j].reshape(-1, self.args.Z)
+            # step_loss = self.args.mse_l1 * self.criterion(net_out, net_target)
+            # total_loss += step_loss
             outs.append(net_out)
 
-        outs = torch.cat(outs, dim=1)
+        net_outs = torch.cat(outs, dim=1)
+        net_targets = y
+        for c in self.criteria:
+            total_loss += c(net_outs, net_targets)
 
         if extras:
-            etc = {'outs': outs,}
+            etc = {'outs': net_outs,}
             return total_loss, etc
         return total_loss
 
@@ -260,10 +263,10 @@ class Trainer:
         ins = x
         goals = y
         total_loss, etc = self.run_trial(x, y=y, extras=True)
-        if self.args.loss == 'mse2':
-            outs = etc['outs']
-            m_loss = mse2_loss(x, outs, info, self.args.mse2_l1, self.args.mse2_l2)
-            total_loss += m_loss
+        # if self.args.loss == 'mse2':
+        #     outs = etc['outs']
+        #     m_loss = mse2_loss(x, outs, info, self.args.mse2_l1, self.args.mse2_l2)
+        #     total_loss += m_loss
 
         total_loss.backward()
 
@@ -288,11 +291,11 @@ class Trainer:
         with torch.no_grad():
             self.net.reset(self.args.res_x_init)
             total_loss, etc = self.run_trial(x, y=y, extras=True)
-            if self.args.loss == 'mse2':
-                outs = etc['outs']
-                m_loss, fta = mse2_loss(x, outs, info, self.args.mse2_l1, self.args.mse2_l2, extras=True)
-                total_loss += m_loss
-                etc['fta'] = fta
+            # if self.args.loss == 'mse2':
+            #     outs = etc['outs']
+            #     m_loss, fta = mse2_loss(x, outs, info, self.args.mse2_l1, self.args.mse2_l2, extras=True)
+            #     total_loss += m_loss
+            #     etc['fta'] = fta
 
         return total_loss.item() / len(batch), etc
 
@@ -421,12 +424,13 @@ def parse_args():
     parser.add_argument('--same_test', action='store_true', help='use entire dataset for both training and testing')
 
     parser.add_argument('--optimizer', choices=['adam', 'sgd', 'rmsprop', 'lbfgs', 'lbfgs-scipy', 'lbfgs-pytorch'], default='lbfgs-scipy')
-    parser.add_argument('--loss', type=str, default='mse')
+    parser.add_argument('--losses', type=str, nargs='+', choices=['mse', 'bce', 'mse-w', 'bce-w'], default=[])
 
-    parser.add_argument('--bce_pulse_l1', type=float, default=50, help='default relative weight of positive examples')
-    parser.add_argument('--mse_l1', type=float, default=1, help='default relative weight of mse loss. want this to be small for rsg-pulse, large for rsg-gaussian')
-    parser.add_argument('--mse2_l1', type=float, default=1, help='threshold for mse2 loss')
-    parser.add_argument('--mse2_l2', type=float, default=2, help='default relative weight of mse2 loss')
+    parser.add_argument('--bce_l1', type=float, default=1, help='default relative weight of bce loss')
+    parser.add_argument('--bce_l2', type=float, default=50, help='default relative weight of positive examples')
+    parser.add_argument('--mse_l1', type=float, default=1, help='default relative weight of mse loss')
+    # parser.add_argument('--mse2_l1', type=float, default=1, help='threshold for mse2 loss')
+    # parser.add_argument('--mse2_l2', type=float, default=2, help='default relative weight of mse2 loss')
 
     # lbfgs-scipy arguments
     parser.add_argument('--maxiter', type=int, default=10000, help='limit to # iterations. lbfgs-scipy only')
@@ -506,24 +510,21 @@ def adjust_args(args):
         args.train_parts = ['']
 
     # set the dataset
-    if 'rsg-gaussian' in args.dataset:
-        args.dset_type = 'rsg-gaussian'
-        args.loss = 'mse'
-    elif 'rsg-pulse' in args.dataset:
-        args.dset_type = 'rsg-pulse'
-        args.loss = 'mse2'
-    elif 'copy' in args.dataset:
+    config = get_config(args.dataset, ctype='data', to_bunch=True)
+    if config.t_type == 'rsg-bin':
+        args.dset_type = 'rsg-bin'
+        args.out_act = 'none'
+        if 'bce' not in args.losses:
+            args.losses.append('bce')
+    elif config.t_type == 'rsg-sohn':
+        args.dset_type = 'rsg-sohn'
+        args.out_act = 'exp'
+        if 'mse' not in args.losses:
+            args.losses.append('mse')
+    elif config.t_type == 'copy':
         args.dset_type = 'copy'
     else:
         args.dset_type = 'unknown'
-
-    # output activation depends on the task / dataset used
-    if args.out_act is None:
-        if 'mse' in args.loss:
-            args.out_act = 'exp'
-        else:
-            args.out_act = 'none'
-
 
     # initializing logging
     # do this last, because we will be logging previous parameters into the config file

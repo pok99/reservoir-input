@@ -11,7 +11,7 @@ import sys
 from network import BasicNetwork
 from utils import Bunch, load_rb
 
-from helpers import get_x_y_info, mse2_loss, get_criterion
+from helpers import get_x_y_info, mse2_loss, get_criteria
 
 
 def load_model_path(path, config):
@@ -34,13 +34,13 @@ def test_model(net, config, n_tests=0):
     test_set = [dset[i] for i in dset_idx]
     x, y, info = get_x_y_info(test_set)
 
-    criterion = get_criterion(config)
+    criteria = get_criteria(config)
 
     with torch.no_grad():
         net.reset()
 
         # saving each individual loss per sample, per timestep
-        losses = np.zeros((len(test_set), x.shape[1]))
+        losses = np.zeros(len(test_set))
         outs = []
 
         for j in range(x.shape[1]):
@@ -48,28 +48,20 @@ def test_model(net, config, n_tests=0):
             net_in = x[:,j].reshape(-1, net.args.L)
             net_out = net(net_in)
             outs.append(net_out)
-            # if config.dset_type == 'rsg-gaussian':
-            net_target = y[:,j].reshape(-1, net.args.Z)
-            # elif config.dset_type == 'rsg-pulse':
-            #     net_target = torch.zeros_like(net_out)
 
+        net_outs = torch.cat(outs, dim=1)
+        net_targets = y
+        for c in criteria:
             for k in range(len(test_set)):
-                step_loss = criterion(net_out[k], net_target[k])
-                losses[k, j] = step_loss.item()
-
-        outs = torch.cat(outs, dim=1)
-        if config.loss == 'mse2':
-            m_losses = np.zeros(len(test_set))
-            for j in range(len(test_set)):
-                m_loss = mse2_loss(x[j], outs[j], info[j], config.mse2_l1, config.mse2_l2)
-                m_losses[j] = m_loss
+                losses[k] = c(net_outs[k], net_targets[k]).item()
 
     ins = x
     goals = y
 
-    losses = np.sum(losses, axis=1)
-    if config.loss == 'mse2':
-        losses = losses + m_losses
+    if 'bce' in config.losses or 'bce-w' in config.losses:
+        outs = np.exp(net_outs)
+    else:
+        outs = net_outs
 
     data = list(zip(dset_idx, ins, goals, outs, losses))
 

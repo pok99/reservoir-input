@@ -23,19 +23,51 @@ def get_optimizer(args, train_params):
         op = optim.LBFGS(train_params, lr=0.75)
     return op
 
-def get_criterion(args):
-    if args.loss == 'mse':
-        # criterion = nn.MSELoss()
-        criterion = nn.MSELoss(reduction='sum')
-    elif args.loss == 'bce':
-        criterion = nn.BCEWithLogitsLoss()
-    elif args.loss == 'bce-pulse':
-        weights = args.bce_pulse_l1 * torch.ones(1)
-        criterion = nn.BCEWithLogitsLoss(reduction='sum', pos_weight=weights)
-    elif args.loss == 'mse2':
-        criterion = nn.MSELoss(reduction='sum')
-
-    return criterion
+def get_criteria(args):
+    criteria = []
+    if 'mse' in args.losses:
+        fn = nn.MSELoss(reduction='sum')
+        def mse(t, o, i=None):
+            return args.mse_l1 * fn(t, o)
+        criteria.append(mse)
+    if 'bce' in args.losses:
+        weights = args.bce_l2 * torch.ones(1)
+        fn = nn.BCEWithLogitsLoss(reduction='sum', pos_weight=weights)
+        def bce(t, o, i=None):
+            return args.bce_l1 * fn(t, o)
+        criteria.append(bce)
+    if 'mse-w' in args.losses:
+        fn = nn.MSELoss(reduction='sum')
+        def mse_w(t, o, i):
+            loss = 0.
+            if len(o.shape) == 1:
+                o = o.unsqueeze(0)
+                t = t.unsqueeze(0)
+                i = [i]
+            for j in range(len(t)):
+                t_set, t_go = i[j][0], i[j][2]
+                # using interval from t_set to t_go + t_p
+                loss += fn(t[j,t_set:2*t_go-t_set+1], o[j,t_set:2*t_go-t_set+1])
+            return args.mse_l1 * loss
+        criteria.append(mse_w)
+    if 'bce-w' in args.losses:
+        weights = args.bce_l2 * torch.ones(1)
+        fn = nn.BCEWithLogitsLoss(reduction='sum', pos_weight=weights)
+        def bce_w(t, o, i):
+            loss = 0.
+            if len(o.shape) == 1:
+                o = o.unsqueeze(0)
+                t = t.unsqueeze(0)
+                i = [i]
+            for j in range(len(t)):
+                t_set, t_go = i[j][0], i[j][2]
+                # using interval from t_set to t_go + t_p
+                loss += fn(t[j,t_set:2*t_go-t_set+1], o[j,t_set:2*t_go-t_set+1])
+            return args.bce_l1 * loss
+        criteria.append(bce_w)
+    if len(criteria) == 0:
+        raise NotImplementedError
+    return criteria
 
 def get_output_activation(args):
     if args.out_act == 'exp':

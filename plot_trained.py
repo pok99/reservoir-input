@@ -57,30 +57,32 @@ if not args.no_plot:
         ax.spines['bottom'].set_visible(False)
 
         # if config.dset_type == 'rsg-gaussian':
-        if config.loss == 'mse':
+        if 'mse' in config.losses:
             ax.plot(xr, x, color='coral', alpha=0.5, lw=1, label='input')
             ax.plot(xr, y, color='coral', alpha=1, lw=1, label='target')
             ax.plot(xr, z, color='cornflowerblue', alpha=1, lw=1.5, label='response')
-        elif config.loss == 'bce-pulse':
-            ax.plot(xr, x, color='coral', alpha=0.5, lw=1, label='input')
-            ax.plot(xr, sigmoid(z), color='cornflowerblue', alpha=1, lw=1.5, label='response')
-        elif config.loss == 'mse2':
-            if config.dset_type == 'rsg-pulse':
-                ax.scatter(xr, x, color='coral', alpha=1, s=3, label='input')
-                start = torch.nonzero(x)[0,0]
-            elif config.dset_type == 'rsg-pulse2d':
-                # pdb.set_trace()
-                ax.scatter(xr, x[:,0], color='coral', alpha=1, s=3, label='input')
-                ax.scatter(xr, x[:,1], color='coral', alpha=1, s=3, label='input')
-                start = torch.nonzero(x[:,0])[0,0]
-            yr = torch.nonzero(y)[0]
-            ax.scatter(yr, 1, color='forestgreen', alpha=1, s=5, label='target')
+        elif 'bce' in config.losses:
+            # ax.plot(xr, x, color='coral', alpha=0.5, lw=1, label='input')
+            ax.scatter(xr, x, color='coral', alpha=1, s=3, label='input')
+            ax.scatter(xr, y, color='coral', alpha=0.5, s=3, label='target')
             ax.plot(xr, z, color='cornflowerblue', alpha=1, lw=1.5, label='response')
-            indx = torch.nonzero(z[start:] >= 1)
-            if len(indx) > 0:
-                indx = indx[0,0] + start
-                ml, sl, bl = ax.stem([indx], [z[indx]], use_line_collection=True, linefmt='cornflowerblue', markerfmt=' ')
-                sl.set_linewidth(1)
+        # elif config.loss == 'mse2':
+        #     if config.dset_type == 'rsg-pulse':
+        #         ax.scatter(xr, x, color='coral', alpha=1, s=3, label='input')
+        #         start = torch.nonzero(x)[0,0]
+        #     elif config.dset_type == 'rsg-pulse2d':
+        #         # pdb.set_trace()
+        #         ax.scatter(xr, x[:,0], color='coral', alpha=1, s=3, label='input')
+        #         ax.scatter(xr, x[:,1], color='coral', alpha=1, s=3, label='input')
+        #         start = torch.nonzero(x[:,0])[0,0]
+        #     yr = torch.nonzero(y)[0]
+        #     ax.scatter(yr, 1, color='forestgreen', alpha=1, s=5, label='target')
+        #     ax.plot(xr, z, color='cornflowerblue', alpha=1, lw=1.5, label='response')
+        #     indx = torch.nonzero(z[start:] >= 1)
+        #     if len(indx) > 0:
+        #         indx = indx[0,0] + start
+        #         ml, sl, bl = ax.stem([indx], [z[indx]], use_line_collection=True, linefmt='cornflowerblue', markerfmt=' ')
+        #         sl.set_linewidth(1)
 
         ax.tick_params(axis='both', color='white')
         ax.set_title(f'trial {ix}, avg loss {np.round(float(loss), 2)}', size='small')
