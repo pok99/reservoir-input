@@ -14,7 +14,7 @@ def create_parameters(name):
 
     lr = 1e-4
     n_epochs = 10
-    patience = 2000
+    patience = 4000
 
     # keep the same network seeds
     preserve_seed = True

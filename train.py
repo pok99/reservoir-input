@@ -354,6 +354,7 @@ def parse_args():
     parser.add_argument('--same_test', action='store_true', help='use entire dataset for both training and testing')
 
     parser.add_argument('--optimizer', choices=['adam', 'sgd', 'rmsprop', 'lbfgs'], default='lbfgs')
+    parser.add_argument('--l2', type=float, default=0, help='amount of l2 regularization')
     parser.add_argument('--s_rate', default=None, type=float, help='scheduler rate. dont use for no scheduler')
     parser.add_argument('--losses', type=str, nargs='+', choices=['mse', 'bce', 'mse-w', 'bce-w'], default=[])
 
@@ -493,9 +494,9 @@ if __name__ == '__main__':
     logging.info(f'Initialized trainer. Using optimizer {args.optimizer}.')
     n_iters = 0
     if args.optimizer == 'lbfgs':
-        final_loss, n_iters = trainer.optimize_lbfgs()
+        best_loss, n_iters = trainer.optimize_lbfgs()
     elif args.optimizer in ['sgd', 'rmsprop', 'adam']:
-        final_loss, n_iters = trainer.train()
+        best_loss, n_iters = trainer.train()
 
     if args.slurm_id is not None:
         # if running many jobs, then we gonna put the results into a csv
@@ -503,11 +504,11 @@ if __name__ == '__main__':
         csv_exists = os.path.exists(csv_path)
         with open(csv_path, 'a') as f:
             writer = csv.writer(f, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
-            labels_csv = ['slurm_id', 'D', 'N', 'seed', 'rseed', 'xseed', 'rnoise', 'dset', 'niter', 'loss']
+            labels_csv = ['slurm_id', 'N', 'D', 'seed', 'rseed', 'xseed', 'rnoise', 'dset', 'niter', 'tparts', 'loss']
             vals_csv = [
-                args.slurm_id, args.D, args.N, args.seed,
+                args.slurm_id, args.N, args.D, args.seed,
                 args.res_seed, args.res_x_seed, args.res_noise,
-                args.dataset, n_iters, final_loss
+                args.dataset, n_iters, '-'.join(train_parts), best_loss
             ]
             if args.optimizer == 'adam':
                 labels_csv.extend(['lr', 'epochs'])
