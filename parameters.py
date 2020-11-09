@@ -10,10 +10,10 @@ def create_parameters(name):
     ix = 1
 
     Ds = [30, 100, 200]
-    Ns = [100, 200]
+    Ns = [200]
 
     lr = 1e-4
-    n_epochs = 20
+    n_epochs = 15
     patience = 4000
 
     # keep the same network seeds
@@ -37,10 +37,10 @@ def create_parameters(name):
         patience = 1000
 
     datasets = [
-        'datasets/rsg-bin.pkl'
+        'datasets/rsg-sohn-d2.pkl'
     ]
     losses = [
-        'bce'
+        'mse'
     ]
 
     if preserve_seed:

@@ -40,61 +40,10 @@ def create_dataset(args):
 
     trials = []
 
-    # if t_type == 'rsg-gaussian':
-    #     '''
-    #     trial_args options:
-    #     - use_ints
-    #     - lt [x]
-    #     - gt [x]
-    #     - scale [x]
-
-    #     '''
-    #     # use_ints is overridden by rsg_intervals
-    #     use_ints = 'use_ints' in trial_args
-    #     if args.rsg_intervals is None:
-    #         # amount of time in between ready and set cues
-    #         min_t = get_args_val(trial_args, 'gt', 15, int)
-    #         max_t = get_args_val(trial_args, 'lt', t_len // 2 - 15, int)
-    #         config['min_t'] = min_t
-    #         config['max_t'] = max_t
-    #     for n in range(n_trials):
-    #         if args.rsg_intervals is None:
-    #             if use_ints:
-    #                 t_p = np.random.randint(min_t, max_t)
-    #             else:
-    #                 t_p = np.round(np.random.uniform(min_t, max_t), 2)
-    #         else:
-    #             # use one of the intervals that we desire
-    #             # overrides use_ints
-    #             num = random.choice(args.rsg_intervals)
-    #             assert num < t_len / 2
-    #             t_p = num
-
-    #         if use_ints:
-    #             ready_time = np.random.randint(5, t_len - t_p * 2 - 10)
-    #         else:
-    #             ready_time = np.round(np.random.uniform(5, t_len - t_p * 2 - 10), 2)
-                
-    #         set_time = ready_time + t_p
-    #         go_time = set_time + t_p
-
-    #         # check if width of gaussian is changed from default
-    #         scale = get_args_val(trial_args, 'scale', 1, float)
-    #         config['scale'] = scale
-
-    #         trial_range = np.arange(t_len)
-    #         trial_x = norm.pdf(trial_range, loc=ready_time, scale=1)
-    #         trial_x += norm.pdf(trial_range, loc=set_time, scale=1)
-    #         # scaling by `scale` so the height of the middle is always the same
-    #         trial_y = 2 * scale * norm.pdf(trial_range, loc=go_time, scale=scale)
-
-    #         info = (ready_time, set_time, go_time)
-
-    #         trials.append((trial_x, trial_y, info))
-
     if t_type.startswith('rsg'):
         p_len = get_args_val(trial_args, 'plen', 5, int)
         config['p_len'] = p_len
+        config['d2'] = 'd2' in trial_args
         if args.rsg_intervals is None:
             # amount of time in between ready and set cues
             min_t = get_args_val(trial_args, 'gt', p_len * 4, int)
@@ -114,10 +63,14 @@ def create_dataset(args):
             set_time = ready_time + t_p
             go_time = set_time + t_p
 
-            trial_x = np.zeros((t_len))
-            
-            trial_x[ready_time:ready_time+p_len] = 1
-            trial_x[set_time:set_time+p_len] = 1
+            if config['d2']:
+                trial_x = np.zeros((t_len, 2))
+                trial_x[ready_time:ready_time+p_len, 0] = 1
+                trial_x[set_time:set_time+p_len, 1] = 1
+            else:
+                trial_x = np.zeros((t_len))
+                trial_x[ready_time:ready_time+p_len] = 1
+                trial_x[set_time:set_time+p_len] = 1
 
             trial_y = np.zeros((t_len))
             if t_type == 'rsg-bin':
@@ -242,8 +195,8 @@ if __name__ == '__main__':
     parser.add_argument('-i', '--rsg_intervals', nargs='*', type=int, default=None)
     parser.add_argument('--motifs', type=str, help='path to motifs')
     parser.add_argument('-a', '--trial_args', nargs='*', help='terms to specify parameters of trial type')
-    parser.add_argument('-l', '--trial_len', type=int, default=200)
-    parser.add_argument('-n', '--n_trials', type=int, default=1000)
+    parser.add_argument('-l', '--trial_len', type=int, default=500)
+    parser.add_argument('-n', '--n_trials', type=int, default=2000)
     args = parser.parse_args()
 
     if args.trial_args is None:
@@ -279,13 +232,13 @@ if __name__ == '__main__':
             ax.spines['bottom'].set_visible(False)
 
             if dset_type.startswith('rsg'):
-                # ax.scatter(dset_range, sample[i][0], color='coral', label='ready/set', lw=2)
-                # ax.scatter(dset_range, sample[i][1], color='dodgerblue', label='go', lw=2)
-                ml, sl, bl = ax.stem(dset_range, sample[i][0], use_line_collection=True, linefmt='coral', label='ready/set')
+                if config['d2']:
+                    sample_sum = sample[i][0][:,0] + sample[i][0][:,1]
+                    ml, sl, bl = ax.stem(dset_range, sample_sum, use_line_collection=True, linefmt='coral', label='ready/set')
+                else:
+                    ml, sl, bl = ax.stem(dset_range, sample[i][0], use_line_collection=True, linefmt='coral', label='ready/set')
                 ml.set_markerfacecolor('coral')
                 ml.set_markeredgecolor('coral')
-                # ml.set_markersize(2)
-                # sl.set_linewidth(.5)
                 if dset_type == 'rsg-bin':
                     ml, sl, bl = ax.stem(dset_range, sample[i][1], use_line_collection=True, linefmt='dodgerblue', label='go')
                     ml.set_markerfacecolor('dodgerblue')

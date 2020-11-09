@@ -140,11 +140,6 @@ class Trainer:
 
                 # total_loss = torch.tensor(0.)
                 total_loss, etc = self.run_trial(x, y, info, extras=True)
-
-                if self.args.loss == 'mse2':
-                    outs = etc['outs']
-                    m_loss = mse2_loss(x, outs, info, self.args.mse2_l1, self.args.mse2_l2)
-                    total_loss += m_loss
                 total_loss.backward()
 
                 # turn param grads into list
@@ -501,6 +496,11 @@ def adjust_args(args):
         args.dset_type = 'copy'
     else:
         args.dset_type = 'unknown'
+
+    if config.d2:
+        args.L = 2
+    else:
+        args.L = 1
 
     # initializing logging
     # do this last, because we will be logging previous parameters into the config file
