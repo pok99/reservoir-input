@@ -14,11 +14,11 @@ def sigmoid(x):
 def get_optimizer(args, train_params):
     op = None
     if args.optimizer == 'adam':
-        op = optim.Adam(train_params, lr=args.lr)
+        op = optim.Adam(train_params, lr=args.lr, weight_decay=args.l2_reg)
     elif args.optimizer == 'sgd':
-        op = optim.SGD(train_params, lr=args.lr)
+        op = optim.SGD(train_params, lr=args.lr, weight_decay=args.l2_reg)
     elif args.optimizer == 'rmsprop':
-        op = optim.RMSprop(train_params, lr=args.lr)
+        op = optim.RMSprop(train_params, lr=args.lr, weight_decay=args.l2_reg)
     elif args.optimizer == 'lbfgs-pytorch':
         op = optim.LBFGS(train_params, lr=0.75)
     return op

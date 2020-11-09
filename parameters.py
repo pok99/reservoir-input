@@ -13,21 +13,21 @@ def create_parameters(name):
     Ns = [200]
 
     lr = 1e-4
-    n_epochs = 10
+    n_epochs = 12
     patience = 4000
 
     # keep the same network seeds
     preserve_seed = True
 
-    n_seeds = 2
+    n_seeds = 3
     n_rseeds = 5
 
     # noises = [0, 0.1, 0.01]
-    noises = [0, 0.01, 0.1]
+    noises = [0, 0.1]
     train_parts = [['all'], ['W_f', 'W_ro']]
 
     datasets = [
-        'datasets/rsg-sohn-d2.pkl',
+        # 'datasets/rsg-sohn-d2.pkl',
         'datasets/rsg-sohn.pkl'
     ]
     losses = [
@@ -50,8 +50,8 @@ def create_parameters(name):
 
     rseed_samples = random.sample(range(1000), n_rseeds)
 
-    seed_samples = [811, 946]
-    rseed_samples = [534, 496, 291, 127, 727]
+    seed_samples = [811, 946, 122]
+    rseed_samples = [492, 496, 291, 127, 727]
 
     for (nD, nN, d, seed, rseed, tp, noise) in product(Ds, Ns, datasets, range(n_seeds), range(n_rseeds), train_parts, noises):
         if nD > nN:

@@ -299,7 +299,8 @@ class Trainer:
                     if test_loss < running_min_error:
                         running_no_min = 0
                         running_min_error = test_loss
-                        self.log_model(name='model_best.pth')
+                        if not self.args.no_log:
+                            self.log_model(name='model_best.pth')
                     else:
                         running_no_min += self.log_interval
                     if running_no_min > self.args.patience:
@@ -354,7 +355,7 @@ def parse_args():
     parser.add_argument('--same_test', action='store_true', help='use entire dataset for both training and testing')
 
     parser.add_argument('--optimizer', choices=['adam', 'sgd', 'rmsprop', 'lbfgs'], default='lbfgs')
-    parser.add_argument('--l2', type=float, default=0, help='amount of l2 regularization')
+    parser.add_argument('--l2_reg', type=float, default=0, help='amount of l2 regularization')
     parser.add_argument('--s_rate', default=None, type=float, help='scheduler rate. dont use for no scheduler')
     parser.add_argument('--losses', type=str, nargs='+', choices=['mse', 'bce', 'mse-w', 'bce-w'], default=[])
 

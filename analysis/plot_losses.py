@@ -34,7 +34,7 @@ color_scale = ['coral', 'chartreuse', 'skyblue']
 
 cols_to_keep = ['slurm_id', 'N', 'D', 'seed', 'rseed', 'rnoise', 'dset', 'loss', 'tparts']
 dt = csv_data[cols_to_keep]
-dt = dt.sort_values(by='D')
+dt = dt.sort_values(by=['D', 'rnoise'])
 dt.D = dt.D.astype(str)
 
 rnoises = dt['rnoise'].unique()
@@ -43,6 +43,7 @@ rseeds = dt['rseed'].unique()
 fig, axes = plt.subplots(nrows=len(rnoises), ncols=len(rseeds), sharex=True, sharey=True, figsize=(14,6))
 
 # dt = dt[(dt.dset == 'datasets/rsg-sohn.pkl')]
+# dt = dt[(dt.tparts == 'all')]
 for i, rnoise in enumerate(rnoises):
     for j, rseed in enumerate(rseeds):
         subset = dt[(dt.rnoise == rnoise) & (dt.rseed == rseed)]
@@ -54,10 +55,12 @@ for i, rnoise in enumerate(rnoises):
         ax.set_ylabel(rnoise)
         
         # subset_all = subset[subset.]
+        # subsubset = subset[subset.dset == 'datasets/rsg-sohn.pkl']
         subsubset = subset[subset.tparts == 'all']
-        ax.scatter(subsubset.D, subsubset.loss, s=5, alpha=.7, c=color_scale[0], label='train all')
+        ax.scatter(subsubset.D, subsubset.loss, s=5, alpha=.7, c=color_scale[0], label='all')
+        # subsubset = subset[subset.dset == 'datasets/rsg-sohn-d2.pkl']
         subsubset = subset[subset.tparts == 'Wf-Wro']
-        ax.scatter(subsubset.D, subsubset.loss, s=5, alpha=.7, c=color_scale[1], label='train parts')
+        ax.scatter(subsubset.D, subsubset.loss, s=5, alpha=.7, c=color_scale[1], label='part')
 
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
