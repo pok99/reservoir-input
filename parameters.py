@@ -9,22 +9,30 @@ def create_parameters(name):
     mapping = {}
     ix = 1
 
-    Ds = [30, 100, 200]
+    Ds = [10, 30, 100, 200]
     Ns = [200]
 
     lr = 1e-4
     n_epochs = 10
-    patience = 4000
+    patience = 2000
 
     # keep the same network seeds
-    preserve_seed = False
+    preserve_seed = True
 
-    n_seeds = 1
-    n_rseeds = 3
+    n_seeds = 2
+    n_rseeds = 5
 
     # noises = [0, 0.1, 0.01]
-    noises = [0]
-    train_parts = ['W_f', 'W_ro']
+    noises = [0, 0.01, 0.1]
+    train_parts = [['all'], ['W_f', 'W_ro']]
+
+    datasets = [
+        'datasets/rsg-sohn-d2.pkl',
+        'datasets/rsg-sohn.pkl'
+    ]
+    losses = [
+        'mse'
+    ]
 
     debug = False
     if debug:
@@ -35,21 +43,17 @@ def create_parameters(name):
         noises = [0]
         n_epochs = 5
         patience = 1000
-
-    datasets = [
-        'datasets/rsg-sohn-d2.pkl',
-        'datasets/rsg-sohn.pkl'
-    ]
-    losses = [
-        'mse'
-    ]
+        train_parts = [['W_f', 'W_ro']]
 
     if preserve_seed:
         seed_samples = random.sample(range(1000), n_seeds)
 
     rseed_samples = random.sample(range(1000), n_rseeds)
 
-    for (nD, nN, d, seed, rseed, noise) in product(Ds, Ns, datasets, range(n_seeds), range(n_rseeds), noises):
+    seed_samples = [811, 946]
+    rseed_samples = [534, 496, 291, 127, 727]
+
+    for (nD, nN, d, seed, rseed, tp, noise) in product(Ds, Ns, datasets, range(n_seeds), range(n_rseeds), train_parts, noises):
         if nD > nN:
             continue
         run_params = {}
@@ -65,9 +69,9 @@ def create_parameters(name):
 
         # run_params['optimizer'] = 'lbfgs-scipy'
         run_params['optimizer'] = 'adam'
-        run_params['s_rate'] = 0.2
+        # run_params['s_rate'] = 0.2
 
-        run_params['train_parts'] = train_parts
+        run_params['train_parts'] = tp
 
         run_params['res_noise'] = noise
 

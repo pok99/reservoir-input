@@ -157,14 +157,21 @@ class Trainer:
         n_iters = optim.nit
 
         if not self.args.no_log:
-            self.log_model(ix='final')
+            self.log_model(name='model_final.pth')
             with open(os.path.join(self.log.run_dir, f'checkpoints_{self.run_id}.pkl'), 'wb') as f:
                 pickle.dump(self.vis_samples, f)
             self.csv_path.close()
 
         return error_final, n_iters
 
-    def log_model(self, ix=0):
+    def log_model(self, ix=0, name=None):
+        # if we want to save a particular name, just do it and leave
+        if name is not None:
+            model_path = os.path.join(self.log.run_dir, name)
+            if os.path.exists(model_path):
+                os.remove(model_path)
+            torch.save(self.net.state_dict(), model_path)
+            return
         # saving all checkpoints takes too much space so we just save one model at a time, unless we explicitly specify it
         if self.args.log_checkpoint_models:
             self.save_model_path = os.path.join(self.log.checkpoint_dir, f'model_{ix}.pth')
@@ -209,14 +216,12 @@ class Trainer:
         self.net.reset(self.args.res_x_init)
         self.optimizer.zero_grad()
 
-        ins = x
-        goals = y
         total_loss, etc = self.run_trial(x, y, info, extras=True)
         total_loss.backward()
 
         etc = {
-            'ins': ins,
-            'goals': goals,
+            'ins': x,
+            'goals': y,
             'outs': etc['outs'].detach()
         }
         return total_loss.item(), etc
@@ -245,12 +250,10 @@ class Trainer:
         logging.info(f'Training set size {len(self.train_set)} | batch size {self.args.batch_size} --> {its_p_epoch} iterations / epoch')
 
         # for convergence testing
-        max_abs_grads = []
         running_min_error = float('inf')
         running_no_min = 0
 
         running_loss = 0.0
-        running_mag = 0.0
         ending = False
         for e in range(self.args.n_epochs):
             np.random.shuffle(self.train_set)
@@ -275,23 +278,15 @@ class Trainer:
                     break
 
                 running_loss += iter_loss
-                mag = max([torch.max(torch.abs(p.grad)) for p in self.train_params])
-                running_mag += mag             
 
                 if ix % self.log_interval == 0:
                     z = etc['outs'].numpy().squeeze()
-                    # avg of the last 50 trials
                     avg_loss = running_loss / self.args.batch_size / self.log_interval
-
                     test_loss, test_etc = self.test()
-                    # fta = test_etc['fta']
-                    avg_max_grad = running_mag / self.log_interval
                     log_arr = [
                         f'iteration {ix}',
                         f'loss {avg_loss:.3f}',
-                        # f'max abs grad {avg_max_grad:.3f}',
                         f'test loss {test_loss:.3f}',
-                        # f'fta {fta:.3f}'
                     ]
                     log_str = '\t| '.join(log_arr)
                     logging.info(log_str)
@@ -299,22 +294,17 @@ class Trainer:
                     if not self.args.no_log:
                         self.log_checkpoint(ix, etc['ins'].numpy(), etc['goals'].numpy(), z, running_loss, avg_loss)
                     running_loss = 0.0
-                    running_mag = 0.0
 
                     # convergence based on no avg loss decrease after patience samples
-                    if self.args.conv_type == 'patience':
-                        if test_loss < running_min_error:
-                            running_no_min = 0
-                            running_min_error = test_loss
-                        else:
-                            running_no_min += self.log_interval
-                        if running_no_min > self.args.patience:
-                            logging.info(f'iteration {ix}: no min for {args.patience} samples. ending')
-                            ending = True
-                    elif self.args.conv_type == 'grad':
-                        if avg_max_grad < self.args.grad_threshold:
-                            logging.info(f'iteration {ix}: max absolute grad < {args.grad_threshold}. ending')
-                            ending = True
+                    if test_loss < running_min_error:
+                        running_no_min = 0
+                        running_min_error = test_loss
+                        self.log_model(name='model_best.pth')
+                    else:
+                        running_no_min += self.log_interval
+                    if running_no_min > self.args.patience:
+                        logging.info(f'iteration {ix}: no min for {args.patience} samples. ending')
+                        ending = True
                 if ending:
                     break
             logging.info(f'Finished dataset epoch {e+1}')
@@ -330,9 +320,8 @@ class Trainer:
 
             self.csv_path.close()
 
-        final_loss, etc = self.test()
-        logging.info(f'END | iterations: {(ix // self.log_interval) * self.log_interval} | test loss: {final_loss}')
-        return final_loss, ix
+        logging.info(f'END | iterations: {(ix // self.log_interval) * self.log_interval} | best loss: {running_min_error}')
+        return running_min_error, ix
 
 def parse_args():
     parser = argparse.ArgumentParser(description='')
@@ -361,7 +350,7 @@ def parse_args():
     parser.add_argument('--no_bias', action='store_true')
     parser.add_argument('--out_act', type=str, default=None, help='output activation')
 
-    parser.add_argument('--dataset', type=str, default='datasets/rsg.pkl')
+    parser.add_argument('--dataset', type=str, default='datasets/rsg-sohn.pkl')
     parser.add_argument('--same_test', action='store_true', help='use entire dataset for both training and testing')
 
     parser.add_argument('--optimizer', choices=['adam', 'sgd', 'rmsprop', 'lbfgs'], default='lbfgs')
@@ -514,17 +503,15 @@ if __name__ == '__main__':
         csv_exists = os.path.exists(csv_path)
         with open(csv_path, 'a') as f:
             writer = csv.writer(f, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
-            labels_csv = ['slurm_id', 'D', 'N', 'bias', 'seed', 'rseed', 'xseed', 'rnoise', 'dset', 'niter', 'loss']
+            labels_csv = ['slurm_id', 'D', 'N', 'seed', 'rseed', 'xseed', 'rnoise', 'dset', 'niter', 'loss']
             vals_csv = [
-                args.slurm_id, args.D, args.N, args.bias, args.seed,
+                args.slurm_id, args.D, args.N, args.seed,
                 args.res_seed, args.res_x_seed, args.res_noise,
                 args.dataset, n_iters, final_loss
             ]
             if args.optimizer == 'adam':
                 labels_csv.extend(['lr', 'epochs'])
                 vals_csv.extend([args.lr, args.n_epochs])
-            elif args.optimizer == 'lbfgs-scipy':
-                pass
 
             if not csv_exists:
                 writer.writerow(labels_csv)
