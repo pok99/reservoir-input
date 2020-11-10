@@ -11,55 +11,10 @@ sys.path.append('../')
 
 from utils import get_config
 
-# csv_path = '../logs/3531677.csv'
-csv_path = '../logs/3532157.csv'
+csv_path = '../logs/3532647.csv'
 csv_data = pd.read_csv(csv_path)
 
-# vals = []
-# for i in csv_data.slurm_id:
-#     run_dir = os.path.join('../logs/3531677', str(i))
-#     run_files = os.listdir(run_dir)
-#     for f in run_files:
-#         if f.startswith('config'):
-#             c_file = os.path.join(run_dir, f)
-#     config = get_config(c_file, ctype='model')
-#     if config['train_parts'][0] == '':
-#         vals.append('all')
-#     else:
-#         vals.append('Wf-Wro')
-# csv_data['tparts'] = vals
-
-
-# run_id = '3532157'
-# losses = []
-# c_dict = {}
-# Ns = []
-# for i in range(1, 241):
-#     folder = os.path.join('../logs', run_id, str(i))
-#     files = os.listdir(folder)
-#     for f in files:
-#         if f.startswith('config'):
-#             c_file = os.path.join(folder, f)
-#         if f.startswith('log'):
-#             l_file = os.path.join(folder, f)
-#     config = get_config(c_file, ctype='model')
-#     best_loss = float(subprocess.check_output(['tail', '-1', l_file])[:-1].decode('utf-8').split(' ')[-1])
-#     losses.append(best_loss)
-#     for k,v in config.items():
-#         if k == 'train_parts':
-#             if len(v[0]) == 0:
-#                 v = 'all'
-#             else:
-#                 v = 'Wf-Wro'
-#         if k not in c_dict:
-#             c_dict[k] = [v]
-#         else:
-#             c_dict[k].append(v)
-# dt = pd.DataFrame.from_dict(c_dict)
-# dt['loss'] = losses
-# dt = dt.rename(columns={'train_parts':'tparts', 'dataset':'dset', 'res_noise':'rnoise', 'res_seed':'rseed'})
-
-# csv_data = dt
+csv_data['tparts'].fillna('all', inplace=True)
 
 cols_to_keep = ['slurm_id', 'N', 'D', 'seed', 'rseed', 'rnoise', 'dset', 'loss', 'tparts']
 dt = csv_data[cols_to_keep]

@@ -26,8 +26,9 @@ def load_model_path(path, config):
 
 # given a model and a dataset, see how well the model does on it
 # works with plot_trained.py
-def test_model(net, config, n_tests=0):
-    dset = load_rb(config.dataset)
+def test_model(net, config, n_tests=0, dset_base='.'):
+    dset_path = os.path.join(dset_base, config.dataset)
+    dset = load_rb(dset_path)
     dset_idx = range(len(dset))
     if n_tests != 0:
         dset_idx = sorted(random.sample(range(len(dset)), n_tests))
@@ -53,7 +54,7 @@ def test_model(net, config, n_tests=0):
         net_targets = y
         for c in criteria:
             for k in range(len(test_set)):
-                losses[k] = c(net_outs[k], net_targets[k], info[k]).item()
+                losses[k] += c(net_outs[k], net_targets[k], info[k]).item()
 
     ins = x
     goals = y

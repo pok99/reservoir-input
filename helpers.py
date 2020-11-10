@@ -32,18 +32,18 @@ def get_criteria(args):
     criteria = []
     if 'mse' in args.losses:
         fn = nn.MSELoss(reduction='sum')
-        def mse(t, o, i=None):
+        def mse(o, t, i=None):
             return args.l1 * fn(t, o)
         criteria.append(mse)
     if 'bce' in args.losses:
         weights = args.l3 * torch.ones(1)
         fn = nn.BCEWithLogitsLoss(reduction='sum', pos_weight=weights)
-        def bce(t, o, i=None):
+        def bce(o, t, i=None):
             return args.l1 * fn(t, o)
         criteria.append(bce)
     if 'mse-w' in args.losses:
         fn = nn.MSELoss(reduction='sum')
-        def mse_w(t, o, i):
+        def mse_w(o, t, i):
             loss = 0.
             if len(o.shape) == 1:
                 o = o.unsqueeze(0)
@@ -59,7 +59,7 @@ def get_criteria(args):
     if 'bce-w' in args.losses:
         weights = args.l4 * torch.ones(1)
         fn = nn.BCEWithLogitsLoss(reduction='sum', pos_weight=weights)
-        def bce_w(t, o, i):
+        def bce_w(o, t, i):
             loss = 0.
             if len(o.shape) == 1:
                 o = o.unsqueeze(0)
@@ -73,6 +73,36 @@ def get_criteria(args):
                 loss += t.shape[1] / t_p * fn(t[j,t_set:t_set+t_p+1], o[j,t_set:t_go+t_p+1])
             return args.l2 * loss
         criteria.append(bce_w)
+    if 'mse-g' in args.losses:
+        fn = nn.MSELoss(reduction='sum')
+        def mse_g(o, t, i):
+            loss = 0.
+            if len(o.shape) == 1:
+                o = o.unsqueeze(0)
+                t = t.unsqueeze(0)
+                i = [i]
+            for j in range(len(t)):
+                t_ready, t_go = i[j][0], i[j][2]
+                first_t = torch.nonzero(o[j][t_ready:] > 1)
+                if len(first_t) == 0:
+                    first_t = torch.tensor(len(o[j])) - 1
+                else:
+                    first_t = first_t[0,0] + t_ready
+                t_new = None
+                if t_go > first_t:
+                    o_new = o[j][first_t:t_go+1]
+                    t_new = t[j][first_t:t_go+1]
+                    # w = torch.arange(t_go+1-first_t,0,-1)
+                elif t_go < first_t:
+                    o_new = o[j][t_go:first_t + 1]
+                    t_new = t[j][t_go:first_t + 1]
+                    # w = torch.arange(0,first_t+1-t_go,1)
+                if t_new is not None:
+                    g_loss = fn(o_new, t_new)
+                    # g_loss = torch.sum(w * torch.square(t_new - o_new))
+                    loss += g_loss
+            return args.l2 * loss
+        criteria.append(mse_g)
     if len(criteria) == 0:
         raise NotImplementedError
     return criteria

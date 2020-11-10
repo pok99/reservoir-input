@@ -8,6 +8,7 @@ import random
 import pickle
 import argparse
 import pdb
+import json
 
 from helpers import sigmoid
 from utils import load_rb, get_config, fill_undefined_args
@@ -23,9 +24,13 @@ parser.add_argument('--res_noise', default=None, type=float)
 parser.add_argument('-x', '--reservoir_x_init', default=None, type=str)
 parser.add_argument('-a', '--test_all', action='store_true')
 parser.add_argument('-n', '--no_plot', action='store_true')
+parser.add_argument('-c', '--config', default=None, help='path to config file if custom')
 args = parser.parse_args()
 
-config = get_config(args.model, ctype='model')
+if args.config is None:
+    config = get_config(args.model, ctype='model')
+else:
+    config = json.load(open(args.config, 'r'))
 config = fill_undefined_args(args, config, overwrite_none=True)
 
 net = load_model_path(args.model, config=config)

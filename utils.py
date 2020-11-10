@@ -117,13 +117,20 @@ def get_config(model_path, ctype='model', to_bunch=False):
     head, tail = os.path.split(model_path)
     if ctype == 'data':
         fname = tail.split('.')[0] + '.json'
-        config_path = os.path.join(head, 'configs', fname)
+        c_folder = os.path.join(head, 'configs')
+        if os.path.isfile(os.path.join(c_folder, fname)):
+            c_path = os.path.join(head, 'configs', fname)
+        else:
+            raise NotImplementedError
+
     elif ctype == 'model':
         run_id = re.split('_|\.', tail)[1]
-        config_path = os.path.join(head, 'config_'+run_id+'.json')
+        c_path = os.path.join(head, 'config_'+run_id+'.json')
+        if not os.path.isfile(c_path):
+            raise NotImplementedError
     else:
         raise NotImplementedError
-    with open(config_path, 'r') as f:
+    with open(c_path, 'r') as f:
         config = json.load(f)
     if to_bunch:
         return Bunch(**config)
