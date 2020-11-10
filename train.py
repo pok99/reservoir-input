@@ -158,8 +158,9 @@ class Trainer:
 
         if not self.args.no_log:
             self.log_model(name='model_final.pth')
-            with open(os.path.join(self.log.run_dir, f'checkpoints_{self.run_id}.pkl'), 'wb') as f:
-                pickle.dump(self.vis_samples, f)
+            if self.args.log_checkpoint_samples:
+                with open(self.plot_checkpoint_path, 'wb') as f:
+                    pickle.dump(self.vis_samples, f)
             self.csv_path.close()
 
         return error_final, n_iters
@@ -318,9 +319,9 @@ class Trainer:
             if ending:
                 break
 
-        if not self.args.no_log:
+        if not self.args.no_log and self.args.log_checkpoint_samples:
             # for later visualization of outputs over timesteps
-            with open(os.path.join(self.log.run_dir, f'checkpoints_{self.run_id}.pkl'), 'wb') as f:
+            with open(self.plot_checkpoint_path, 'wb') as f:
                 pickle.dump(self.vis_samples, f)
 
             self.csv_path.close()
@@ -457,10 +458,6 @@ def adjust_args(args):
     else:
         args.dset_type = 'unknown'
 
-    # if config.d2:
-    #     args.L = 2
-    # else:
-    #     args.L = 1
     if args.same_signal:
         args.L = 1
 
@@ -510,10 +507,10 @@ if __name__ == '__main__':
         csv_exists = os.path.exists(csv_path)
         with open(csv_path, 'a') as f:
             writer = csv.writer(f, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
-            labels_csv = ['slurm_id', 'N', 'D', 'seed', 'rseed', 'xseed', 'rnoise', 'dset', 'niter', 'tparts', 'loss']
+            labels_csv = ['slurm_id', 'N', 'D', 'seed', 'rseed', 'mnoise', 'rnoise', 'dset', 'niter', 'tparts', 'loss']
             vals_csv = [
                 args.slurm_id, args.N, args.D, args.seed,
-                args.res_seed, args.res_x_seed, args.res_noise,
+                args.res_seed, args.m_noise, args.res_noise,
                 args.dataset, n_iters, '-'.join(args.train_parts), best_loss
             ]
             if args.optimizer == 'adam':

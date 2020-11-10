@@ -21,10 +21,10 @@ def create_parameters(name):
     # keep the same network seeds
     preserve_seed = True
 
-    n_seeds = 3
-    n_rseeds = 5
+    n_seeds = 2
+    n_rseeds = 4
 
-    m_noises = [0, 1, 2]
+    m_noises = [0, 1, 3, 6, 10]
     r_noises = [0, 0.01]
     train_parts = [['all'], ['W_f', 'W_ro']]
 
@@ -60,8 +60,8 @@ def create_parameters(name):
     # seed_samples = [811, 946, 122]
     # rseed_samples = [492, 496, 291, 127, 727]
 
-    seed_samples = [11, 12, 13, 14]
-    rseed_samples = [1, 2, 3, 4, 5]
+    seed_samples = [11, 12]
+    rseed_samples = [1, 2, 3, 4]
 
     for (d, nN, nD, rnoise, mnoise, tp, seed, rseed) in product(datasets, Ns, Ds, r_noises, m_noises, train_parts, range(n_seeds), range(n_rseeds)):
         if nD > nN:

@@ -11,12 +11,25 @@ sys.path.append('../')
 
 from utils import get_config
 
-csv_path = '../logs/3533296.csv'
+run_id = '3534830'
+
+csv_path = f'../logs/{run_id}.csv'
 csv_data = pd.read_csv(csv_path)
+
+vals = []
+for i in csv_data.slurm_id:
+    run_dir = os.path.join(f'../logs/{run_id}', str(i))
+    run_files = os.listdir(run_dir)
+    for f in run_files:
+        if f.startswith('config'):
+            c_file = os.path.join(run_dir, f)
+    config = get_config(c_file, ctype='model')
+    vals.append(config['m_noise'])
+csv_data['mnoise'] = vals
 
 csv_data['tparts'].fillna('all', inplace=True)
 
-cols_to_keep = ['slurm_id', 'N', 'D', 'seed', 'rseed', 'rnoise', 'dset', 'loss', 'tparts']
+cols_to_keep = ['slurm_id', 'N', 'D', 'seed', 'rseed', 'rnoise', 'mnoise', 'dset', 'loss', 'tparts']
 dt = csv_data[cols_to_keep]
 dt = dt.sort_values(by=['D', 'rnoise', 'rseed'])
 
@@ -38,13 +51,13 @@ fig.text(0.07, 0.5, 'loss', va='center', rotation='vertical')
 fig.text(0.5, 0.04, 'D', ha='center')
 
 # dt = dt[(dt.dset == 'datasets/rsg-sohn.pkl')]
-# dt = dt[(dt.tparts == 'all')]
+dt = dt[(dt.mnoise == 2)]
 for i, rnoise in enumerate(rnoises):
     for j, rseed in enumerate(rseeds):
         subset = dt[(dt.rnoise == rnoise) & (dt.rseed == rseed)]
 
         ax = axes[i, j]
-        ax.set_xticklabels([0, 10, 30, 100, 200])
+        ax.set_xticklabels([0, 20, 100, 200])
         # ax.tick_params()
         # ax.xaxis.set_ticks_position('bottom')
         # ax.tick_params(which='major', width=1.00, length=4)
@@ -76,7 +89,7 @@ for i, rnoise in enumerate(rnoises):
         # ax.tick_params(axis='both', color='white')
         ax.grid(None)
         ax.grid(True, which='major', axis='y', lw=1, color='lightgray', alpha=0.4)
-        ax.set_xlim([-.5, 3.5])
+        ax.set_xlim([-.5, 2.5])
         ax.set_ylim([0, 100])
 
 

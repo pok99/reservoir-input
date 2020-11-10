@@ -11,7 +11,7 @@ import sys
 from network import BasicNetwork
 from utils import Bunch, load_rb
 
-from helpers import get_x_y_info, mse2_loss, get_criteria
+from helpers import get_x_y_info, mse2_loss, get_criteria, shift_ix
 
 
 def load_model_path(path, config):
@@ -34,6 +34,8 @@ def test_model(net, config, n_tests=0, dset_base='.'):
         dset_idx = sorted(random.sample(range(len(dset)), n_tests))
     test_set = [dset[i] for i in dset_idx]
     x, y, info = get_x_y_info(config, test_set)
+    pdb.set_trace()
+    x = shift_ix(config, x, info)
 
     criteria = get_criteria(config)
 

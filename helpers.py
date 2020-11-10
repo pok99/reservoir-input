@@ -152,23 +152,24 @@ def get_dim(a):
 
 def corrupt_ix(args, x):
     if args.x_noise == 0:
-        return x
+        return x.clone()
     pulses = torch.nonzero(x)[:,1].reshape(x.shape[0], args.L, -1).repeat(1,1,10).float()
     pulses += torch.randn_like(pulses) * args.x_noise
     pulses = torch.round(pulses).long()
-    x = torch.zeros_like(x)
-    for i in range(x.shape[0]):
+    x_new = torch.zeros_like(x)
+    for i in range(x_new.shape[0]):
         for j in range(args.L):
             nums, counts = torch.unique(pulses[i,j], return_counts=True)
-            x[i,nums,j] = counts / 10
+            x_new[i,nums,j] = counts / 10
     if args.L == 1:
-        x = x.squeeze(2)
-    return x
+        x_new = x_new.squeeze(2)
+    return x_new
 
 def shift_ix(args, x, info):
+    x_new = x.detach().clone()
     if args.m_noise == 0:
-        return x
-    for i in range(x.shape[0]):
+        return x_new
+    for i in range(x_new.shape[0]):
         if args.L == 1:
             t_p = info[i][1] - info[i][0]
             disp = np.rint(np.random.normal(0, args.m_noise*t_p/50))
@@ -176,8 +177,8 @@ def shift_ix(args, x, info):
         else:
             t_p = info[i][1] - info[i][0]
             disp = int(np.random.normal(0, args.m_noise*t_p/50))
-            x[i,:,0] = x[i,:,0].roll(disp)
-    return x
+            x_new[i,:,0] = x_new[i,:,0].roll(disp)
+    return x_new
 
 
 def mse2_loss(x, outs, info, l1, l2, extras=False):
