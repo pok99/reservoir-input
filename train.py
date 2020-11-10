@@ -511,7 +511,7 @@ if __name__ == '__main__':
             vals_csv = [
                 args.slurm_id, args.N, args.D, args.seed,
                 args.res_seed, args.res_x_seed, args.res_noise,
-                args.dataset, n_iters, '-'.join(train_parts), best_loss
+                args.dataset, n_iters, '-'.join(args.train_parts), best_loss
             ]
             if args.optimizer == 'adam':
                 labels_csv.extend(['lr', 'epochs'])
