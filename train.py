@@ -19,7 +19,7 @@ import copy
 from network import BasicNetwork, Reservoir
 
 from utils import log_this, load_rb, get_config, fill_undefined_args
-from helpers import get_optimizer, get_scheduler, get_criteria, get_x_y_info, mse2_loss
+from helpers import get_optimizer, get_scheduler, get_criteria, get_x_y_info, mse2_loss, corrupt_ix
 
 class Trainer:
     def __init__(self, args):
@@ -235,7 +235,7 @@ class Trainer:
             batch = self.test_set
 
         x, y, info = get_x_y_info(batch)
-        etc = {}
+        x = corrupt_ix(self.args, x)
 
         with torch.no_grad():
             self.net.reset(self.args.res_x_init)
@@ -266,6 +266,7 @@ class Trainer:
                 ix += 1
 
                 x, y, info = get_x_y_info(batch)
+                x = corrupt_ix(self.args, x)
                 iter_loss, etc = self.train_iteration(x, y, info)
 
                 if ix_callback is not None:
@@ -348,6 +349,7 @@ def parse_args():
     parser.add_argument('--res_init_gaussian_std', type=float, default=1.5)
     # parser.add_argument('--network_delay', type=int, default=0)
     parser.add_argument('--res_noise', type=float, default=0)
+    parser.add_argument('--x_noise', type=float, default=0)
     parser.add_argument('--no_bias', action='store_true')
     parser.add_argument('--out_act', type=str, default=None, help='output activation')
 

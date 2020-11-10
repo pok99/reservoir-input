@@ -99,6 +99,21 @@ def get_dim(a):
     else:
         return 1
 
+def corrupt_ix(args, x):
+    if args.x_noise == 0:
+        return x
+    pulses = torch.nonzero(x)[:,1].reshape(args.batch_size, args.L, -1).repeat(1,1,10).float()
+    pulses += torch.randn_like(pulses) * args.x_noise
+    pulses = torch.round(pulses).long()
+    x = torch.zeros_like(x)
+    for i in range(args.batch_size):
+        for j in range(args.L):
+            nums, counts = torch.unique(pulses[i,j], return_counts=True)
+            x[i,nums,j] = counts / 10
+    if args.L == 1:
+        x = x.squeeze(2)
+    return x
+
 
 def mse2_loss(x, outs, info, l1, l2, extras=False):
     total_loss = 0.

@@ -13,8 +13,9 @@ def create_parameters(name):
     Ns = [200]
 
     lr = 1e-4
-    n_epochs = 12
-    patience = 4000
+    n_epochs = 20
+    patience = 3000
+    batch_size = 2
 
     # keep the same network seeds
     preserve_seed = True
@@ -66,6 +67,7 @@ def create_parameters(name):
         run_params['lr'] = lr
         run_params['n_epochs'] = n_epochs
         run_params['patience'] = patience
+        run_params['batch_size'] = batch_size
 
         # run_params['optimizer'] = 'lbfgs-scipy'
         run_params['optimizer'] = 'adam'
