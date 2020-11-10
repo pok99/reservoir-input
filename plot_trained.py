@@ -62,7 +62,7 @@ if not args.no_plot:
         if len(x.shape) > 1:
             x = x[:,0] + x[:,1]
         ax.scatter(xr, x, color='coral', alpha=0.5, s=3, label='input')
-        if 'mse' in config.losses:
+        if 'mse' in config.losses or 'mse-w2' in config.losses:
             ax.plot(xr, y, color='coral', alpha=1, lw=1, label='target')
             ax.plot(xr, z, color='cornflowerblue', alpha=1, lw=1.5, label='response')
         elif 'bce' in config.losses:

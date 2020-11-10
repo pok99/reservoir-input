@@ -136,10 +136,12 @@ def get_output_activation(args):
     return fn
 
 # given batch, get the x, y pairs and turn them into Tensors
-def get_x_y_info(batch):
+def get_x_y_info(args, batch):
     x, y, info = list(zip(*batch))
     x = torch.as_tensor(x, dtype=torch.float)
     y = torch.as_tensor(y, dtype=torch.float)
+    if args.same_signal:
+        x = torch.sum(x, dim=-1)
     return x, y, info
 
 def get_dim(a):
@@ -151,16 +153,30 @@ def get_dim(a):
 def corrupt_ix(args, x):
     if args.x_noise == 0:
         return x
-    pulses = torch.nonzero(x)[:,1].reshape(args.batch_size, args.L, -1).repeat(1,1,10).float()
+    pulses = torch.nonzero(x)[:,1].reshape(x.shape[0], args.L, -1).repeat(1,1,10).float()
     pulses += torch.randn_like(pulses) * args.x_noise
     pulses = torch.round(pulses).long()
     x = torch.zeros_like(x)
-    for i in range(args.batch_size):
+    for i in range(x.shape[0]):
         for j in range(args.L):
             nums, counts = torch.unique(pulses[i,j], return_counts=True)
             x[i,nums,j] = counts / 10
     if args.L == 1:
         x = x.squeeze(2)
+    return x
+
+def shift_ix(args, x, info):
+    if args.m_noise == 0:
+        return x
+    for i in range(x.shape[0]):
+        if args.L == 1:
+            t_p = info[i][1] - info[i][0]
+            disp = np.rint(np.random.normal(0, args.m_noise*t_p/50))
+            raise NotImplementedError
+        else:
+            t_p = info[i][1] - info[i][0]
+            disp = int(np.random.normal(0, args.m_noise*t_p/50))
+            x[i,:,0] = x[i,:,0].roll(disp)
     return x
 
 

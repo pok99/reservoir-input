@@ -33,7 +33,7 @@ def test_model(net, config, n_tests=0, dset_base='.'):
     if n_tests != 0:
         dset_idx = sorted(random.sample(range(len(dset)), n_tests))
     test_set = [dset[i] for i in dset_idx]
-    x, y, info = get_x_y_info(test_set)
+    x, y, info = get_x_y_info(config, test_set)
 
     criteria = get_criteria(config)
 

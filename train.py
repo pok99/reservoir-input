@@ -19,7 +19,7 @@ import copy
 from network import BasicNetwork, Reservoir
 
 from utils import log_this, load_rb, get_config, fill_undefined_args
-from helpers import get_optimizer, get_scheduler, get_criteria, get_x_y_info, mse2_loss, corrupt_ix
+from helpers import get_optimizer, get_scheduler, get_criteria, get_x_y_info, mse2_loss, corrupt_ix, shift_ix
 
 class Trainer:
     def __init__(self, args):
@@ -78,7 +78,7 @@ class Trainer:
             self.save_model_path = os.path.join(self.log.run_dir, f'model_{self.run_id}.pth')
 
     def optimize_lbfgs(self):
-        x, y, info = get_x_y_info(self.dset)
+        x, y, info = get_x_y_info(args, self.dset)
         # so that the callback for scipy.optimize.minimize knows what step it is on
         self.scipy_ix = 0
         vis_samples = []
@@ -186,11 +186,12 @@ class Trainer:
         self.log_model(ix)
 
         # we can save individual samples at each checkpoint, that's not too bad space-wise
-        self.vis_samples.append([ix, x, y, z, total_loss, avg_loss])
-        if os.path.exists(self.plot_checkpoint_path):
-            os.remove(self.plot_checkpoint_path)
-        with open(self.plot_checkpoint_path, 'wb') as f:
-            pickle.dump(self.vis_samples, f)
+        if self.args.log_checkpoint_samples:
+            self.vis_samples.append([ix, x, y, z, total_loss, avg_loss])
+            if os.path.exists(self.plot_checkpoint_path):
+                os.remove(self.plot_checkpoint_path)
+            with open(self.plot_checkpoint_path, 'wb') as f:
+                pickle.dump(self.vis_samples, f)
 
 
     # runs an iteration where we want to match a certain trajectory
@@ -234,8 +235,9 @@ class Trainer:
         else:
             batch = self.test_set
 
-        x, y, info = get_x_y_info(batch)
-        x = corrupt_ix(self.args, x)
+        x, y, info = get_x_y_info(args, batch)
+        # x = corrupt_ix(self.args, x)
+        x = shift_ix(self.args, x, info)
 
         with torch.no_grad():
             self.net.reset(self.args.res_x_init)
@@ -265,8 +267,9 @@ class Trainer:
                     break
                 ix += 1
 
-                x, y, info = get_x_y_info(batch)
-                x = corrupt_ix(self.args, x)
+                x, y, info = get_x_y_info(args, batch)
+                # x = corrupt_ix(self.args, x)
+                x = shift_ix(self.args, x, info)
                 iter_loss, etc = self.train_iteration(x, y, info)
 
                 if ix_callback is not None:
@@ -327,7 +330,7 @@ class Trainer:
 
 def parse_args():
     parser = argparse.ArgumentParser(description='')
-    parser.add_argument('-L', type=int, default=1, help='latent input dimension')
+    parser.add_argument('-L', type=int, default=2, help='latent input dimension')
     parser.add_argument('-T', type=int, default=1, help='task dimension')
     parser.add_argument('-D', type=int, default=5, help='intermediate dimension')
     parser.add_argument('-N', type=int, default=50, help='number of neurons in reservoir')
@@ -350,26 +353,23 @@ def parse_args():
     # parser.add_argument('--network_delay', type=int, default=0)
     parser.add_argument('--res_noise', type=float, default=0)
     parser.add_argument('--x_noise', type=float, default=0)
+    parser.add_argument('--m_noise', type=float, default=0)
     parser.add_argument('--no_bias', action='store_true')
     parser.add_argument('--out_act', type=str, default=None, help='output activation')
 
-    parser.add_argument('--dataset', type=str, default='datasets/rsg-sohn.pkl')
+    parser.add_argument('-d', '--dataset', type=str, default='datasets/rsg-sohn.pkl')
+    parser.add_argument('--same_signal', action='store_true', help='use 1d input instead of separate ready/set pulses')
     parser.add_argument('--same_test', action='store_true', help='use entire dataset for both training and testing')
 
-    parser.add_argument('--optimizer', choices=['adam', 'sgd', 'rmsprop', 'lbfgs'], default='lbfgs')
+    parser.add_argument('--optimizer', choices=['adam', 'sgd', 'rmsprop', 'lbfgs'], default='adam')
     parser.add_argument('--l2_reg', type=float, default=0, help='amount of l2 regularization')
     parser.add_argument('--s_rate', default=None, type=float, help='scheduler rate. dont use for no scheduler')
-    parser.add_argument('--losses', type=str, nargs='+', choices=['mse', 'bce', 'mse-w', 'bce-w', 'mse-g'], default=[])
+    parser.add_argument('--losses', type=str, nargs='+', choices=['mse', 'bce', 'mse-w', 'bce-w', 'mse-g', 'mse-w2'], default=[])
 
     parser.add_argument('--l1', type=float, default=1, help='weight of normal loss')
-    parser.add_argument('--l2', type=float, default=1, help='weight of secondary (windowed/goal) loss')
+    parser.add_argument('--l2', type=float, default=0.5, help='weight of secondary (windowed/goal) loss')
     parser.add_argument('--l3', type=float, default=100, help='bce: weight of positive examples')
     parser.add_argument('--l4', type=float, default=10, help='bce-w: weight of positive examples')
-
-
-    # parser.add_argument('--bcew_l1', type=float, default=1, help='default relative weight of bce loss within window')
-    # parser.add_argument('--mse_l1', type=float, default=1, help='default relative weight of mse loss')
-    # parser.add_argument('--msew_l1', type=float, default=1, help='default relative weight of mse loss within window')
 
     # lbfgs-scipy arguments
     parser.add_argument('--maxiter', type=int, default=10000, help='limit to # iterations. lbfgs-scipy only')
@@ -392,6 +392,7 @@ def parse_args():
     parser.add_argument('--no_log', action='store_true')
     parser.add_argument('--log_interval', type=int, default=50)
     parser.add_argument('--log_checkpoint_models', action='store_true')
+    parser.add_argument('--log_checkpoint_samples', action='store_true')
 
     parser.add_argument('--name', type=str, default='test')
     parser.add_argument('--param_path', type=str, default=None)
@@ -444,21 +445,23 @@ def adjust_args(args):
     if config.t_type == 'rsg-bin':
         args.dset_type = 'rsg-bin'
         args.out_act = 'none'
-        if 'bce' not in args.losses:
-            args.losses.append('bce')
+        # if 'bce' not in args.losses:
+        #     args.losses.append('bce')
     elif config.t_type == 'rsg-sohn':
         args.dset_type = 'rsg-sohn'
         args.out_act = 'exp'
-        if 'mse' not in args.losses:
-            args.losses.append('mse')
+        # if 'mse' not in args.losses:
+        #     args.losses.append('mse')
     elif config.t_type == 'copy':
         args.dset_type = 'copy'
     else:
         args.dset_type = 'unknown'
 
-    if config.d2:
-        args.L = 2
-    else:
+    # if config.d2:
+    #     args.L = 2
+    # else:
+    #     args.L = 1
+    if args.same_signal:
         args.L = 1
 
     # initializing logging

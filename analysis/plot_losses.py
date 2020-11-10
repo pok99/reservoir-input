@@ -11,7 +11,7 @@ sys.path.append('../')
 
 from utils import get_config
 
-csv_path = '../logs/3532647.csv'
+csv_path = '../logs/3533296.csv'
 csv_data = pd.read_csv(csv_path)
 
 csv_data['tparts'].fillna('all', inplace=True)

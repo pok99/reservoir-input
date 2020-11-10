@@ -9,26 +9,32 @@ def create_parameters(name):
     mapping = {}
     ix = 1
 
-    Ds = [10, 30, 100, 200]
+    Ds = [20, 100, 200]
     Ns = [200]
 
     lr = 1e-4
     n_epochs = 40
     patience = 4000
     batch_size = 2
+    l2 = 0.5
 
     # keep the same network seeds
     preserve_seed = True
 
-    n_seeds = 4
+    n_seeds = 3
     n_rseeds = 5
 
-    # noises = [0, 0.1, 0.01]
-    noises = [0, 0.1]
+    m_noises = [0, 1, 2]
+    r_noises = [0, 0.01]
     train_parts = [['all'], ['W_f', 'W_ro']]
 
     datasets = [
-        'datasets/rsg-sohn-d2.pkl',
+        'datasets/rsg-sohn-100-200.pkl',
+        'datasets/rsg-sohn-150-200.pkl',
+        'datasets/rsg-sohn-100-150.pkl',
+        # 'datasets/rsg-sohn-50-100.pkl',
+        # 'datasets/rsg-sohn-50-150.pkl',
+        # 'datasets/rsg-sohn-50-200.pkl',
         # 'datasets/rsg-sohn.pkl'
     ]
     losses = [
@@ -54,16 +60,16 @@ def create_parameters(name):
     # seed_samples = [811, 946, 122]
     # rseed_samples = [492, 496, 291, 127, 727]
 
-    seed_samples = [100, 200, 300, 400]
-    rseed_samples = [101, 201, 301, 401, 501]
+    seed_samples = [11, 12, 13, 14]
+    rseed_samples = [1, 2, 3, 4, 5]
 
-    for (nD, nN, d, seed, rseed, tp, noise) in product(Ds, Ns, datasets, range(n_seeds), range(n_rseeds), train_parts, noises):
+    for (d, nN, nD, rnoise, mnoise, tp, seed, rseed) in product(datasets, Ns, Ds, r_noises, m_noises, train_parts, range(n_seeds), range(n_rseeds)):
         if nD > nN:
             continue
         run_params = {}
         run_params['dataset'] = d
         run_params['losses'] = losses
-        run_params['l2'] = .5
+        run_params['l2'] = l2
         run_params['D'] = nD
         run_params['N'] = nN
 
@@ -79,7 +85,8 @@ def create_parameters(name):
 
         run_params['train_parts'] = tp
 
-        run_params['res_noise'] = noise
+        run_params['res_noise'] = rnoise
+        run_params['m_noise'] = mnoise
 
         # keep the seed the same across all runs sharing network seeds
         # but use a totally random one otherwise. train.py will take care of it

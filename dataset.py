@@ -44,7 +44,7 @@ def create_dataset(args):
     if t_type.startswith('rsg'):
         p_len = get_args_val(trial_args, 'plen', 5, int)
         config['p_len'] = p_len
-        config['d2'] = 'd2' in trial_args
+        # config['d2'] = 'd2' in trial_args
         if args.rsg_intervals is None:
             # amount of time in between ready and set cues
             min_t = get_args_val(trial_args, 'gt', p_len * 4, int)
@@ -64,14 +64,14 @@ def create_dataset(args):
             set_time = ready_time + t_p
             go_time = set_time + t_p
 
-            if config['d2']:
-                trial_x = np.zeros((t_len, 2))
-                trial_x[ready_time:ready_time+p_len, 0] = 1
-                trial_x[set_time:set_time+p_len, 1] = 1
-            else:
-                trial_x = np.zeros((t_len))
-                trial_x[ready_time:ready_time+p_len] = 1
-                trial_x[set_time:set_time+p_len] = 1
+            # if config['d2']:
+            trial_x = np.zeros((t_len, 2))
+            trial_x[ready_time:ready_time+p_len, 0] = 1
+            trial_x[set_time:set_time+p_len, 1] = 1
+            # else:
+            #     trial_x = np.zeros((t_len))
+            #     trial_x[ready_time:ready_time+p_len] = 1
+            #     trial_x[set_time:set_time+p_len] = 1
 
             trial_y = np.zeros((t_len))
             if t_type == 'rsg-bin':
@@ -84,14 +84,14 @@ def create_dataset(args):
                 trial_y[set_time+p_len:] = trial_y_fn(trial_y_temp)
                 trial_y = np.clip(trial_y, 0, 2)
             elif t_type == 'rsg-window':
-                if config['d2']:
-                    trial_x = np.zeros((ready_time + 3 * t_p, 2))
-                    trial_x[ready_time:ready_time+p_len, 0] = 1
-                    trial_x[set_time:set_time+p_len, 1] = 1
-                else:
-                    trial_x = np.zeros((ready_time + 3 * t_p))
-                    trial_x[ready_time:ready_time+p_len] = 1
-                    trial_x[set_time:set_time+p_len] = 1
+                # if config['d2']:
+                trial_x = np.zeros((ready_time + 3 * t_p, 2))
+                trial_x[ready_time:ready_time+p_len, 0] = 1
+                trial_x[set_time:set_time+p_len, 1] = 1
+                # else:
+                #     trial_x = np.zeros((ready_time + 3 * t_p))
+                #     trial_x[ready_time:ready_time+p_len] = 1
+                #     trial_x[set_time:set_time+p_len] = 1
                 trial_y = np.zeros((ready_time + 3 * t_p))
 
                 A = 3
@@ -237,9 +237,9 @@ if __name__ == '__main__':
         dset_type = config['t_type']
 
         dset_len = len(dset)
-        sample = random.sample(dset, 6)
+        sample = random.sample(dset, 12)
         dset_range = range(len(sample[0][0]))
-        fig, ax = plt.subplots(2,3,sharex=True, sharey=True, figsize=(8,4))
+        fig, ax = plt.subplots(3,4,sharex=True, sharey=True, figsize=(10,6))
         for i, ax in enumerate(fig.axes):
             ax.axvline(x=0, color='dimgray', alpha = 1)
             ax.axhline(y=0, color='dimgray', alpha = 1)
@@ -253,11 +253,13 @@ if __name__ == '__main__':
 
             dset_range = range(len(sample[i][0]))
             if dset_type.startswith('rsg'):
-                if config['d2']:
-                    sample_sum = sample[i][0][:,0] + sample[i][0][:,1]
-                    ml, sl, bl = ax.stem(dset_range, sample_sum, use_line_collection=True, linefmt='coral', label='ready/set')
-                else:
-                    ml, sl, bl = ax.stem(dset_range, sample[i][0], use_line_collection=True, linefmt='coral', label='ready/set')
+                sample_sum = sample[i][0][:,0] + sample[i][0][:,1]
+                ml, sl, bl = ax.stem(dset_range, sample_sum, use_line_collection=True, linefmt='coral', label='ready/set')
+                # if config['d2']:
+                #     sample_sum = sample[i][0][:,0] + sample[i][0][:,1]
+                #     ml, sl, bl = ax.stem(dset_range, sample_sum, use_line_collection=True, linefmt='coral', label='ready/set')
+                # else:
+                #     ml, sl, bl = ax.stem(dset_range, sample[i][0], use_line_collection=True, linefmt='coral', label='ready/set')
                 ml.set_markerfacecolor('coral')
                 ml.set_markeredgecolor('coral')
                 if dset_type == 'rsg-bin':
