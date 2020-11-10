@@ -40,6 +40,7 @@ def create_dataset(args):
 
     trials = []
 
+
     if t_type.startswith('rsg'):
         p_len = get_args_val(trial_args, 'plen', 5, int)
         config['p_len'] = p_len
@@ -76,10 +77,29 @@ def create_dataset(args):
             if t_type == 'rsg-bin':
                 trial_y[go_time:go_time+p_len] = 1
             elif t_type == 'rsg-sohn':
+                # A = 3
+                # alpha = (t_p - p_len) / t_p / np.log(4/3)
                 trial_y_temp = np.arange(t_len - set_time - p_len)
-                trial_y_fn = lambda t: 1 / (t_p - p_len) * t
+                trial_y_fn = lambda t: t / t_p
                 trial_y[set_time+p_len:] = trial_y_fn(trial_y_temp)
                 trial_y = np.clip(trial_y, 0, 2)
+            elif t_type == 'rsg-window':
+                if config['d2']:
+                    trial_x = np.zeros((ready_time + 3 * t_p, 2))
+                    trial_x[ready_time:ready_time+p_len, 0] = 1
+                    trial_x[set_time:set_time+p_len, 1] = 1
+                else:
+                    trial_x = np.zeros((ready_time + 3 * t_p))
+                    trial_x[ready_time:ready_time+p_len] = 1
+                    trial_x[set_time:set_time+p_len] = 1
+                trial_y = np.zeros((ready_time + 3 * t_p))
+
+                A = 3
+                alpha = (t_p - p_len) / t_p / np.log(4/3)
+                trial_y_temp = np.arange(2 * t_p - p_len)
+                trial_y_fn = lambda t: A * (np.exp(t / (alpha * t_p)) - 1)
+                trial_y[set_time+p_len:] = trial_y_fn(trial_y_temp)
+                # trial_y = np.clip(trial_y, 0, 2)
 
             info = (ready_time, set_time, go_time)
             trials.append((trial_x, trial_y, info))
@@ -231,6 +251,7 @@ if __name__ == '__main__':
             ax.spines['left'].set_visible(False)
             ax.spines['bottom'].set_visible(False)
 
+            dset_range = range(len(sample[i][0]))
             if dset_type.startswith('rsg'):
                 if config['d2']:
                     sample_sum = sample[i][0][:,0] + sample[i][0][:,1]
@@ -243,7 +264,7 @@ if __name__ == '__main__':
                     ml, sl, bl = ax.stem(dset_range, sample[i][1], use_line_collection=True, linefmt='dodgerblue', label='go')
                     ml.set_markerfacecolor('dodgerblue')
                     ml.set_markeredgecolor('dodgerblue')
-                elif dset_type == 'rsg-sohn':
+                elif dset_type == 'rsg-sohn' or dset_type == 'rsg-window':
                     ax.plot(dset_range, sample[i][1], color='dodgerblue', label='go', lw=2)
 
             ax.set_ylim([-.5, 2.5])

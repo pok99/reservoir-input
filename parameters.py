@@ -13,9 +13,9 @@ def create_parameters(name):
     Ns = [200]
 
     lr = 1e-4
-    n_epochs = 50
+    n_epochs = 40
     patience = 4000
-    batch_size = 3
+    batch_size = 2
 
     # keep the same network seeds
     preserve_seed = True
@@ -32,7 +32,7 @@ def create_parameters(name):
         # 'datasets/rsg-sohn.pkl'
     ]
     losses = [
-        'mse'
+        'mse', 'mse-w'
     ]
 
     debug = False
@@ -63,6 +63,7 @@ def create_parameters(name):
         run_params = {}
         run_params['dataset'] = d
         run_params['losses'] = losses
+        run_params['l2'] = .5
         run_params['D'] = nD
         run_params['N'] = nN
 

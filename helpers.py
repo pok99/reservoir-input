@@ -53,8 +53,27 @@ def get_criteria(args):
                 t_set, t_go = i[j][1], i[j][2]
                 t_p = t_go - t_set
                 # using interval from t_set to t_go + t_p
-                loss += t.shape[1] / t_p * fn(t[j,t_set:t_go+t_p+1], o[j,t_set:t_go+t_p+1])
+                loss += t.shape[1] / t_p * fn(o[j,t_set:t_go+t_p+1], t[j,t_set:t_go+t_p+1])
             return args.l2 * loss
+        criteria.append(mse_w)
+    if 'mse-w2' in args.losses:
+        # use this and only this. no loss defined after we reach the goal
+        # l1 for normal loss pre-set, l2 for loss post-set
+        fn = nn.MSELoss(reduction='sum')
+        def mse_w(o, t, i):
+            loss = 0.
+            if len(o.shape) == 1:
+                o = o.unsqueeze(0)
+                t = t.unsqueeze(0)
+                i = [i]
+            for j in range(len(t)):
+                t_set, t_go = i[j][1], i[j][2]
+                t_p = t_go - t_set
+                # using interval from t_set to t_go + t_p, for the windowed loss
+                loss += args.l2 * t.shape[1] / (2 * t_p) * fn(o[j,t_set:t_go+t_p], t[j,t_set:t_go+t_p])
+                # normal nonwindowed loss for times before t_set
+                loss += args.l1 * t.shape[1] / t_set * fn(o[j,:t_set], t[j,:t_set])
+            return loss
         criteria.append(mse_w)
     if 'bce-w' in args.losses:
         weights = args.l4 * torch.ones(1)
@@ -70,7 +89,7 @@ def get_criteria(args):
                 t_p = t_go - t_set
                 # using interval from t_set to t_go + t_p
                 # normalizing by length of the whole trial over length of penalized window
-                loss += t.shape[1] / t_p * fn(t[j,t_set:t_set+t_p+1], o[j,t_set:t_go+t_p+1])
+                loss += t.shape[1] / t_p * fn(o[j,t_set:t_set+t_p+1], t[j,t_set:t_go+t_p+1])
             return args.l2 * loss
         criteria.append(bce_w)
     if 'mse-g' in args.losses:
