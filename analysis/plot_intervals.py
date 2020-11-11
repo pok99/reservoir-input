@@ -56,7 +56,7 @@ for i in range(len(data)):
 
     val = np.asarray(val)
 
-    interval = s - r
+    interval = g - s + 5
     if interval not in distr:
         distr[interval] = [val]
     else:
@@ -73,7 +73,16 @@ intervals, vals, stds = list(zip(*intervals))
 vals = np.array(vals)
 stds = np.array(stds)
 
+plt.plot()
 plt.scatter(intervals, vals, marker='o', color='tomato', alpha=0.5)
+
+x_min, x_max = min(intervals), max(intervals)
+y_min, y_max = min(vals), max(vals)
+xdiff = x_max - x_min
+ydiff = y_max - y_min
+x_min -= .1 * xdiff; y_min -= .1 * ydiff
+x_max += .1 * xdiff; y_max += .1 * ydiff
+plt.plot(range(int(x_max)), range(int(x_max)))
 # plt.fill_between(intervals, offsets - stds, offsets, color='coral', alpha=.5)
 # plt.fill_between(intervals, offsets + stds, offsets, color='coral', alpha=.5)
 plt.xlabel('real t_p')
@@ -86,7 +95,8 @@ elif args.mode == 'times':
     label_str = 'times'
 plt.ylabel('network ' + label_str)
 
-# plt.xlim([0,100])
+plt.xlim([x_min, x_max])
+plt.ylim([y_min, y_max])
 
 
 plt.show()

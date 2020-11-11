@@ -79,6 +79,7 @@ def create_dataset(args):
             elif t_type == 'rsg-sohn':
                 # A = 3
                 # alpha = (t_p - p_len) / t_p / np.log(4/3)
+                # TODO: FIX THIS BUG WITH OFFSETS
                 trial_y_temp = np.arange(t_len - set_time - p_len)
                 trial_y_fn = lambda t: t / t_p
                 trial_y[set_time+p_len:] = trial_y_fn(trial_y_temp)

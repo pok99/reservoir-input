@@ -88,6 +88,8 @@ def create_parameters(name):
         run_params['res_noise'] = rnoise
         run_params['m_noise'] = mnoise
 
+        run_params['same_signal'] = True
+
         # keep the seed the same across all runs sharing network seeds
         # but use a totally random one otherwise. train.py will take care of it
         if preserve_seed:

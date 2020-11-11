@@ -91,7 +91,7 @@ for i, mnoise in enumerate(mnoises):
         ax.grid(None)
         ax.grid(True, which='major', axis='y', lw=1, color='lightgray', alpha=0.4)
         ax.set_xlim([-.5, 2.5])
-        ax.set_ylim([0, 100])
+        ax.set_ylim([0, 25])
 
 
 plt.legend()

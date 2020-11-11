@@ -56,25 +56,6 @@ def get_criteria(args):
                 loss += t.shape[1] / t_p * fn(o[j,t_set:t_go+t_p+1], t[j,t_set:t_go+t_p+1])
             return args.l2 * loss
         criteria.append(mse_w)
-    if 'mse-w2' in args.losses:
-        # use this and only this. no loss defined after we reach the goal
-        # l1 for normal loss pre-set, l2 for loss post-set
-        fn = nn.MSELoss(reduction='sum')
-        def mse_w(o, t, i):
-            loss = 0.
-            if len(o.shape) == 1:
-                o = o.unsqueeze(0)
-                t = t.unsqueeze(0)
-                i = [i]
-            for j in range(len(t)):
-                t_set, t_go = i[j][1], i[j][2]
-                t_p = t_go - t_set
-                # using interval from t_set to t_go + t_p, for the windowed loss
-                loss += args.l2 * t.shape[1] / (2 * t_p) * fn(o[j,t_set:t_go+t_p], t[j,t_set:t_go+t_p])
-                # normal nonwindowed loss for times before t_set
-                loss += args.l1 * t.shape[1] / t_set * fn(o[j,:t_set], t[j,:t_set])
-            return loss
-        criteria.append(mse_w)
     if 'bce-w' in args.losses:
         weights = args.l4 * torch.ones(1)
         fn = nn.BCEWithLogitsLoss(reduction='sum', pos_weight=weights)
@@ -92,36 +73,6 @@ def get_criteria(args):
                 loss += t.shape[1] / t_p * fn(o[j,t_set:t_set+t_p+1], t[j,t_set:t_go+t_p+1])
             return args.l2 * loss
         criteria.append(bce_w)
-    if 'mse-g' in args.losses:
-        fn = nn.MSELoss(reduction='sum')
-        def mse_g(o, t, i):
-            loss = 0.
-            if len(o.shape) == 1:
-                o = o.unsqueeze(0)
-                t = t.unsqueeze(0)
-                i = [i]
-            for j in range(len(t)):
-                t_ready, t_go = i[j][0], i[j][2]
-                first_t = torch.nonzero(o[j][t_ready:] > 1)
-                if len(first_t) == 0:
-                    first_t = torch.tensor(len(o[j])) - 1
-                else:
-                    first_t = first_t[0,0] + t_ready
-                t_new = None
-                if t_go > first_t:
-                    o_new = o[j][first_t:t_go+1]
-                    t_new = t[j][first_t:t_go+1]
-                    # w = torch.arange(t_go+1-first_t,0,-1)
-                elif t_go < first_t:
-                    o_new = o[j][t_go:first_t + 1]
-                    t_new = t[j][t_go:first_t + 1]
-                    # w = torch.arange(0,first_t+1-t_go,1)
-                if t_new is not None:
-                    g_loss = fn(o_new, t_new)
-                    # g_loss = torch.sum(w * torch.square(t_new - o_new))
-                    loss += g_loss
-            return args.l2 * loss
-        criteria.append(mse_g)
     if len(criteria) == 0:
         raise NotImplementedError
     return criteria
@@ -140,7 +91,7 @@ def get_x_y_info(args, batch):
     x, y, info = list(zip(*batch))
     x = torch.as_tensor(x, dtype=torch.float).detach().clone()
     y = torch.as_tensor(y, dtype=torch.float).detach().clone()
-    x = shift_x(args, x, info)
+    x = shift_x(args, x, info) # always needs to go before same_signal
     if args.same_signal:
         x = torch.sum(x, dim=-1)
     return x, y, info
@@ -170,14 +121,9 @@ def shift_x(args, x, info):
     if args.m_noise == 0:
         return x
     for i in range(x.shape[0]):
-        if args.L == 1:
-            t_p = info[i][1] - info[i][0]
-            disp = np.rint(np.random.normal(0, args.m_noise*t_p/50))
-            raise NotImplementedError
-        else:
-            t_p = info[i][1] - info[i][0]
-            disp = int(np.random.normal(0, args.m_noise*t_p/50))
-            x[i,:,0] = x[i,:,0].roll(disp)
+        t_p = info[i][1] - info[i][0]
+        disp = int(np.random.normal(0, args.m_noise*t_p/50))
+        x[i,:,0] = x[i,:,0].roll(disp)
     return x
 
 
