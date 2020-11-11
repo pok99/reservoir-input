@@ -11,27 +11,27 @@ sys.path.append('../')
 
 from utils import get_config
 
-run_id = '3534830'
+run_id = '3535712'
 
 csv_path = f'../logs/{run_id}.csv'
 csv_data = pd.read_csv(csv_path)
 
-vals = []
-for i in csv_data.slurm_id:
-    run_dir = os.path.join(f'../logs/{run_id}', str(i))
-    run_files = os.listdir(run_dir)
-    for f in run_files:
-        if f.startswith('config'):
-            c_file = os.path.join(run_dir, f)
-    config = get_config(c_file, ctype='model')
-    vals.append(config['m_noise'])
-csv_data['mnoise'] = vals
+# vals = []
+# for i in csv_data.slurm_id:
+#     run_dir = os.path.join(f'../logs/{run_id}', str(i))
+#     run_files = os.listdir(run_dir)
+#     for f in run_files:
+#         if f.startswith('config'):
+#             c_file = os.path.join(run_dir, f)
+#     config = get_config(c_file, ctype='model')
+#     vals.append(config['m_noise'])
+# csv_data['mnoise'] = vals
 
 csv_data['tparts'].fillna('all', inplace=True)
 
 cols_to_keep = ['slurm_id', 'N', 'D', 'seed', 'rseed', 'rnoise', 'mnoise', 'dset', 'loss', 'tparts']
 dt = csv_data[cols_to_keep]
-dt = dt.sort_values(by=['D', 'rnoise', 'rseed'])
+dt = dt.sort_values(by=['D', 'mnoise', 'rseed'])
 
 
 # mapping Ds so we can plot it as factor later
@@ -42,19 +42,20 @@ dt['D_map'] = dt['D'].map(D_map)
 dt['D_map'] += np.random.normal(0, .05, len(dt['D_map']))
 
 rnoises = dt['rnoise'].unique()
+mnoises = dt['mnoise'].unique()
 rseeds = dt['rseed'].unique()
 
 color_scale = ['coral', 'chartreuse', 'skyblue']
 
-fig, axes = plt.subplots(nrows=len(rnoises), ncols=len(rseeds), sharex=True, sharey=True, figsize=(14,6))
+fig, axes = plt.subplots(nrows=len(mnoises), ncols=len(rseeds), sharex=True, sharey=True, figsize=(14,10))
 fig.text(0.07, 0.5, 'loss', va='center', rotation='vertical')
 fig.text(0.5, 0.04, 'D', ha='center')
 
 # dt = dt[(dt.dset == 'datasets/rsg-sohn.pkl')]
-dt = dt[(dt.mnoise == 2)]
-for i, rnoise in enumerate(rnoises):
+dt = dt[(dt.rnoise == 0)]
+for i, mnoise in enumerate(mnoises):
     for j, rseed in enumerate(rseeds):
-        subset = dt[(dt.rnoise == rnoise) & (dt.rseed == rseed)]
+        subset = dt[(dt.mnoise == mnoise) & (dt.rseed == rseed)]
 
         ax = axes[i, j]
         ax.set_xticklabels([0, 20, 100, 200])
@@ -64,7 +65,7 @@ for i, rnoise in enumerate(rnoises):
         if i == 0:
             ax.set_title('seed = ' + str(rseed))
         if j == 0:
-            ax.set_ylabel('noise = ' + str(rnoise))
+            ax.set_ylabel('noise = ' + str(mnoise))
         
         # subset_all = subset[subset.]
         train_all = subset[subset.tparts == 'all']
@@ -73,7 +74,7 @@ for i, rnoise in enumerate(rnoises):
         for D in Ds:
             means.append(np.mean(train_all[train_all.D == D]['loss']))
         ax.plot(range(len(Ds)), means, c=color_scale[0], ms=20)
-        train_lim = subset[subset.tparts == 'Wf-Wro']
+        train_lim = subset[subset.tparts == 'W_f-W_ro']
         ax.scatter(train_lim.D_map, train_lim.loss, s=8, alpha=.7, c=color_scale[1], label='train part')
         means = []
         for D in Ds:

@@ -138,8 +138,9 @@ def get_output_activation(args):
 # given batch, get the x, y pairs and turn them into Tensors
 def get_x_y_info(args, batch):
     x, y, info = list(zip(*batch))
-    x = torch.as_tensor(x, dtype=torch.float)
-    y = torch.as_tensor(y, dtype=torch.float)
+    x = torch.as_tensor(x, dtype=torch.float).detach().clone()
+    y = torch.as_tensor(y, dtype=torch.float).detach().clone()
+    x = shift_x(args, x, info)
     if args.same_signal:
         x = torch.sum(x, dim=-1)
     return x, y, info
@@ -150,26 +151,25 @@ def get_dim(a):
     else:
         return 1
 
-def corrupt_ix(args, x):
+def corrupt_x(args, x):
     if args.x_noise == 0:
-        return x.clone()
+        return x
     pulses = torch.nonzero(x)[:,1].reshape(x.shape[0], args.L, -1).repeat(1,1,10).float()
     pulses += torch.randn_like(pulses) * args.x_noise
     pulses = torch.round(pulses).long()
-    x_new = torch.zeros_like(x)
-    for i in range(x_new.shape[0]):
+    x = torch.zeros_like(x)
+    for i in range(x.shape[0]):
         for j in range(args.L):
             nums, counts = torch.unique(pulses[i,j], return_counts=True)
-            x_new[i,nums,j] = counts / 10
+            x[i,nums,j] = counts / 10
     if args.L == 1:
-        x_new = x_new.squeeze(2)
-    return x_new
+        x = x.squeeze(2)
+    return x
 
-def shift_ix(args, x, info):
-    x_new = x.detach().clone()
+def shift_x(args, x, info):
     if args.m_noise == 0:
-        return x_new
-    for i in range(x_new.shape[0]):
+        return x
+    for i in range(x.shape[0]):
         if args.L == 1:
             t_p = info[i][1] - info[i][0]
             disp = np.rint(np.random.normal(0, args.m_noise*t_p/50))
@@ -177,8 +177,8 @@ def shift_ix(args, x, info):
         else:
             t_p = info[i][1] - info[i][0]
             disp = int(np.random.normal(0, args.m_noise*t_p/50))
-            x_new[i,:,0] = x_new[i,:,0].roll(disp)
-    return x_new
+            x[i,:,0] = x[i,:,0].roll(disp)
+    return x
 
 
 def mse2_loss(x, outs, info, l1, l2, extras=False):

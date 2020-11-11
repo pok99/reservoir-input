@@ -19,7 +19,7 @@ import copy
 from network import BasicNetwork, Reservoir
 
 from utils import log_this, load_rb, get_config, fill_undefined_args
-from helpers import get_optimizer, get_scheduler, get_criteria, get_x_y_info, mse2_loss, corrupt_ix, shift_ix
+from helpers import get_optimizer, get_scheduler, get_criteria, get_x_y_info
 
 class Trainer:
     def __init__(self, args):
@@ -236,11 +236,8 @@ class Trainer:
         else:
             batch = self.test_set
 
-        x, y, info = get_x_y_info(args, batch)
-        # x = corrupt_ix(self.args, x)
-        x = shift_ix(self.args, x, info)
-
         with torch.no_grad():
+            x, y, info = get_x_y_info(args, batch)
             self.net.reset(self.args.res_x_init)
             total_loss, etc = self.run_trial(x, y, info, extras=True)
 
@@ -269,8 +266,6 @@ class Trainer:
                 ix += 1
 
                 x, y, info = get_x_y_info(args, batch)
-                # x = corrupt_ix(self.args, x)
-                x = shift_ix(self.args, x, info)
                 iter_loss, etc = self.train_iteration(x, y, info)
 
                 if ix_callback is not None:
