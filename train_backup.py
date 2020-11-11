@@ -112,7 +112,7 @@ class Trainer:
             # turn param grads into list
             grad_list = []
             for v in self.train_params:
-                grad = v.grad.numpy().reshape(-1)
+                grad = v.grad.clone().numpy().reshape(-1)
                 grad_list.append(grad)
             vec = np.concatenate(grad_list)
             post = np.float64(vec)
@@ -149,7 +149,7 @@ class Trainer:
         # getting the initial values to put into the algorithm
         init_list = []
         for v in self.train_params:
-            init_list.append(v.detach().numpy().reshape(-1))
+            init_list.append(v.detach().clone().numpy().reshape(-1))
         init = np.concatenate(init_list)
 
         optim_options = {
@@ -459,6 +459,7 @@ def adjust_args(args):
     elif config.t_type == 'copy-delay':
         args.dset_type = 'copy-delay'
         args.out_act = 'none'
+        args.L = 1
     else:
         args.dset_type = 'unknown'
 

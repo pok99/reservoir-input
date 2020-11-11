@@ -106,12 +106,38 @@ def create_dataset(args):
             trials.append((trial_x, trial_y, info))
 
     elif t_type.startswith('copy'):
-        # delay = get_args_val(trial_args, 'delay', 0, int)
-        # config['delay'] = delay
+        delay = get_args_val(trial_args, 'delay', 0, int)
+        config['delay'] = delay
         p_len = get_args_val(trial_args, 'plen', 5, int)
         config['p_len'] = p_len
 
         if t_type == 'copy-delay':
+            n_freqs = get_args_val(trial_args, 'n_freqs', 15, int)
+            f_range = get_args_val(trial_args, 'f_range', [5, 30], float, n_vals=2)
+            amp = get_args_val(trial_args, 'amp', 1, float)
+            config['n_freqs'] = n_freqs
+            config['f_range'] = f_range
+            config['amp'] = amp
+
+
+            x_r = np.arange(t_len)
+
+            for n in range(n_trials):
+                x = np.zeros((t_len))
+                freqs = np.random.uniform(f_range[0], f_range[1], (n_freqs))
+                amps = np.random.uniform(-amp, amp, (n_freqs))
+                for i in range(n_freqs):
+                    x = x + amps[i] * np.sin(1/freqs[i] * x_r)
+
+                y = np.zeros(t_len)
+                if delay == 0:
+                    y = x
+                else:
+                    y[delay:] = x[:-delay]
+
+                trials.append((x, y, delay))
+
+        elif t_type == 'copy-delays':
             if args.intervals is None:
                 # amounts of time in between 
                 min_t = get_args_val(trial_args, 'gt', 0, int)
@@ -135,7 +161,7 @@ def create_dataset(args):
                 else:
                     # use one of the intervals that we desire
                     num = random.choice(args.intervals)
-                    assert num < t_len / 2
+                    assert num <= t_len / 2
                     delay = num
                 x = np.zeros((t_len, 2))
                 x[delay,1] = 1
@@ -149,14 +175,6 @@ def create_dataset(args):
                     y = x[:,0]
                 else:
                     y[delay:] = x[:-delay,0]
-
-                # ys.append(y)
-
-                # z = np.zeros_like(y)
-                # if delay == 0:
-                #     z = y
-                # else:
-                #     z[delay:] = y[:-delay]
 
                 trials.append((x, y, delay))
 
@@ -282,11 +300,6 @@ if __name__ == '__main__':
             if dset_type.startswith('rsg'):
                 sample_sum = sample[i][0][:,0] + sample[i][0][:,1]
                 ml, sl, bl = ax.stem(dset_range, sample_sum, use_line_collection=True, linefmt='coral', label='ready/set')
-                # if config['d2']:
-                #     sample_sum = sample[i][0][:,0] + sample[i][0][:,1]
-                #     ml, sl, bl = ax.stem(dset_range, sample_sum, use_line_collection=True, linefmt='coral', label='ready/set')
-                # else:
-                #     ml, sl, bl = ax.stem(dset_range, sample[i][0], use_line_collection=True, linefmt='coral', label='ready/set')
                 ml.set_markerfacecolor('coral')
                 ml.set_markeredgecolor('coral')
                 if dset_type == 'rsg-bin':
@@ -299,10 +312,14 @@ if __name__ == '__main__':
                 ax.set_ylim([-.5, 2.5])
 
             elif dset_type.startswith('copy'):
-                ml, sl, bl = ax.stem(dset_range, sample[i][0][:,1], use_line_collection=True, linefmt='coral', label='ready/set')
-                ml.set_markerfacecolor('coral')
-                ml.set_markeredgecolor('coral')
-                ax.plot(dset_range, sample[i][0][:,0], color='coral', alpha=1, lw=1)
+                if len(sample[i][0].shape) > 1:
+                    ml, sl, bl = ax.stem(dset_range, sample[i][0][:,1], use_line_collection=True, linefmt='coral', label='ready/set')
+                    ml.set_markerfacecolor('coral')
+                    ml.set_markeredgecolor('coral')
+                    ax.plot(dset_range, sample[i][0][:,0], color='coral', alpha=1, lw=1)
+                else:
+                    ax.plot(dset_range, sample[i][0], color='coral', alpha=1, lw=1)
+                
                 ax.plot(dset_range, sample[i][1], color='dodgerblue', lw=1)
 
         handles, labels = ax.get_legend_handles_labels()
