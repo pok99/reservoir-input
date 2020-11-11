@@ -11,7 +11,7 @@ sys.path.append('../')
 
 from utils import get_config
 
-run_id = '3535712'
+run_id = '3539456'
 
 csv_path = f'../logs/{run_id}.csv'
 csv_data = pd.read_csv(csv_path)

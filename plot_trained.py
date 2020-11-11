@@ -61,8 +61,16 @@ if not args.no_plot:
 
         # quick fix to 2d
         if len(x.shape) > 1:
-            x = x[:,0] + x[:,1]
-        ax.scatter(xr, x, color='coral', alpha=0.5, s=3, label='input')
+            if 'rsg' in config.dataset:
+                x = x[:,0] + x[:,1]
+            elif 'copy' in config.dataset:
+                x = x[:,0]
+        if 'rsg' in config.dataset:
+            ax.scatter(xr, x, color='coral', alpha=0.5, s=3, label='input')
+            ax.set_ylim([-.5,2])
+        elif 'copy' in config.dataset:
+            ax.plot(xr, x, color='coral', alpha=0.5, lw=1, label='input')
+
         if 'mse' in config.losses or 'mse-w2' in config.losses:
             ax.plot(xr, y, color='coral', alpha=1, lw=1, label='target')
             ax.plot(xr, z, color='cornflowerblue', alpha=1, lw=1.5, label='response')
@@ -72,7 +80,7 @@ if not args.no_plot:
 
         ax.tick_params(axis='both', color='white')
         ax.set_title(f'trial {ix}, avg loss {np.round(float(loss), 2)}', size='small')
-        ax.set_ylim([-.5,2])
+
 
     fig.text(0.5, 0.04, 'timestep', ha='center', va='center')
     fig.text(0.06, 0.5, 'value', ha='center', va='center', rotation='vertical')

@@ -1,0 +1,26 @@
+{
+  "argv": [
+    "dataset.py",
+    "create",
+    "copy-delay-0-100-200",
+    "-t",
+    "copy-delay",
+    "-a",
+    "lt",
+    "100",
+    "-l",
+    "200"
+  ],
+  "t_type": "copy-delay",
+  "n_trials": 2000,
+  "t_len": 200,
+  "p_len": 5,
+  "min_t": 0,
+  "max_t": 100,
+  "n_freqs": 15,
+  "f_range": [
+    5,
+    30
+  ],
+  "amp": 1
+}

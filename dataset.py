@@ -45,18 +45,18 @@ def create_dataset(args):
         p_len = get_args_val(trial_args, 'plen', 5, int)
         config['p_len'] = p_len
         # config['d2'] = 'd2' in trial_args
-        if args.rsg_intervals is None:
+        if args.intervals is None:
             # amount of time in between ready and set cues
             min_t = get_args_val(trial_args, 'gt', p_len * 4, int)
             max_t = get_args_val(trial_args, 'lt', t_len // 2 - p_len * 4, int)
             config['min_t'] = min_t
             config['max_t'] = max_t
         for n in range(n_trials):
-            if args.rsg_intervals is None:
+            if args.intervals is None:
                 t_p = np.random.randint(min_t, max_t)
             else:
                 # use one of the intervals that we desire
-                num = random.choice(args.rsg_intervals)
+                num = random.choice(args.intervals)
                 assert num < t_len / 2
                 t_p = num
 
@@ -106,56 +106,82 @@ def create_dataset(args):
             trials.append((trial_x, trial_y, info))
 
     elif t_type.startswith('copy'):
-        delay = get_args_val(trial_args, 'delay', 0, int)
-        config['delay'] = delay
-        
-        dim = 1
-        x = np.arange(0, t_len)
-        ys = []
+        # delay = get_args_val(trial_args, 'delay', 0, int)
+        # config['delay'] = delay
+        p_len = get_args_val(trial_args, 'plen', 5, int)
+        config['p_len'] = p_len
 
-        if t_type == 'copy':
+        if t_type == 'copy-delay':
+            if args.intervals is None:
+                # amounts of time in between 
+                min_t = get_args_val(trial_args, 'gt', 0, int)
+                max_t = get_args_val(trial_args, 'lt', t_len // 2, int)
+                config['min_t'] = min_t
+                config['max_t'] = max_t
+
             n_freqs = get_args_val(trial_args, 'n_freqs', 15, int)
-            f_range = get_args_val(trial_args, 'f_range', [2, 30], float, n_vals=2)
+            f_range = get_args_val(trial_args, 'f_range', [5, 30], float, n_vals=2)
             amp = get_args_val(trial_args, 'amp', 1, float)
-            start_zero = 'start_nonzero' not in trial_args
             config['n_freqs'] = n_freqs
             config['f_range'] = f_range
             config['amp'] = amp
-            config['start_zero'] = start_zero
 
-            fn = np.sin if start_zero else np.cos
+
+            x_r = np.arange(t_len)
 
             for n in range(n_trials):
-                y = np.zeros_like(x)
+                if args.intervals is None:
+                    delay = np.random.randint(min_t, max_t)
+                else:
+                    # use one of the intervals that we desire
+                    num = random.choice(args.intervals)
+                    assert num < t_len / 2
+                    delay = num
+                x = np.zeros((t_len, 2))
+                x[delay,1] = 1
                 freqs = np.random.uniform(f_range[0], f_range[1], (n_freqs))
                 amps = np.random.uniform(-amp, amp, (n_freqs))
                 for i in range(n_freqs):
-                    y = y + amps[i] * fn(1/freqs[i] * x)
+                    x[:,0] = x[:,0] + amps[i] * np.sin(1/freqs[i] * x_r)
 
-                ys.append(y)
+                y = np.zeros(t_len)
+                if delay == 0:
+                    y = x[:,0]
+                else:
+                    y[delay:] = x[:-delay,0]
 
-        elif t_type == 'copy_motifs':
-            assert args.motifs is not None
-            motifs = load_rb(args.motifs)
-            pause = get_args_val(trial_args, 'pause', 10, int)
-            amp = get_args_val(trial_args, 'amp', .1, float)
-            config['pause'] = pause
-            config['amp'] = amp
+                # ys.append(y)
 
-            for n in range(n_trials):
-                y = gen_fn_motifs(motifs, length=t_len, pause=pause, amp=amp, smoothing='cubic')
-                ys.append(y)
-        else:
-            raise Exception
+                # z = np.zeros_like(y)
+                # if delay == 0:
+                #     z = y
+                # else:
+                #     z[delay:] = y[:-delay]
 
-        for y in ys:
-            z = np.zeros_like(y)
-            if delay == 0:
-                z = y
-            else:
-                z[delay:] = y[:-delay]
+                trials.append((x, y, delay))
 
-            trials.append((y, z, delay))
+        # elif t_type == 'copy_motifs':
+        #     assert args.motifs is not None
+        #     motifs = load_rb(args.motifs)
+        #     pause = get_args_val(trial_args, 'pause', 10, int)
+        #     amp = get_args_val(trial_args, 'amp', .1, float)
+        #     config['pause'] = pause
+        #     config['amp'] = amp
+
+        #     for n in range(n_trials):
+        #         y = gen_fn_motifs(motifs, length=t_len, pause=pause, amp=amp, smoothing='cubic')
+        #         ys.append(y)
+        # else:
+        #     raise Exception
+
+        # for y in ys:
+        #     z = np.zeros_like(y)
+        #     if delay == 0:
+        #         z = y
+        #     else:
+        #         z[delay:] = y[:-delay]
+
+        #     trials.append((y, z, delay))
 
     elif t_type == 'amplify':
         n_freqs = get_args_val(trial_args, 'n_freqs', 15, int)
@@ -213,7 +239,7 @@ if __name__ == '__main__':
     parser.add_argument('mode', default='load')
     parser.add_argument('name')
     parser.add_argument('-t', '--trial_type', default='rsg-pulse')
-    parser.add_argument('-i', '--rsg_intervals', nargs='*', type=int, default=None)
+    parser.add_argument('-i', '--intervals', nargs='*', type=int, default=None)
     parser.add_argument('--motifs', type=str, help='path to motifs')
     parser.add_argument('-a', '--trial_args', nargs='*', help='terms to specify parameters of trial type')
     parser.add_argument('-l', '--trial_len', type=int, default=500)
@@ -270,7 +296,14 @@ if __name__ == '__main__':
                 elif dset_type == 'rsg-sohn' or dset_type == 'rsg-window':
                     ax.plot(dset_range, sample[i][1], color='dodgerblue', label='go', lw=2)
 
-            ax.set_ylim([-.5, 2.5])
+                ax.set_ylim([-.5, 2.5])
+
+            elif dset_type.startswith('copy'):
+                ml, sl, bl = ax.stem(dset_range, sample[i][0][:,1], use_line_collection=True, linefmt='coral', label='ready/set')
+                ml.set_markerfacecolor('coral')
+                ml.set_markeredgecolor('coral')
+                ax.plot(dset_range, sample[i][0][:,0], color='coral', alpha=1, lw=1)
+                ax.plot(dset_range, sample[i][1], color='dodgerblue', lw=1)
 
         handles, labels = ax.get_legend_handles_labels()
         #fig.legend(handles, labels, loc='lower center')
