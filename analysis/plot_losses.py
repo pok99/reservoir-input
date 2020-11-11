@@ -52,7 +52,7 @@ fig.text(0.07, 0.5, 'loss', va='center', rotation='vertical')
 fig.text(0.5, 0.04, 'D', ha='center')
 
 # dt = dt[(dt.dset == 'datasets/rsg-sohn.pkl')]
-dt = dt[(dt.rnoise == 0)]
+dt = dt[(dt.rnoise == 0.01)]
 for i, mnoise in enumerate(mnoises):
     for j, rseed in enumerate(rseeds):
         subset = dt[(dt.mnoise == mnoise) & (dt.rseed == rseed)]

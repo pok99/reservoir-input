@@ -53,7 +53,13 @@ class Trainer:
         self.criteria = get_criteria(self.args)
         self.optimizer = get_optimizer(self.args, self.train_params)
         self.scheduler = get_scheduler(self.args, self.optimizer)
-        self.dset = load_rb(self.args.dataset)
+        if self.args.dataset is None:
+            # means we're using contexts
+            dsets = []
+            for d in self.args.contexts:
+                dsets.append(load_rb(d))
+        else:
+            self.dset = load_rb(self.args.dataset)            
 
         # if using separate training and test sets, separate them out
         if self.args.same_test:
@@ -344,9 +350,9 @@ def parse_args():
     parser.add_argument('--Wf_path', type=str, default=None, help='start training from certain Wf')
     parser.add_argument('--J_path', type=str, default=None, help='saved reservoir. should be saved with seed tho')
     
+    # network manipulation
     parser.add_argument('--res_init_type', type=str, default='gaussian', help='')
     parser.add_argument('--res_init_gaussian_std', type=float, default=1.5)
-    # parser.add_argument('--network_delay', type=int, default=0)
     parser.add_argument('--res_noise', type=float, default=0)
     parser.add_argument('--x_noise', type=float, default=0)
     parser.add_argument('--m_noise', type=float, default=0)
@@ -354,30 +360,35 @@ def parse_args():
     parser.add_argument('--out_act', type=str, default=None, help='output activation')
 
     parser.add_argument('-d', '--dataset', type=str, default='datasets/rsg-sohn.pkl')
+    # need same number of inputs for the following two arguments. using them overwrites -d dataset
+    parser.add_argument('-c', '--contexts', type=str, nargs='+', default=[], help='list of datasets to use for context training')
+    parser.add_argument('-n', '--context_names', type=str, nargs='+', default=[], help='names of datasets used for context training')
+    # high-level arguments that control dataset manipulations
     parser.add_argument('--same_signal', action='store_true', help='use 1d input instead of separate ready/set pulses')
     parser.add_argument('--same_test', action='store_true', help='use entire dataset for both training and testing')
-
+    
     parser.add_argument('--optimizer', choices=['adam', 'sgd', 'rmsprop', 'lbfgs'], default='adam')
+
+    # adam parameters
+    parser.add_argument('--batch_size', type=int, default=1, help='size of minibatch used')
+    parser.add_argument('--lr', type=float, default=1e-4, help='learning rate. adam only')
+    parser.add_argument('--n_epochs', type=int, default=10, help='number of epochs to train for. adam only')
+    parser.add_argument('--conv_type', type=str, choices=['patience', 'grad'], default='patience', help='how to determine convergence. adam only')
+    parser.add_argument('--patience', type=int, default=2000, help='stop training if loss doesn\'t decrease. adam only')
     parser.add_argument('--l2_reg', type=float, default=0, help='amount of l2 regularization')
     parser.add_argument('--s_rate', default=None, type=float, help='scheduler rate. dont use for no scheduler')
     parser.add_argument('--losses', type=str, nargs='+', choices=['mse', 'bce', 'mse-w', 'bce-w', 'mse-g', 'mse-w2'], default=[])
 
+    # adam lambdas
     parser.add_argument('--l1', type=float, default=1, help='weight of normal loss')
     parser.add_argument('--l2', type=float, default=0.5, help='weight of secondary (windowed/goal) loss')
     parser.add_argument('--l3', type=float, default=100, help='bce: weight of positive examples')
     parser.add_argument('--l4', type=float, default=10, help='bce-w: weight of positive examples')
 
-    # lbfgs-scipy arguments
+    # lbfgs-scipy parameters
     parser.add_argument('--maxiter', type=int, default=10000, help='limit to # iterations. lbfgs-scipy only')
 
-    # adam arguments
-    parser.add_argument('--batch_size', type=int, default=1, help='size of minibatch used')
-    parser.add_argument('--conv_type', type=str, choices=['patience', 'grad'], default='patience', help='how to determine convergence. adam only')
-    parser.add_argument('--patience', type=int, default=2000, help='stop training if loss doesn\'t decrease. adam only')
-    # parser.add_argument('--grad_threshold', type=float, default=1e-4, help='stop training if grad is less than certain amount. adam only')
-    parser.add_argument('--lr', type=float, default=1e-4, help='learning rate. adam only')
-    parser.add_argument('--n_epochs', type=int, default=10, help='number of epochs to train for. adam only')
-
+    # seeds
     parser.add_argument('--seed', type=int, help='seed for most of network')
     parser.add_argument('--res_seed', type=int, help='seed for reservoir')
     parser.add_argument('--res_x_seed', type=int, default=0, help='seed for reservoir init hidden states. -1 for zero init')
@@ -385,6 +396,7 @@ def parse_args():
 
     parser.add_argument('-x', '--res_x_init', type=str, default=None, help='other seed options for reservoir')
 
+    # control logging
     parser.add_argument('--no_log', action='store_true')
     parser.add_argument('--log_interval', type=int, default=50)
     parser.add_argument('--log_checkpoint_models', action='store_true')
@@ -441,13 +453,9 @@ def adjust_args(args):
     if config.t_type == 'rsg-bin':
         args.dset_type = 'rsg-bin'
         args.out_act = 'none'
-        # if 'bce' not in args.losses:
-        #     args.losses.append('bce')
     elif config.t_type == 'rsg-sohn':
         args.dset_type = 'rsg-sohn'
         args.out_act = 'exp'
-        # if 'mse' not in args.losses:
-        #     args.losses.append('mse')
     elif config.t_type == 'copy':
         args.dset_type = 'copy'
     else:
@@ -455,6 +463,12 @@ def adjust_args(args):
 
     if args.same_signal:
         args.L = 1
+
+    args.n_contexts = 0
+    assert len(args.contexts) == len(args.context_names) or len(args.context_names) == 0
+    if len(args.contexts) > 0:
+        args.n_contexts = len(args.contexts)
+        args.dataset = 'None'
 
     # initializing logging
     # do this last, because we will be logging previous parameters into the config file
