@@ -460,6 +460,10 @@ def adjust_args(args):
         args.dset_type = 'copy-delay'
         args.out_act = 'none'
         args.L = 1
+    elif config.t_type == 'copy-snip':
+        args.dset_type = 'copy-snip'
+        args.out_act = 'none'
+        args.L = 1
     else:
         args.dset_type = 'unknown'
 

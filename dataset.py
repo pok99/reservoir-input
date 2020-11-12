@@ -178,6 +178,30 @@ def create_dataset(args):
 
                 trials.append((x, y, delay))
 
+        elif t_type == 'copy-snip':
+            n_freqs = get_args_val(trial_args, 'n_freqs', 20, int)
+            f_range = get_args_val(trial_args, 'f_range', [10, 40], float, n_vals=2)
+            amp = get_args_val(trial_args, 'amp', 1, float)
+            config['n_freqs'] = n_freqs
+            config['f_range'] = f_range
+            config['amp'] = amp
+
+            s_len = t_len // 2
+            x_r = np.arange(s_len)
+
+            for n in range(n_trials):
+                x = np.zeros((t_len))
+                freqs = np.random.uniform(f_range[0], f_range[1], (n_freqs))
+                amps = np.random.uniform(-amp, amp, (n_freqs))
+                for i in range(n_freqs):
+                    x[:s_len] = x[:s_len] + amps[i] * np.sin(1/freqs[i] * x_r) / np.sqrt(n_freqs)
+
+                y = np.zeros(t_len)
+                y[s_len:] = x[:s_len]
+
+                trials.append((x, y, s_len))
+
+
         # elif t_type == 'copy_motifs':
         #     assert args.motifs is not None
         #     motifs = load_rb(args.motifs)
@@ -313,13 +337,12 @@ if __name__ == '__main__':
 
             elif dset_type.startswith('copy'):
                 if len(sample[i][0].shape) > 1:
-                    ml, sl, bl = ax.stem(dset_range, sample[i][0][:,1], use_line_collection=True, linefmt='coral', label='ready/set')
+                    ml, sl, bl = ax.stem(dset_range, sample[i][0][:,1], use_line_collection=True, linefmt='coral', label='fn')
                     ml.set_markerfacecolor('coral')
                     ml.set_markeredgecolor('coral')
                     ax.plot(dset_range, sample[i][0][:,0], color='coral', alpha=1, lw=1)
                 else:
                     ax.plot(dset_range, sample[i][0], color='coral', alpha=1, lw=1)
-                
                 ax.plot(dset_range, sample[i][1], color='dodgerblue', lw=1)
 
         handles, labels = ax.get_legend_handles_labels()

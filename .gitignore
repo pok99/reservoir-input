@@ -9,3 +9,5 @@ sshfs_ri/
 *.pkl
 
 ._*
+
+train_backup.py

@@ -1,0 +1,18 @@
+{
+  "argv": [
+    "dataset.py",
+    "create",
+    "even-odd-5",
+    "-t",
+    "even-odd",
+    "-l",
+    "200",
+    "-n",
+    "1000"
+  ],
+  "t_type": "even-odd",
+  "n_trials": 1000,
+  "t_len": 200,
+  "mnum": 5,
+  "p_len": 5
+}

@@ -9,11 +9,11 @@ def create_parameters(name):
     mapping = {}
     ix = 1
 
-    Ds = [1, 2, 5, 10, 15, 25, 35, 50]
+    Ds = [1, 2, 5, 10, 15, 25, 35, 50, 80, 120, 200]
     Ns = [200]
 
     lr = 1e-4
-    n_epochs = 20
+    n_epochs = 40
     patience = 4000
     batch_size = 2
     l2 = 0.5
@@ -25,22 +25,22 @@ def create_parameters(name):
     n_rseeds = 3
 
     m_noises = [0]
-    r_noises = [0, 0.01]
-    train_parts = [['all'], ['W_f', 'W_ro']]
+    r_noises = [0]
+    train_parts = [['W_ro']]
 
     datasets = [
-        # 'datasets/rsg-sohn-100-200.pkl',
+        'datasets/rsg-sohn-100-200.pkl',
         # 'datasets/rsg-sohn-150-200.pkl',
         # 'datasets/rsg-sohn-100-150.pkl',
         # 'datasets/rsg-sohn-50-100.pkl',
         # 'datasets/rsg-sohn-50-150.pkl',
         # 'datasets/rsg-sohn-50-200.pkl',
         # 'datasets/rsg-sohn.pkl'
-        'datasets/copy-delay-10.pkl',
-        'datasets/copy-delay-20.pkl'
+        # 'datasets/copy-snip-200.pkl',
+        # 'datasets/copy-delay-20.pkl'
     ]
     losses = [
-        'mse'
+        'mse', 'mse-w'
     ]
 
     debug = False
@@ -88,7 +88,7 @@ def create_parameters(name):
         run_params['train_parts'] = tp
 
         run_params['res_noise'] = rnoise
-        # run_params['m_noise'] = mnoise
+        run_params['m_noise'] = mnoise
 
         run_params['same_signal'] = False
 
