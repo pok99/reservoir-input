@@ -124,8 +124,14 @@ def get_config(model_path, ctype='model', to_bunch=False):
             raise NotImplementedError
 
     elif ctype == 'model':
-        run_id = re.split('_|\.', tail)[1]
-        c_path = os.path.join(head, 'config_'+run_id+'.json')
+        if tail == 'model_best.pth':
+            for i in os.listdir(head):
+                if i.startswith('config'):
+                    c_path = os.path.join(head, i)
+                    break
+        else:
+            run_id = re.split('_|\.', tail)[1]
+            c_path = os.path.join(head, 'config_'+run_id+'.json')
         if not os.path.isfile(c_path):
             raise NotImplementedError
     else:

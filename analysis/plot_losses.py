@@ -11,20 +11,24 @@ sys.path.append('../')
 
 from utils import get_config
 
-run_id = '3539456'
+# run_id = '3539456'
 
 
-run_id = '3540770' # run across many Ds
+# run_id = '3540770' # run across many Ds
 
+# csv_path = f'../logs/{run_id}.csv'
+# csv_data1 = pd.read_csv(csv_path)
+
+# run_id = '3541548' # across even more Ds
+
+# csv_path = f'../logs/{run_id}.csv'
+# csv_data2 = pd.read_csv(csv_path)
+
+# csv_data = pd.concat([csv_data1, csv_data2])
+
+run_id = '3537318'
 csv_path = f'../logs/{run_id}.csv'
-csv_data1 = pd.read_csv(csv_path)
-
-run_id = '3541548' # across even more Ds
-
-csv_path = f'../logs/{run_id}.csv'
-csv_data2 = pd.read_csv(csv_path)
-
-csv_data = pd.concat([csv_data1, csv_data2])
+csv_data = pd.read_csv(csv_path)
 
 # vals = []
 # for i in csv_data.slurm_id:
@@ -57,7 +61,7 @@ rseeds = dt['rseed'].unique()
 
 color_scale = ['coral', 'chartreuse', 'skyblue']
 
-fig, axes = plt.subplots(nrows=len(mnoises), ncols=len(rseeds), sharex=True, sharey=True, figsize=(14,10))
+fig, axes = plt.subplots(nrows=len(mnoises), ncols=len(rseeds), sharex=True, sharey=True, figsize=(14,10), squeeze=False)
 fig.text(0.07, 0.5, 'loss', va='center', rotation='vertical')
 fig.text(0.5, 0.04, 'D', ha='center')
 
@@ -92,6 +96,13 @@ for i, mnoise in enumerate(mnoises):
             means.append(np.mean(train_lim[train_lim.D == D]['loss']))
         ax.plot(range(len(Ds)), means, c=color_scale[1], ms=50)
 
+        train_ro = subset[subset.tparts == 'W_ro']
+        ax.scatter(train_ro.D_map, train_ro.loss, s=8, alpha=.7, c=color_scale[2], label='train ro')
+        means = []
+        for D in Ds:
+            means.append(np.mean(train_ro[train_ro.D == D]['loss']))
+        ax.plot(range(len(Ds)), means, c=color_scale[2], ms=20)
+
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
         # ax.spines['bottom'].set_visible(False)
@@ -102,7 +113,7 @@ for i, mnoise in enumerate(mnoises):
         ax.grid(None)
         ax.grid(True, which='major', axis='y', lw=1, color='lightgray', alpha=0.4)
         ax.set_xlim([-.5, len(Ds) - .5])
-        ax.set_ylim([0, 100])
+        ax.set_ylim([0, 20])
 
 
 plt.legend()

@@ -13,10 +13,6 @@ sys.path.append('../')
 
 from utils import get_config
 
-# plt.rcParams["font.family"] = "space mono"
-
-run_id = '3539456'
-
 
 run_id = '3540770' # run across many Ds
 
@@ -30,16 +26,6 @@ csv_data2 = pd.read_csv(csv_path)
 
 csv_data = pd.concat([csv_data1, csv_data2])
 
-# vals = []
-# for i in csv_data.slurm_id:
-#     run_dir = os.path.join(f'../logs/{run_id}', str(i))
-#     run_files = os.listdir(run_dir)
-#     for f in run_files:
-#         if f.startswith('config'):
-#             c_file = os.path.join(run_dir, f)
-#     config = get_config(c_file, ctype='model')
-#     vals.append(config['m_noise'])
-# csv_data['mnoise'] = vals
 
 csv_data['tparts'].fillna('all', inplace=True)
 
@@ -61,13 +47,6 @@ rseeds = dt['rseed'].unique()
 
 color_scale = ['coral', 'cornflowerblue', 'skyblue']
 
-# fig.text(0.07, 0.5, 'loss', va='center', rotation='vertical')
-# fig.text(0.5, 0.04, 'D', ha='center')
-
-# dt = dt[(dt.dset == 'datasets/rsg-sohn.pkl')]
-
-# pdb.set_trace()
-# dt = dt[(dt.rnoise == 0.01)]
 dt = dt[(dt.mnoise == 4)]
 
 plt.figure(figsize=(5,4))
@@ -75,14 +54,6 @@ ax = plt.gca()
 ax.set_xticklabels([0] + list(Ds), fontsize=9)
 plt.yticks(fontsize=9)
 ax.xaxis.set_major_locator(ticker.MultipleLocator(1))
-# plt.tick_params()
-# plt.xaxis.set_ticks_position('bottom')
-# plt.tick_params(which='major', width=1.00, length=4)
-# if i == 0:
-#     plt.set_title('seed = ' + str(rseed))
-# if j == 0:
-#     plt.set_ylabel('noise = ' + str(mnoise))
-
 train_all = dt[dt.tparts == 'all']
 train_lim = dt[dt.tparts == 'W_f-W_ro']
 plt.scatter(train_all.D_map, train_all.loss, s=8, alpha=.3, c=color_scale[0])
@@ -117,18 +88,13 @@ plt.errorbar(range(len(Ds)), q_lim[0], yerr = [q_lim[1], q_lim[2]], c=color_scal
 
 ax.spines['top'].set_visible(False)
 ax.spines['right'].set_visible(False)
-# plt.spines['bottom'].set_visible(False)
-# plt.spines['left'].set_visible(False)
-# plt.axhline(y=0, color='dimgray', alpha = 1)
-# plt.axvline(x=-.5, color='dimgray', alpha = 1)
-# plt.tick_params(axis='both', color='white')
 plt.grid(None)
 plt.grid(True, which='major', axis='y', lw=1, color='lightgray', alpha=0.4)
 plt.xlim([-.5, len(Ds) - .5])
 plt.ylim([0, 70])
 
 plt.xlabel('D')
-plt.ylabel('loss')
+plt.ylabel('mean squared error')
 
 plt.legend()
 plt.show()
