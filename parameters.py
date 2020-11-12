@@ -13,7 +13,7 @@ def create_parameters(name):
     Ns = [200]
 
     lr = 1e-4
-    n_epochs = 40
+    n_epochs = 20
     patience = 4000
     batch_size = 2
     l2 = 0.5
@@ -21,24 +21,26 @@ def create_parameters(name):
     # keep the same network seeds
     preserve_seed = True
 
-    n_seeds = 1
+    n_seeds = 2
     n_rseeds = 3
 
-    m_noises = [0, 4, 10]
-    r_noises = [0.01]
+    m_noises = [0]
+    r_noises = [0, 0.01]
     train_parts = [['all'], ['W_f', 'W_ro']]
 
     datasets = [
-        'datasets/rsg-sohn-100-200.pkl',
-        'datasets/rsg-sohn-150-200.pkl',
-        'datasets/rsg-sohn-100-150.pkl',
+        # 'datasets/rsg-sohn-100-200.pkl',
+        # 'datasets/rsg-sohn-150-200.pkl',
+        # 'datasets/rsg-sohn-100-150.pkl',
         # 'datasets/rsg-sohn-50-100.pkl',
         # 'datasets/rsg-sohn-50-150.pkl',
         # 'datasets/rsg-sohn-50-200.pkl',
         # 'datasets/rsg-sohn.pkl'
+        'datasets/copy-delay-10.pkl',
+        'datasets/copy-delay-20.pkl'
     ]
     losses = [
-        'mse', 'mse-w'
+        'mse'
     ]
 
     debug = False
@@ -60,7 +62,7 @@ def create_parameters(name):
     # seed_samples = [811, 946, 122]
     # rseed_samples = [492, 496, 291, 127, 727]
 
-    seed_samples = [11]
+    seed_samples = [11, 12]
     rseed_samples = [1, 2, 3]
 
     for (d, nN, nD, rnoise, mnoise, tp, seed, rseed) in product(datasets, Ns, Ds, r_noises, m_noises, train_parts, range(n_seeds), range(n_rseeds)):
@@ -69,7 +71,7 @@ def create_parameters(name):
         run_params = {}
         run_params['dataset'] = d
         run_params['losses'] = losses
-        run_params['l2'] = l2
+        # run_params['l2'] = l2
         run_params['D'] = nD
         run_params['N'] = nN
 
@@ -86,9 +88,9 @@ def create_parameters(name):
         run_params['train_parts'] = tp
 
         run_params['res_noise'] = rnoise
-        run_params['m_noise'] = mnoise
+        # run_params['m_noise'] = mnoise
 
-        run_params['same_signal'] = True
+        run_params['same_signal'] = False
 
         # keep the seed the same across all runs sharing network seeds
         # but use a totally random one otherwise. train.py will take care of it
