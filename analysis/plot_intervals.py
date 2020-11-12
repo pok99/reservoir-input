@@ -44,7 +44,7 @@ fig, axes = plt.subplots(nrows=len(mnoises), ncols=len(dsets), figsize=(14,10), 
 fig.text(0.07, 0.5, 'loss', va='center', rotation='vertical')
 fig.text(0.5, 0.04, 'D', ha='center')
 
-dt = dt[dt.D == 100]
+dt = dt[dt.D == 20]
 dt = dt[dt.tparts == 'W_f-W_ro']
 dt = dt[(dt.seed == 12) & (dt.rseed > 1) & (dt.rnoise == 0.01)]
 
@@ -60,16 +60,12 @@ for i, mnoise in enumerate(mnoises):
             job_id = subset.iloc[iterr].slurm_id
 
             model_folder = os.path.join('..', 'logs', run_id, str(job_id))
-            model_path = os.path.join(model_folder, 'model_best.pth')
-            # for k in os.listdir(model_folder):
-            #     if k.startswith('model_') and k != 'model_best.pth':
-            #         model_path = os.path.join(model_folder, k)
-            #         break
+            model_path = os.path.join(model_folder, 'model_best.pth')=
             config = get_config(model_path, ctype='model', to_bunch=True)
             config.m_noise = 0
             net = load_model_path(model_path, config=config)
 
-            data, loss = test_model(net, config, n_tests=250, dset_base='../')
+            data, loss = test_model(net, config, n_tests=200, dset_base='../')
             dset = load_rb(os.path.join('..', config.dataset))
 
             distr = {}
@@ -84,7 +80,7 @@ for i, mnoise in enumerate(mnoises):
                 else:
                     t_first = len(x)
 
-                mode = 'intervals'
+                mode = 'offsets'
                 if mode == 'offsets':
                     val = t_first - g
                 elif mode == 'times':
@@ -128,51 +124,6 @@ for i, mnoise in enumerate(mnoises):
         ax.set_ylim([y_min, y_max])
 
         print('finished', i, j)
-
-        # ax = axes[i, j]
-        # ax.set_xticklabels([0] + list(Ds))
-        # ax.xaxis.set_major_locator(ticker.MultipleLocator(1))
-        # # ax.tick_params()
-        # # ax.xaxis.set_ticks_position('bottom')
-        # # ax.tick_params(which='major', width=1.00, length=4)
-        # if i == 0:
-        #     ax.set_title(dset)
-        # if j == 0:
-        #     ax.set_ylabel('noise = ' + str(mnoise))
-        
-        # # subset_all = subset[subset.]
-        # train_all = subset[subset.tparts == 'all']
-        # ax.scatter(train_all.D_map, train_all.loss, s=8, alpha=.7, c=color_scale[0], label='train all')
-        # means = []
-        # for D in Ds:
-        #     means.append(np.mean(train_all[train_all.D == D]['loss']))
-        # ax.plot(range(len(Ds)), means, c=color_scale[0], ms=20)
-        # train_lim = subset[subset.tparts == 'W_f-W_ro']
-        # ax.scatter(train_lim.D_map, train_lim.loss, s=8, alpha=.7, c=color_scale[1], label='train part')
-        # means = []
-        # for D in Ds:
-        #     means.append(np.mean(train_lim[train_lim.D == D]['loss']))
-        # ax.plot(range(len(Ds)), means, c=color_scale[1], ms=50)
-
-        # train_ro = subset[subset.tparts == 'W_ro']
-        # ax.scatter(train_ro.D_map, train_ro.loss, s=8, alpha=.7, c=color_scale[2], label='train ro')
-        # means = []
-        # for D in Ds:
-        #     means.append(np.mean(train_ro[train_ro.D == D]['loss']))
-        # ax.plot(range(len(Ds)), means, c=color_scale[2], ms=20)
-
-        # ax.spines['top'].set_visible(False)
-        # ax.spines['right'].set_visible(False)
-        # # ax.spines['bottom'].set_visible(False)
-        # # ax.spines['left'].set_visible(False)
-        # # ax.axhline(y=0, color='dimgray', alpha = 1)
-        # # ax.axvline(x=-.5, color='dimgray', alpha = 1)
-        # # ax.tick_params(axis='both', color='white')
-        # ax.grid(None)
-        # ax.grid(True, which='major', axis='y', lw=1, color='lightgray', alpha=0.4)
-        # ax.set_xlim([-.5, len(Ds) - .5])
-        # ax.set_ylim([0, 20])
-
 
 plt.legend()
 plt.show()
