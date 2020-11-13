@@ -123,9 +123,13 @@ ax.spines['top'].set_visible(False)
 ax.spines['right'].set_visible(False)
 plt.xlabel('target interval')
 plt.ylabel('produced interval')
-plt.yticks(fontsize=9)
-plt.xticks(fontsize=9)
+plt.tick_params(left=False,
+                bottom=False,
+                labelleft=False,
+                labelbottom=False)
+# plt.yticks(fontsize=9)
+# plt.xticks(fontsize=9)
 plt.grid(None)
-plt.grid(True, which='major', axis='y', lw=1, color='lightgray', alpha=0.4)
+# plt.grid(True, which='major', axis='y', lw=1, color='lightgray', alpha=0.4)
 
 plt.show()
