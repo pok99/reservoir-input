@@ -15,7 +15,6 @@ from helpers import get_output_activation
 
 DEFAULT_ARGS = {
     'L': 2,
-    'T': 2,
     'D': 5,
     'N': 50,
     'Z': 2,
@@ -44,6 +43,7 @@ class Reservoir(nn.Module):
             self.args.res_x_seed = np.random.randint(1e6)
 
         self.tau_x = 10
+        self.activation = torch.tanh
 
         self._init_vars()
         self.reset()
@@ -73,8 +73,11 @@ class Reservoir(nn.Module):
         self.x.detach_()
 
     # extras currently doesn't do anything. maybe add x val, etc.
-    def forward(self, u, extras=False):
-        g = torch.tanh(self.J(self.x) + self.W_u(u))
+    def forward(self, u=None, extras=False):
+        if u is None:
+            g = self.activation(self.J(self.x))
+        else:
+            g = self.activation(self.J(self.x) + self.W_u(u))
         # adding any inherent reservoir noise
         if self.args.res_noise > 0:
             gn = g + torch.normal(torch.zeros_like(g), self.args.res_noise)
