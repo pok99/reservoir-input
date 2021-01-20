@@ -11,12 +11,64 @@ sys.path.append('../')
 from network import BasicNetwork, Reservoir
 from utils import Bunch
 
-N = 200
+N = 50
 res_init_std = 1.5
 # b = Bunch(N=N, res_init_std=res_init_std)
 
 
 colors = ['moccasin', 'springgreen', 'royalblue']
+
+
+def random_trajs():
+    n_net_reps = 12
+    n_reps = 10
+    n_steps = 1000
+    res_init_stds = [1.5] * n_net_reps
+
+    all_xs = []
+    all_dists = []
+
+    for rep in range(n_net_reps):
+        b = Bunch(N=N, res_init_std=res_init_stds[rep], bias=False)
+        net = Reservoir(b)
+        # net.activation = lambda x: x
+        init_x = np.random.normal(0, 1, (1, N))
+        net.reset(res_state=init_x)
+        xs = np.zeros((n_steps, N))
+        for i in range(n_steps):
+            net()
+            xs[i] = net.x.detach().numpy().reshape(-1)
+
+        dists = []
+
+        # changing the initial condition just a lil bit
+        for i in range(n_reps):
+            # new_x = init_x + np.random.normal(0, .1, (1, N))
+            # using a totally new initial condition
+            new_x = np.random.normal(0, 1, (1, N))
+            net.reset(res_state=new_x)
+            xss = np.zeros((n_steps, N))
+            dist = np.zeros(n_steps)
+            for j in range(n_steps):
+                net()
+                xss[j] = net.x.detach().numpy().reshape(-1)
+                dist[j] = np.linalg.norm(xss[j] - xs[j]) # relative magnitudes
+                # dist[j] = np.linalg.norm(xss[j]) # absolute magnitudes
+
+            dists.append(dist)
+
+        all_xs.append(np.linalg.norm(xs, axis=1))
+        all_dists.append(dists)
+
+    fig, axes = plt.subplots(nrows=3, ncols=4, sharex=True, sharey=False, squeeze=False, figsize=(20,10))
+    axes = [i for j in axes for i in j]
+    for i, ax in enumerate(axes):
+        ax.plot(all_xs[i], lw=2, color='black')
+        for j in range(n_reps):
+            ax.plot(all_dists[i][j], lw=1)
+            ax.set_title(f'g = {res_init_stds[i]}')
+
+    plt.show()
 
 
 # a range of stds
@@ -78,10 +130,11 @@ def many_stds():
     plt.show()
 
 # plot many repetitions of a single value for g
+# these are the differences between 
 def single_std():
     std = 1.5
     n_net_reps = 9
-    n_steps = 600
+    n_steps = 1500
     n_reps = 10
     all_xs = []
     all_dists = []
@@ -130,8 +183,8 @@ def single_std():
 def single_std_rep():
     std = 1.5
     n_net_reps = 3
-    n_noises = 4
-    noises = [.0001, .01, .1, 1]
+    n_noises = 5
+    noises = [.0001, .01, .1, 1, 3]
     n_steps = 600
     n_reps = 10
     all_dists = []
@@ -181,7 +234,7 @@ def single_std_rep():
         # ax.plot(all_xs[rep], lw=2, color='black')
         for j in range(n_reps):
             ax.plot(all_dists[rep][j], lw=1)
-            ax.xlabel()
+            # ax.xlabel()
 
     plt.suptitle(f'g = {std}')
     fig.text(0.5, 0.04, 'noise amount', ha='center')
@@ -191,7 +244,8 @@ def single_std_rep():
 if __name__ == '__main__':
     mode = 'many_stds'
     mode = 'single_std'
-    mode = 'single_std_rep'
+    mode = 'random_trajs'
+    # mode = 'single_std_rep'
 
     if mode == 'many_stds':
         many_stds()
@@ -201,3 +255,6 @@ if __name__ == '__main__':
 
     elif mode == 'single_std_rep':
         single_std_rep()
+
+    elif mode == 'random_trajs':
+        random_trajs()
