@@ -26,7 +26,10 @@ class Trainer:
         super().__init__()
 
         self.args = args
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
         self.net = BasicNetwork(self.args)
+        self.net.to(self.device)
 
         # getting number of elements of every parameter
         self.n_params = {}
@@ -59,7 +62,9 @@ class Trainer:
             for d in self.args.contexts:
                 dsets.append(load_rb(d))
         else:
-            self.dset = load_rb(self.args.dataset)            
+            self.dset = load_rb(self.args.dataset)
+
+        self.dset = self.dset
 
         # if using separate training and test sets, separate them out
         if self.args.same_test:
@@ -506,10 +511,10 @@ def adjust_args(args):
 
 if __name__ == '__main__':
     args = parse_args()
-    args = adjust_args(args)   
+    args = adjust_args(args)
 
     trainer = Trainer(args)
-    logging.info(f'Initialized trainer. Using optimizer {args.optimizer}.')
+    logging.info(f'Initialized trainer. Using device {trainer.device}, optimizer {args.optimizer}.')
     n_iters = 0
     if args.optimizer == 'lbfgs':
         best_loss, n_iters = trainer.optimize_lbfgs()

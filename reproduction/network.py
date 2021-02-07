@@ -43,9 +43,6 @@ class Reservoir(nn.Module):
             self.args.res_x_seed = np.random.randint(1e6)
 
         self.tau_x = 10
-        self.activation = torch.tanh
-
-        self.nonlinear_mode = 0
 
         self._init_vars()
         self.reset()
@@ -54,9 +51,9 @@ class Reservoir(nn.Module):
         rng_pt = torch.get_rng_state()
         torch.manual_seed(self.args.res_seed)
         self.W_u = nn.Linear(self.args.D, self.args.N, bias=False)
-        self.W_u.weight.data = torch.normal(0, self.args.res_init_std, self.W_u.weight.shape) / np.sqrt(self.args.D)
+        self.W_u.weight.data = torch.rand(self.W_u.weight.shape) * 2 - 1
         self.J = nn.Linear(self.args.N, self.args.N, bias=self.args.bias)
-        self.J.weight.data = torch.normal(0, self.args.res_init_std, self.J.weight.shape) / np.sqrt(self.args.N)
+        self.J.weight.data = torch.normal(0, 1/N, self.J.weight.shape)
         self.W_ro = nn.Linear(self.args.N, self.args.Z, bias=self.args.bias)
         # print(self.J.weight.data[0])
         torch.set_rng_state(rng_pt)
@@ -113,33 +110,8 @@ class Reservoir(nn.Module):
         return z
 
     def reset(self, res_state=None, burn_in=True):
-        if res_state is None:
-            # load specified hidden state from seed
-            res_state = self.args.res_x_seed
-
-        if type(res_state) is np.ndarray:
-            # load an actual particular hidden state
-            # if there's an error here then highly possible that res_state has wrong form
-            self.x = torch.as_tensor(res_state).float()
-        elif type(res_state) is torch.Tensor:
-            self.x = res_state
-        elif res_state == 'zero' or res_state == -1:
-            # reset to 0
-            self.x = torch.zeros((1, self.args.N))
-        elif res_state == 'random' or res_state == -2:
-            # reset to totally random value without using reservoir seed
-            self.x = torch.normal(0, 1, (1, self.args.N))
-        elif type(res_state) is int and res_state >= 0:
-            # if any seed set, set the net to that seed and burn in
-            rng_pt = torch.get_rng_state()
-            torch.manual_seed(res_state)
-            self.x = torch.normal(0, 1, (1, self.args.N))
-            torch.set_rng_state(rng_pt)
-        else:
-            print('not any of these types, something went wrong')
-            pdb.set_trace()
-
-        self.r = self.activation(self.x)
+        self.x = torch.rand(self.args.N)
+        self.r = torch.tanh(self.x)
 
         if burn_in:
             self.burn_in(self.args.res_burn_steps)

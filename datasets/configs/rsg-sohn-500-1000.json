@@ -1,0 +1,26 @@
+{
+  "argv": [
+    "dataset.py",
+    "create",
+    "rsg-sohn-500-1000",
+    "-n",
+    "2000",
+    "-t",
+    "rsg-sohn",
+    "-l",
+    "3000",
+    "-a",
+    "gt",
+    "500",
+    "lt",
+    "1000",
+    "plen",
+    "20"
+  ],
+  "t_type": "rsg-sohn",
+  "n_trials": 2000,
+  "t_len": 3000,
+  "p_len": 20,
+  "min_t": 500,
+  "max_t": 1000
+}

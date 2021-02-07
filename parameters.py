@@ -9,11 +9,11 @@ def create_parameters(name):
     mapping = {}
     ix = 1
 
-    Ds = [1, 2, 5, 10, 15, 25, 35, 50, 80, 120, 200]
+    Ds = [10, 50]
     Ns = [200]
 
     lr = 1e-4
-    n_epochs = 40
+    n_epochs = 20
     patience = 4000
     batch_size = 2
     l2 = 0.5
@@ -21,12 +21,15 @@ def create_parameters(name):
     # keep the same network seeds
     preserve_seed = True
 
-    n_seeds = 2
-    n_rseeds = 3
+    # usually have this off but if we wanna check models, set it on
+    log_checkpoint_models = True
 
-    m_noises = [0]
-    r_noises = [0]
-    train_parts = [['W_ro']]
+    n_seeds = 2
+    n_rseeds = 1
+
+    m_noises = [2]
+    r_noises = [0, 0.01]
+    train_parts = [[''], ['W_f', 'W_ro']]
 
     datasets = [
         'datasets/rsg-sohn-100-200.pkl',
@@ -42,6 +45,10 @@ def create_parameters(name):
     losses = [
         'mse', 'mse-w'
     ]
+
+    # losses = [
+    #     'mse'
+    # ]
 
     debug = False
     if debug:
@@ -97,6 +104,8 @@ def create_parameters(name):
         if preserve_seed:
             run_params['seed'] = seed_samples[seed]
         run_params['res_seed'] = rseed_samples[rseed]
+
+        run_params['log_checkpoint_models'] = log_checkpoint_models
 
         mapping[ix] = run_params
         ix += 1
