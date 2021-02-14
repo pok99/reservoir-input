@@ -24,7 +24,7 @@ csv_data['tparts'].fillna('all', inplace=True)
 cols_to_keep = ['slurm_id', 'N', 'D', 'seed', 'rseed', 'rnoise', 'mnoise', 'dset', 'loss', 'tparts']
 dt = csv_data[cols_to_keep]
 
-dsets =dt.dset.unique()
+dsets = dt.dset.unique()
 
 
 # mapping Ds so we can plot it as factor later
@@ -60,7 +60,7 @@ for i, mnoise in enumerate(mnoises):
             job_id = subset.iloc[iterr].slurm_id
 
             model_folder = os.path.join('..', 'logs', run_id, str(job_id))
-            model_path = os.path.join(model_folder, 'model_best.pth')=
+            model_path = os.path.join(model_folder, 'model_best.pth')
             config = get_config(model_path, ctype='model', to_bunch=True)
             config.m_noise = 0
             net = load_model_path(model_path, config=config)

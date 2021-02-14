@@ -7,6 +7,8 @@ import sys
 import json
 import pdb
 
+import argparse
+
 
 sys.path.append('../')
 
@@ -14,17 +16,23 @@ from testers import load_model_path
 
 
 
-def main():
-    ckpt_path = '../logs/test_mid/checkpoints_0393265'
-    config_path = '../logs/test_mid/config_0393265.json'
+def main(args):
 
-    models = os.scandir(ckpt_path)
+    files = os.scandir(args.dir)
+    for fn in os.scandir(args.dir):
+        if os.path.basename(fn).startswith('checkpoints'):
+            ckpt_folder = fn
+        elif os.path.basename(fn).startswith('config'):
+            config_path = fn
+
+    models = os.scandir(ckpt_folder)
     with open(config_path, 'r') as f:
         config = json.load(f)
-
+    
     norms = []
 
     for ix, s in enumerate(models):
+        print(s.path)
         model = load_model_path(s.path, config)
         # J = model.reservoir.J.weight.data.numpy()
         Wf = model.W_f.weight.data.numpy()
@@ -40,7 +48,6 @@ def main():
 
         # last_J = J
         last_Wf = Wf
-        print(f'finished {ix}')
 
 
     plt.plot(norms)
@@ -48,4 +55,10 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+
+    ap = argparse.ArgumentParser()
+    ap.add_argument('dir', type=str)
+    args = ap.parse_args()
+
+
+    main(args)
