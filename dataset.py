@@ -16,7 +16,7 @@ from matplotlib import collections as matcoll
 import argparse
 
 from motifs import gen_fn_motifs
-from utils import load_rb
+from utils import load_rb, Bunch
 
 eps = 1e-6
 
@@ -32,6 +32,9 @@ def create_dataset(args):
     t_len = args.trial_len
     trial_args = args.trial_args
 
+    # config = Bunch(args)
+    # config.argv = sys.argv
+
     config = {}
     config['argv'] = sys.argv
     config['t_type'] = t_type
@@ -40,11 +43,49 @@ def create_dataset(args):
 
     trials = []
 
+    if t_type == 'rsg':
+        # fixing the bug where distribution of start points is different for different intervals
+        p_len = get_args_val(trial_args, 'plen', 5, int)
+        max_ready = get_args_val(trial_args, 'max_ready', 80, int)
+        config['p_len'] = p_len
+        config['max_ready'] = max_ready
+        if args.intervals is None:
+            # amount of time in between ready and set cues
+            min_t = get_args_val(trial_args, 'gt', p_len * 4, int)
+            max_t = get_args_val(trial_args, 'lt', t_len // 2 - p_len * 4, int)
+            config['min_t'] = min_t
+            config['max_t'] = max_t
+        for n in range(n_trials):
+            if args.intervals is None:
+                t_p = np.random.randint(min_t, max_t)
+            else:
+                # use one of the intervals that we desire
+                num = random.choice(args.intervals)
+                assert num < t_len / 2
+                t_p = num
 
-    if t_type.startswith('rsg'):
+
+            ready_time = np.random.randint(p_len * 2, max_ready)
+            set_time = ready_time + t_p
+            go_time = set_time + t_p
+
+            trial_x = np.zeros((t_len, 2))
+            trial_x[ready_time:ready_time+p_len, 0] = 1
+            trial_x[set_time:set_time+p_len, 1] = 1
+
+            trial_y = np.arange(t_len)
+            slope = 1 / t_p
+            trial_y = trial_y * slope - set_time * slope
+            trial_y = np.clip(trial_y, 0, 2)
+
+            info = (ready_time, set_time, go_time)
+            trials.append((trial_x, trial_y, info))
+
+
+    elif t_type.startswith('rsg'):
+        # old implementation with bug here for reproducibility
         p_len = get_args_val(trial_args, 'plen', 5, int)
         config['p_len'] = p_len
-        # config['d2'] = 'd2' in trial_args
         if args.intervals is None:
             # amount of time in between ready and set cues
             min_t = get_args_val(trial_args, 'gt', p_len * 4, int)
@@ -64,14 +105,9 @@ def create_dataset(args):
             set_time = ready_time + t_p
             go_time = set_time + t_p
 
-            # if config['d2']:
             trial_x = np.zeros((t_len, 2))
             trial_x[ready_time:ready_time+p_len, 0] = 1
             trial_x[set_time:set_time+p_len, 1] = 1
-            # else:
-            #     trial_x = np.zeros((t_len))
-            #     trial_x[ready_time:ready_time+p_len] = 1
-            #     trial_x[set_time:set_time+p_len] = 1
 
             trial_y = np.zeros((t_len))
             if t_type == 'rsg-bin':
@@ -85,14 +121,9 @@ def create_dataset(args):
                 trial_y[set_time+p_len:] = trial_y_fn(trial_y_temp)
                 trial_y = np.clip(trial_y, 0, 2)
             elif t_type == 'rsg-window':
-                # if config['d2']:
                 trial_x = np.zeros((ready_time + 3 * t_p, 2))
                 trial_x[ready_time:ready_time+p_len, 0] = 1
                 trial_x[set_time:set_time+p_len, 1] = 1
-                # else:
-                #     trial_x = np.zeros((ready_time + 3 * t_p))
-                #     trial_x[ready_time:ready_time+p_len] = 1
-                #     trial_x[set_time:set_time+p_len] = 1
                 trial_y = np.zeros((ready_time + 3 * t_p))
 
                 A = 3
@@ -330,7 +361,7 @@ if __name__ == '__main__':
                     ml, sl, bl = ax.stem(dset_range, sample[i][1], use_line_collection=True, linefmt='dodgerblue', label='go')
                     ml.set_markerfacecolor('dodgerblue')
                     ml.set_markeredgecolor('dodgerblue')
-                elif dset_type == 'rsg-sohn' or dset_type == 'rsg-window':
+                elif dset_type == 'rsg-sohn' or dset_type == 'rsg-window' or dset_type == 'rsg':
                     ax.plot(dset_range, sample[i][1], color='dodgerblue', label='go', lw=2)
 
                 ax.set_ylim([-.5, 2.5])

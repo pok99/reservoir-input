@@ -181,7 +181,7 @@ def single_std_rep():
         # ax.plot(all_xs[rep], lw=2, color='black')
         for j in range(n_reps):
             ax.plot(all_dists[rep][j], lw=1)
-            ax.xlabel()
+            # ax.xlabel()
 
     plt.suptitle(f'g = {std}')
     fig.text(0.5, 0.04, 'noise amount', ha='center')
