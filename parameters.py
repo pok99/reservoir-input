@@ -22,17 +22,18 @@ def create_parameters(name):
     preserve_seed = True
 
     # usually have this off but if we wanna check models, set it on
-    log_checkpoint_models = True
+    log_checkpoint_models = False
 
     n_seeds = 2
     n_rseeds = 1
 
-    m_noises = [2]
-    r_noises = [0, 0.01]
+    m_noises = [0, 2]
+    r_noises = [0.01]
     train_parts = [[''], ['W_f', 'W_ro']]
 
     datasets = [
-        'datasets/rsg-sohn-100-200.pkl',
+        'datasets/rsg-2c.pkl'
+        # 'datasets/rsg-sohn-100-200.pkl',
         # 'datasets/rsg-sohn-150-200.pkl',
         # 'datasets/rsg-sohn-100-150.pkl',
         # 'datasets/rsg-sohn-50-100.pkl',

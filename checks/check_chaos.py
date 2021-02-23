@@ -82,7 +82,7 @@ def single_std():
     std = 1.5
     n_net_reps = 9
     n_steps = 600
-    n_reps = 10
+    n_reps = 6
     all_xs = []
     all_dists = []
     for rep in range(n_net_reps):
@@ -102,7 +102,7 @@ def single_std():
         for i in range(n_reps):
             new_x = init_x + np.random.normal(0, .1, (1, N))
             # using a totally new initial condition
-            # new_x = np.random.normal(0, 1, (1, N))
+            new_x = np.random.normal(0, 1, (1, N))
             net.reset(res_state=new_x)
             xss = np.zeros((n_steps, N))
             dist = np.zeros(n_steps)
@@ -121,7 +121,20 @@ def single_std():
         ax = plt.subplot(3, 3, rep+1)
         # ax.plot(all_xs[rep], lw=2, color='black')
         for j in range(n_reps):
-            ax.plot(all_dists[rep][j], lw=1)
+            ax.plot(all_dists[rep][j], lw=2)
+
+        ax.grid(True, which='major', lw=1, color='lightgray', alpha=0.4)
+        ax.tick_params(axis='both', color='white')
+        ax.set_yticklabels([])
+        ax.set_xticklabels([])
+        # ax.set_axis_off()
+        #ax.set_title(sample[i][2])
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['left'].set_visible(False)
+        ax.spines['bottom'].set_visible(False)
+        ax.set_ylabel('distance')
+        ax.set_xlabel('timestep')
 
     plt.suptitle(f'g = {std}')
     plt.show()
@@ -191,7 +204,7 @@ def single_std_rep():
 if __name__ == '__main__':
     mode = 'many_stds'
     mode = 'single_std'
-    mode = 'single_std_rep'
+    # mode = 'single_std_rep'
 
     if mode == 'many_stds':
         many_stds()

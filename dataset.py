@@ -23,7 +23,6 @@ eps = 1e-6
 mpl.rcParams['lines.markersize'] = 2
 mpl.rcParams['lines.linewidth'] = .5
 
-
 # toy ready set go dataset
 def create_dataset(args):
     name = args.name
@@ -32,8 +31,6 @@ def create_dataset(args):
     t_len = args.trial_len
     trial_args = args.trial_args
 
-    # config = Bunch(args)
-    # config.argv = sys.argv
 
     config = {}
     config['argv'] = sys.argv
@@ -42,241 +39,191 @@ def create_dataset(args):
     config['t_len'] = t_len
 
     trials = []
-
-    if t_type == 'rsg':
-        # fixing the bug where distribution of start points is different for different intervals
-        p_len = get_args_val(trial_args, 'plen', 5, int)
-        max_ready = get_args_val(trial_args, 'max_ready', 80, int)
-        config['p_len'] = p_len
-        config['max_ready'] = max_ready
-        if args.intervals is None:
-            # amount of time in between ready and set cues
-            min_t = get_args_val(trial_args, 'gt', p_len * 4, int)
-            max_t = get_args_val(trial_args, 'lt', t_len // 2 - p_len * 4, int)
-            config['min_t'] = min_t
-            config['max_t'] = max_t
-        for n in range(n_trials):
-            if args.intervals is None:
-                t_p = np.random.randint(min_t, max_t)
-            else:
-                # use one of the intervals that we desire
-                num = random.choice(args.intervals)
-                assert num < t_len / 2
-                t_p = num
-
-
-            ready_time = np.random.randint(p_len * 2, max_ready)
-            set_time = ready_time + t_p
-            go_time = set_time + t_p
-
-            trial_x = np.zeros((t_len, 2))
-            trial_x[ready_time:ready_time+p_len, 0] = 1
-            trial_x[set_time:set_time+p_len, 1] = 1
-
-            trial_y = np.arange(t_len)
-            slope = 1 / t_p
-            trial_y = trial_y * slope - set_time * slope
-            trial_y = np.clip(trial_y, 0, 2)
-
-            info = (ready_time, set_time, go_time)
-            trials.append((trial_x, trial_y, info))
-
-
-    elif t_type.startswith('rsg'):
+    if t_type.startswith('rsg'):
+        # should generally not use rsg1 and use rsg instead
         # old implementation with bug here for reproducibility
-        p_len = get_args_val(trial_args, 'plen', 5, int)
-        config['p_len'] = p_len
-        if args.intervals is None:
-            # amount of time in between ready and set cues
-            min_t = get_args_val(trial_args, 'gt', p_len * 4, int)
-            max_t = get_args_val(trial_args, 'lt', t_len // 2 - p_len * 4, int)
-            config['min_t'] = min_t
-            config['max_t'] = max_t
-        for n in range(n_trials):
+        if t_type.startswith('rsg1'):
+            p_len = get_args_val(trial_args, 'plen', 5, int)
+            config['p_len'] = p_len
             if args.intervals is None:
-                t_p = np.random.randint(min_t, max_t)
-            else:
-                # use one of the intervals that we desire
-                num = random.choice(args.intervals)
-                assert num < t_len / 2
-                t_p = num
+                # amount of time in between ready and set cues
+                min_t = get_args_val(trial_args, 'gt', p_len * 4, int)
+                max_t = get_args_val(trial_args, 'lt', t_len // 2 - p_len * 4, int)
+                config['min_t'] = min_t
+                config['max_t'] = max_t
+            for n in range(n_trials):
+                if args.intervals is None:
+                    t_p = np.random.randint(min_t, max_t)
+                else:
+                    # use one of the intervals that we desire
+                    num = random.choice(args.intervals)
+                    assert num < t_len / 2
+                    t_p = num
 
-            ready_time = np.random.randint(p_len * 4, t_len - t_p * 2 - p_len * 4)
-            set_time = ready_time + t_p
-            go_time = set_time + t_p
+                ready_time = np.random.randint(p_len * 4, t_len - t_p * 2 - p_len * 4)
+                set_time = ready_time + t_p
+                go_time = set_time + t_p
 
-            trial_x = np.zeros((t_len, 2))
-            trial_x[ready_time:ready_time+p_len, 0] = 1
-            trial_x[set_time:set_time+p_len, 1] = 1
+                assert go_time < t_len
 
-            trial_y = np.zeros((t_len))
-            if t_type == 'rsg-bin':
-                trial_y[go_time:go_time+p_len] = 1
-            elif t_type == 'rsg-sohn':
-                # A = 3
-                # alpha = (t_p - p_len) / t_p / np.log(4/3)
-                # TODO: FIX THIS BUG WITH OFFSETS
-                trial_y_temp = np.arange(t_len - set_time - p_len)
-                trial_y_fn = lambda t: t / t_p
-                trial_y[set_time+p_len:] = trial_y_fn(trial_y_temp)
-                trial_y = np.clip(trial_y, 0, 2)
-            elif t_type == 'rsg-window':
-                trial_x = np.zeros((ready_time + 3 * t_p, 2))
+                trial_x = np.zeros((t_len, 2))
                 trial_x[ready_time:ready_time+p_len, 0] = 1
                 trial_x[set_time:set_time+p_len, 1] = 1
-                trial_y = np.zeros((ready_time + 3 * t_p))
 
-                A = 3
-                alpha = (t_p - p_len) / t_p / np.log(4/3)
-                trial_y_temp = np.arange(2 * t_p - p_len)
-                trial_y_fn = lambda t: A * (np.exp(t / (alpha * t_p)) - 1)
-                trial_y[set_time+p_len:] = trial_y_fn(trial_y_temp)
-                # trial_y = np.clip(trial_y, 0, 2)
+                trial_y = np.zeros((t_len))
+                if t_type == 'rsg1-bin':
+                    trial_y[go_time:go_time+p_len] = 1
+                elif t_type == 'rsg1-sohn':
+                    # A = 3
+                    # alpha = (t_p - p_len) / t_p / np.log(4/3)
+                    # TODO: FIX THIS BUG WITH OFFSETS
+                    trial_y_temp = np.arange(t_len - set_time - p_len)
+                    trial_y_fn = lambda t: t / t_p
+                    trial_y[set_time+p_len:] = trial_y_fn(trial_y_temp)
+                    trial_y = np.clip(trial_y, 0, 2)
+                elif t_type == 'rsg1-window':
+                    trial_x = np.zeros((ready_time + 3 * t_p, 2))
+                    trial_x[ready_time:ready_time+p_len, 0] = 1
+                    trial_x[set_time:set_time+p_len, 1] = 1
+                    trial_y = np.zeros((ready_time + 3 * t_p))
 
-            info = (ready_time, set_time, go_time)
-            trials.append((trial_x, trial_y, info))
+                    A = 3
+                    alpha = (t_p - p_len) / t_p / np.log(4/3)
+                    trial_y_temp = np.arange(2 * t_p - p_len)
+                    trial_y_fn = lambda t: A * (np.exp(t / (alpha * t_p)) - 1)
+                    trial_y[set_time+p_len:] = trial_y_fn(trial_y_temp)
+
+                info = (ready_time, set_time, go_time)
+                trials.append((trial_x, trial_y, info))
+
+        elif t_type.startswith('rsg2'):
+            # fixed the bug where distribution of start points is different for different intervals
+            p_len = get_args_val(trial_args, 'plen', 5, int)
+            max_ready = get_args_val(trial_args, 'max_ready', 80, int)
+            config['p_len'] = p_len
+            config['max_ready'] = max_ready
+            if args.intervals is None:
+                min_t = get_args_val(trial_args, 'gt', p_len * 4, int)
+                max_t = get_args_val(trial_args, 'lt', t_len // 2 - p_len * 4, int)
+                config['min_t'] = min_t
+                config['max_t'] = max_t
+            for n in range(n_trials):
+                if args.intervals is None:
+                    t_p = np.random.randint(min_t, max_t)
+                else:
+                    t_p = random.choice(args.intervals)
+                ready_time = np.random.randint(p_len * 2, max_ready)
+                set_time = ready_time + t_p
+                go_time = set_time + t_p
+
+                assert go_time < t_len
+
+                trial_x = np.zeros((t_len, 2))
+                trial_x[ready_time:ready_time+p_len, 0] = 1
+                trial_x[set_time:set_time+p_len, 1] = 1
+
+                trial_y = np.arange(t_len)
+                slope = 1 / t_p
+                trial_y = trial_y * slope - set_time * slope
+                trial_y = np.clip(trial_y, 0, 2)
+
+                info = (ready_time, set_time, go_time)
+                trials.append((trial_x, trial_y, info))
+
+        elif t_type == 'rsg-2c':
+            # fixing the bug where distribution of start points is different for different intervals
+            p_len = get_args_val(trial_args, 'plen', 5, int)
+            max_ready = get_args_val(trial_args, 'max_ready', 80, int)
+            config['p_len'] = p_len
+            config['max_ready'] = max_ready
+            if args.intervals is None or args.intervals2 is None:
+                min_t = get_args_val(trial_args, 'gt', p_len * 4, int)
+                max_t = get_args_val(trial_args, 'lt', t_len // 2 - p_len * 4, int)
+                mean_t = (min_t + max_t) / 2
+                config['min_t'] = min_t
+                config['max_t'] = max_t
+                config['mean_t'] = mean_t
+            for n in range(n_trials):
+                context = random.choice([0, 1])
+                if context == 0:
+                    if args.intervals is None:
+                        t_p = np.random.randint(min_t, mean_t)
+                    else:
+                        t_p = random.choice(args.intervals)
+                else:
+                    if args.intervals2 is None:
+                        t_p = np.random.randint(mean_t, max_t)
+                    else:
+                        t_p = random.choice(args.intervals2)
+
+                ready_time = np.random.randint(p_len * 2, max_ready)
+                set_time = ready_time + t_p
+                go_time = set_time + t_p
+                assert go_time < t_len
+
+                trial_x = np.zeros((t_len, 2))
+                trial_x[ready_time:ready_time+p_len, 0] = (context + 1) / 2
+                trial_x[set_time:set_time+p_len, 1] = 1
+
+                trial_y = np.arange(t_len)
+                slope = 1 / t_p
+                trial_y = trial_y * slope - set_time * slope
+                trial_y = np.clip(trial_y, 0, 2)
+
+                info = (ready_time, set_time, go_time, context)
+                trials.append((trial_x, trial_y, info))
 
     elif t_type.startswith('copy'):
         delay = get_args_val(trial_args, 'delay', 0, int)
         config['delay'] = delay
-        p_len = get_args_val(trial_args, 'plen', 5, int)
-        config['p_len'] = p_len
 
-        if t_type == 'copy-delay':
-            n_freqs = get_args_val(trial_args, 'n_freqs', 15, int)
-            f_range = get_args_val(trial_args, 'f_range', [5, 30], float, n_vals=2)
-            amp = get_args_val(trial_args, 'amp', 1, float)
-            config['n_freqs'] = n_freqs
-            config['f_range'] = f_range
-            config['amp'] = amp
-
-
-            x_r = np.arange(t_len)
-
-            for n in range(n_trials):
-                x = np.zeros((t_len))
-                freqs = np.random.uniform(f_range[0], f_range[1], (n_freqs))
-                amps = np.random.uniform(-amp, amp, (n_freqs))
-                for i in range(n_freqs):
-                    x = x + amps[i] * np.sin(1/freqs[i] * x_r)
-
-                y = np.zeros(t_len)
-                if delay == 0:
-                    y = x
-                else:
-                    y[delay:] = x[:-delay]
-
-                trials.append((x, y, delay))
-
-        elif t_type == 'copy-delays':
-            if args.intervals is None:
-                # amounts of time in between 
-                min_t = get_args_val(trial_args, 'gt', 0, int)
-                max_t = get_args_val(trial_args, 'lt', t_len // 2, int)
-                config['min_t'] = min_t
-                config['max_t'] = max_t
-
-            n_freqs = get_args_val(trial_args, 'n_freqs', 15, int)
-            f_range = get_args_val(trial_args, 'f_range', [5, 30], float, n_vals=2)
-            amp = get_args_val(trial_args, 'amp', 1, float)
-            config['n_freqs'] = n_freqs
-            config['f_range'] = f_range
-            config['amp'] = amp
-
-
-            x_r = np.arange(t_len)
-
-            for n in range(n_trials):
-                if args.intervals is None:
-                    delay = np.random.randint(min_t, max_t)
-                else:
-                    # use one of the intervals that we desire
-                    num = random.choice(args.intervals)
-                    assert num <= t_len / 2
-                    delay = num
-                x = np.zeros((t_len, 2))
-                x[delay,1] = 1
-                freqs = np.random.uniform(f_range[0], f_range[1], (n_freqs))
-                amps = np.random.uniform(-amp, amp, (n_freqs))
-                for i in range(n_freqs):
-                    x[:,0] = x[:,0] + amps[i] * np.sin(1/freqs[i] * x_r)
-
-                y = np.zeros(t_len)
-                if delay == 0:
-                    y = x[:,0]
-                else:
-                    y[delay:] = x[:-delay,0]
-
-                trials.append((x, y, delay))
-
-        elif t_type == 'copy-snip':
-            n_freqs = get_args_val(trial_args, 'n_freqs', 20, int)
-            f_range = get_args_val(trial_args, 'f_range', [10, 40], float, n_vals=2)
-            amp = get_args_val(trial_args, 'amp', 1, float)
-            config['n_freqs'] = n_freqs
-            config['f_range'] = f_range
-            config['amp'] = amp
-
-            s_len = t_len // 2
-            x_r = np.arange(s_len)
-
-            for n in range(n_trials):
-                x = np.zeros((t_len))
-                freqs = np.random.uniform(f_range[0], f_range[1], (n_freqs))
-                amps = np.random.uniform(-amp, amp, (n_freqs))
-                for i in range(n_freqs):
-                    x[:s_len] = x[:s_len] + amps[i] * np.sin(1/freqs[i] * x_r) / np.sqrt(n_freqs)
-
-                y = np.zeros(t_len)
-                y[s_len:] = x[:s_len]
-
-                trials.append((x, y, s_len))
-
-
-        # elif t_type == 'copy_motifs':
-        #     assert args.motifs is not None
-        #     motifs = load_rb(args.motifs)
-        #     pause = get_args_val(trial_args, 'pause', 10, int)
-        #     amp = get_args_val(trial_args, 'amp', .1, float)
-        #     config['pause'] = pause
-        #     config['amp'] = amp
-
-        #     for n in range(n_trials):
-        #         y = gen_fn_motifs(motifs, length=t_len, pause=pause, amp=amp, smoothing='cubic')
-        #         ys.append(y)
-        # else:
-        #     raise Exception
-
-        # for y in ys:
-        #     z = np.zeros_like(y)
-        #     if delay == 0:
-        #         z = y
-        #     else:
-        #         z[delay:] = y[:-delay]
-
-        #     trials.append((y, z, delay))
-
-    elif t_type == 'amplify':
         n_freqs = get_args_val(trial_args, 'n_freqs', 15, int)
-        f_range = get_args_val(trial_args, 'f_range', [3, 30], float, n_vals=2)
+        f_range = get_args_val(trial_args, 'f_range', [5, 30], float, n_vals=2)
         amp = get_args_val(trial_args, 'amp', 1, float)
-        mag = get_args_val(trial_args, 'mag', 1, float)
         config['n_freqs'] = n_freqs
         config['f_range'] = f_range
         config['amp'] = amp
-        config['mag'] = mag
+
+
+        x_r = np.arange(t_len)
 
         for n in range(n_trials):
-            x = np.arange(0, t_len)
-            y = np.zeros_like(x)
-
+            x = np.zeros((t_len))
             freqs = np.random.uniform(f_range[0], f_range[1], (n_freqs))
             amps = np.random.uniform(-amp, amp, (n_freqs))
             for i in range(n_freqs):
-                y = y + amps[i] * np.cos(1/freqs[i] * x)
+                x = x + amps[i] * np.sin(1/freqs[i] * x_r)
 
-            z = y * mag
-            trials.append((y, z, mag))
+            y = np.zeros(t_len)
+            if delay == 0:
+                y = x
+            else:
+                y[delay:] = x[:-delay]
+
+            trials.append((x, y, delay))
+
+    elif t_type == 'delay-copy':
+        n_freqs = get_args_val(trial_args, 'n_freqs', 20, int)
+        f_range = get_args_val(trial_args, 'f_range', [10, 40], float, n_vals=2)
+        amp = get_args_val(trial_args, 'amp', 1, float)
+        config['n_freqs'] = n_freqs
+        config['f_range'] = f_range
+        config['amp'] = amp
+
+        s_len = t_len // 2
+        x_r = np.arange(s_len)
+
+        for n in range(n_trials):
+            x = np.zeros((t_len))
+            freqs = np.random.uniform(f_range[0], f_range[1], (n_freqs))
+            amps = np.random.uniform(-amp, amp, (n_freqs))
+            for i in range(n_freqs):
+                x[:s_len] = x[:s_len] + amps[i] * np.sin(1/freqs[i] * x_r) / np.sqrt(n_freqs)
+
+            y = np.zeros(t_len)
+            y[s_len:] = x[:s_len]
+
+            trials.append((x, y, s_len))
 
     else:
         raise NotImplementedError
@@ -311,8 +258,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('mode', default='load')
     parser.add_argument('name')
-    parser.add_argument('-t', '--trial_type', default='rsg-pulse')
-    parser.add_argument('-i', '--intervals', nargs='*', type=int, default=None)
+    parser.add_argument('-t', '--trial_type', default='rsg-2c')
+    parser.add_argument('-i', '--intervals', nargs='*', type=int, default=None, help='intervals for rsg task / for context 1')
+    parser.add_argument('-j', '--intervals2', nargs='*', type=int, default=None, help='intervals for rsg task for context 2, only with rsg-2c')
     parser.add_argument('--motifs', type=str, help='path to motifs')
     parser.add_argument('-a', '--trial_args', nargs='*', help='terms to specify parameters of trial type')
     parser.add_argument('-l', '--trial_len', type=int, default=500)
@@ -361,7 +309,7 @@ if __name__ == '__main__':
                     ml, sl, bl = ax.stem(dset_range, sample[i][1], use_line_collection=True, linefmt='dodgerblue', label='go')
                     ml.set_markerfacecolor('dodgerblue')
                     ml.set_markeredgecolor('dodgerblue')
-                elif dset_type == 'rsg-sohn' or dset_type == 'rsg-window' or dset_type == 'rsg':
+                else:
                     ax.plot(dset_range, sample[i][1], color='dodgerblue', label='go', lw=2)
 
                 ax.set_ylim([-.5, 2.5])

@@ -461,6 +461,12 @@ def adjust_args(args):
     elif config.t_type == 'rsg-sohn':
         args.dset_type = 'rsg-sohn'
         args.out_act = 'exp'
+    elif config.t_type == 'rsg':
+        args.dset_type = 'rsg'
+        args.out_act = 'exp'
+    elif config.t_type == 'rsg-2c':
+        args.dset_type = 'rsg-2c'
+        args.out_act = 'exp'
     elif config.t_type == 'copy-delay':
         args.dset_type = 'copy-delay'
         args.out_act = 'none'
