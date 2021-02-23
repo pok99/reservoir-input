@@ -45,7 +45,8 @@ class Reservoir(nn.Module):
         self.tau_x = 10
         self.activation = torch.tanh
 
-        self.nonlinear_mode = 0
+        # use second set of dynamics equations as in jazayeri papers
+        self.dynamics_mode = 0
 
         self._init_vars()
         self.reset()
@@ -58,7 +59,6 @@ class Reservoir(nn.Module):
         self.J = nn.Linear(self.args.N, self.args.N, bias=self.args.bias)
         self.J.weight.data = torch.normal(0, self.args.res_init_std, self.J.weight.shape) / np.sqrt(self.args.N)
         self.W_ro = nn.Linear(self.args.N, self.args.Z, bias=self.args.bias)
-        # print(self.J.weight.data[0])
         torch.set_rng_state(rng_pt)
 
         # if self.args.J_path is not None:
@@ -76,7 +76,7 @@ class Reservoir(nn.Module):
 
     # extras currently doesn't do anything. maybe add x val, etc.
     def forward(self, u=None, extras=False):
-        if self.nonlinear_mode == 0:
+        if self.dynamics_mode == 0:
 
             if u is None:
                 g = self.activation(self.J(self.x))
@@ -92,7 +92,7 @@ class Reservoir(nn.Module):
 
             z = self.W_ro(self.x)
 
-        elif self.nonlinear_mode == 1:
+        elif self.dynamics_mode == 1:
             if u is None:
                 g = self.J(self.r)
             else:
@@ -139,7 +139,8 @@ class Reservoir(nn.Module):
             print('not any of these types, something went wrong')
             pdb.set_trace()
 
-        self.r = self.activation(self.x)
+        if self.dynamics_mode == 1:
+            self.r = self.activation(self.x)
 
         if burn_in:
             self.burn_in(self.args.res_burn_steps)
@@ -159,7 +160,6 @@ class BasicNetwork(nn.Module):
             self.load_state_dict(torch.load(self.args.model_path))
         
         self.out_act = get_output_activation(self.args)
-        self.network_delay = args.network_delay
 
         self.reset()
 
@@ -183,12 +183,6 @@ class BasicNetwork(nn.Module):
             z = self.W_ro(u)
         z = self.out_act(z)
 
-        # if self.network_delay > 0:
-        #     z_delayed = self.delay_output[self.delay_ind]
-        #     self.delay_output[self.delay_ind] = z
-        #     self.delay_ind = (self.delay_ind + 1) % self.network_delay
-        #     z = z_delayed
-
         if not extras:
             return z
         elif self.args.use_reservoir:
@@ -196,12 +190,8 @@ class BasicNetwork(nn.Module):
         else:
             return z, {'u': u}
 
-
     def reset(self, res_state=None):
         if self.args.use_reservoir:
             self.reservoir.reset(res_state=res_state)
-        # set up network delay mechanism. essentially a queue of length network_delay
-        # with a pointer to the current index
-        # if self.network_delay > 0:
-        #     self.delay_output = [None] * self.network_delay
-        #     self.delay_ind = 0
+
+            

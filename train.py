@@ -58,13 +58,12 @@ class Trainer:
         self.scheduler = get_scheduler(self.args, self.optimizer)
         if self.args.dataset is None:
             # means we're using contexts
+            raise NotImplementedError
             dsets = []
             for d in self.args.contexts:
                 dsets.append(load_rb(d))
         else:
             self.dset = load_rb(self.args.dataset)
-
-        self.dset = self.dset
 
         # if using separate training and test sets, separate them out
         if self.args.same_test:
@@ -455,28 +454,24 @@ def adjust_args(args):
 
     # set the dataset
     config = get_config(args.dataset, ctype='data', to_bunch=True)
-    if config.t_type == 'rsg-bin':
-        args.dset_type = 'rsg-bin'
+    args.dset_type = config.t_type
+    if config.t_type.startswith('rsg'):
+        if config.t_type == 'rsg-bin':
+            args.out_act = 'none'
+        else:
+            args.out_act = 'exp'
+    elif config.t_type == 'copy':
+        args.dset_type = 'copy'
         args.out_act = 'none'
-    elif config.t_type == 'rsg-sohn':
-        args.dset_type = 'rsg-sohn'
-        args.out_act = 'exp'
-    elif config.t_type == 'rsg':
-        args.dset_type = 'rsg'
-        args.out_act = 'exp'
-    elif config.t_type == 'rsg-2c':
-        args.dset_type = 'rsg-2c'
-        args.out_act = 'exp'
-    elif config.t_type == 'copy-delay':
-        args.dset_type = 'copy-delay'
+        args.L = 1
+    elif config.t_type == 'delay-copy':
+        args.dset_type = 'delay-copy'
         args.out_act = 'none'
         args.L = 1
     elif config.t_type == 'copy-snip':
         args.dset_type = 'copy-snip'
         args.out_act = 'none'
         args.L = 1
-    else:
-        args.dset_type = 'unknown'
 
     if args.same_signal:
         args.L = 1
