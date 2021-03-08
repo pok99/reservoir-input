@@ -100,8 +100,15 @@ def log_this(config, log_dir, log_name=None, checkpoints=False, use_id=True):
 
 # https://code.activestate.com/recipes/52308-the-simple-but-handy-collector-of-a-bunch-of-named/?in=user-97991
 class Bunch:
-    def __init__(self, **kwds):
+    def __init__(self, *args, **kwds):
+        if len(args) > 0:
+            for k,v in args[0].__dict__.items():
+                self.__dict__[k] = copy.deepcopy(v)
+            # self.__dict__.update(args[0].__dict__)
         self.__dict__.update(kwds)
+
+    def to_json(self):
+        return copy.deepcopy(self.__dict__)
 
 def load_rb(path):
     with open(path, 'rb') as f:

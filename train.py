@@ -26,7 +26,10 @@ class Trainer:
         super().__init__()
 
         self.args = args
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
         self.net = BasicNetwork(self.args)
+        self.net.to(self.device)
 
         # getting number of elements of every parameter
         self.n_params = {}
@@ -55,11 +58,12 @@ class Trainer:
         self.scheduler = get_scheduler(self.args, self.optimizer)
         if self.args.dataset is None:
             # means we're using contexts
+            raise NotImplementedError
             dsets = []
             for d in self.args.contexts:
                 dsets.append(load_rb(d))
         else:
-            self.dset = load_rb(self.args.dataset)            
+            self.dset = load_rb(self.args.dataset)
 
         # if using separate training and test sets, separate them out
         if self.args.same_test:
@@ -220,12 +224,16 @@ class Trainer:
             return total_loss, etc
         return total_loss
 
-    def train_iteration(self, x, y, info):
+    def train_iteration(self, x, y, info, ix_callback=None):
         self.net.reset(self.args.res_x_init)
         self.optimizer.zero_grad()
 
         total_loss, etc = self.run_trial(x, y, info, extras=True)
         total_loss.backward()
+
+        if ix_callback is not None:
+            ix_callback(total_loss, etc)
+        self.optimizer.step()
 
         etc = {
             'ins': x,
@@ -272,11 +280,7 @@ class Trainer:
                 ix += 1
 
                 x, y, info = get_x_y_info(args, batch)
-                iter_loss, etc = self.train_iteration(x, y, info)
-
-                if ix_callback is not None:
-                    ix_callback(iter_loss, etc)
-                self.optimizer.step()
+                iter_loss, etc = self.train_iteration(x, y, info, ix_callback=ix_callback)
 
                 if iter_loss == -1:
                     logging.info(f'iteration {ix}: is nan. ending')
@@ -450,22 +454,24 @@ def adjust_args(args):
 
     # set the dataset
     config = get_config(args.dataset, ctype='data', to_bunch=True)
-    if config.t_type == 'rsg-bin':
-        args.dset_type = 'rsg-bin'
+    args.dset_type = config.t_type
+    if config.t_type.startswith('rsg'):
+        if config.t_type == 'rsg-bin':
+            args.out_act = 'none'
+        else:
+            args.out_act = 'exp'
+    elif config.t_type == 'copy':
+        args.dset_type = 'copy'
         args.out_act = 'none'
-    elif config.t_type == 'rsg-sohn':
-        args.dset_type = 'rsg-sohn'
-        args.out_act = 'exp'
-    elif config.t_type == 'copy-delay':
-        args.dset_type = 'copy-delay'
+        args.L = 1
+    elif config.t_type == 'delay-copy':
+        args.dset_type = 'delay-copy'
         args.out_act = 'none'
         args.L = 1
     elif config.t_type == 'copy-snip':
         args.dset_type = 'copy-snip'
         args.out_act = 'none'
         args.L = 1
-    else:
-        args.dset_type = 'unknown'
 
     if args.same_signal:
         args.L = 1
@@ -506,10 +512,10 @@ def adjust_args(args):
 
 if __name__ == '__main__':
     args = parse_args()
-    args = adjust_args(args)   
+    args = adjust_args(args)
 
     trainer = Trainer(args)
-    logging.info(f'Initialized trainer. Using optimizer {args.optimizer}.')
+    logging.info(f'Initialized trainer. Using device {trainer.device}, optimizer {args.optimizer}.')
     n_iters = 0
     if args.optimizer == 'lbfgs':
         best_loss, n_iters = trainer.optimize_lbfgs()
