@@ -34,6 +34,22 @@ def add_yaml_args(args, config_file):
             #     logging.warning(f'{c} is not set to begin with: {v}')
     return args
 
+def add_config_args(args, config_file, to_bunch=True):
+    if config_file:
+        try:
+            # maybe it's yaml
+            config = yaml.safe_load(open(config_file))
+        except:
+            # maybe it's json
+            config = json.load(open(config_file, 'r'))
+        dic = vars(args)
+        for c, v in config.items():
+            dic[c] = v
+    if to_bunch:
+        return Bunch(args)
+    else:
+        return args
+
 # fills an argument dictionary with keys from a default dictionary
 # also works with dicts now
 def fill_undefined_args(args, default_args, overwrite_none=False, to_bunch=False):

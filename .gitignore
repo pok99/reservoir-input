@@ -1,13 +1,18 @@
-__pycache__/
 playground/
-logs/
-archive/
 
+# administrative
+admin/cosyne
+*.key
+
+# cluster
 **slurm**
 sshfs_ri/
 
+# data
 *.pkl
+logs/
+archive/
 
+# cache
 ._*
-
-train_backup.py
+__pycache__/

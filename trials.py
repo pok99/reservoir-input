@@ -15,8 +15,8 @@ from matplotlib import collections as matcoll
 
 import argparse
 
-from motifs import gen_fn_motifs
-from utils import load_rb, Bunch
+# from motifs import gen_fn_motifs
+from utils import add_config_args, load_rb, Bunch
 
 eps = 1e-6
 
@@ -31,26 +31,19 @@ def create_dataset(args):
     t_len = args.trial_len
     trial_args = args.trial_args
 
-
-    config = {}
-    config['argv'] = sys.argv
-    config['t_type'] = t_type
-    config['n_trials'] = n_trials
-    config['t_len'] = t_len
-
     trials = []
     if t_type.startswith('rsg'):
         # should generally not use rsg1 and use rsg instead
         # old implementation with bug here for reproducibility
         if t_type.startswith('rsg1'):
             p_len = get_args_val(trial_args, 'plen', 5, int)
-            config['p_len'] = p_len
+            args.pulse_len = p_len
             if args.intervals is None:
                 # amount of time in between ready and set cues
                 min_t = get_args_val(trial_args, 'gt', p_len * 4, int)
                 max_t = get_args_val(trial_args, 'lt', t_len // 2 - p_len * 4, int)
-                config['min_t'] = min_t
-                config['max_t'] = max_t
+                args.min_t = min_t
+                args.max_t = max_t
             for n in range(n_trials):
                 if args.intervals is None:
                     t_p = np.random.randint(min_t, max_t)
@@ -100,13 +93,13 @@ def create_dataset(args):
             # fixed the bug where distribution of start points is different for different intervals
             p_len = get_args_val(trial_args, 'plen', 5, int)
             max_ready = get_args_val(trial_args, 'max_ready', 80, int)
-            config['p_len'] = p_len
-            config['max_ready'] = max_ready
+            args.pulse_len = p_len
+            args.max_ready_time = max_ready
             if args.intervals is None:
                 min_t = get_args_val(trial_args, 'gt', p_len * 4, int)
                 max_t = get_args_val(trial_args, 'lt', t_len // 2 - p_len * 4, int)
-                config['min_t'] = min_t
-                config['max_t'] = max_t
+                args.min_t = min_t
+                args.max_t = max_t
             for n in range(n_trials):
                 if args.intervals is None:
                     t_p = np.random.randint(min_t, max_t)
@@ -134,15 +127,14 @@ def create_dataset(args):
             # fixing the bug where distribution of start points is different for different intervals
             p_len = get_args_val(trial_args, 'plen', 5, int)
             max_ready = get_args_val(trial_args, 'max_ready', 80, int)
-            config['p_len'] = p_len
-            config['max_ready'] = max_ready
+            args.pulse_len = p_len
+            args.max_ready_time = max_ready
             if args.intervals is None or args.intervals2 is None:
                 min_t = get_args_val(trial_args, 'gt', p_len * 4, int)
-                max_t = get_args_val(trial_args, 'lt', t_len // 2 - p_len * 4, int)
+                max_t = get_args_val(trial_args, 'lt', t_len // 2 - max_ready // 2 - p_len * 4, int)
                 mean_t = (min_t + max_t) / 2
-                config['min_t'] = min_t
-                config['max_t'] = max_t
-                config['mean_t'] = mean_t
+                args.min_t = min_t
+                args.max_t = max_t
             for n in range(n_trials):
                 context = random.choice([0, 1])
                 if context == 0:
@@ -175,7 +167,7 @@ def create_dataset(args):
 
     elif t_type.startswith('copy'):
         delay = get_args_val(trial_args, 'delay', 0, int)
-        config['delay'] = delay
+        config.delay = delay
 
         n_freqs = get_args_val(trial_args, 'n_freqs', 15, int)
         f_range = get_args_val(trial_args, 'f_range', [5, 30], float, n_vals=2)
@@ -228,7 +220,7 @@ def create_dataset(args):
     else:
         raise NotImplementedError
 
-    return trials, config
+    return trials, args
 
 def get_args_val(args, name, default, dtype, n_vals=1):
     if name in args:
@@ -250,22 +242,26 @@ def save_dataset(dset, name, config=None):
     gname = name + '.json'
     if config is not None:
         with open(os.path.join('datasets', 'configs', gname), 'w') as f:
-            json.dump(config, f, indent=2)
+            json.dump(config.to_json(), f, indent=2)
 
 
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('mode', default='load')
+    parser.add_argument('mode', default='load', choices=['create', 'load'])
     parser.add_argument('name')
-    parser.add_argument('-t', '--trial_type', default='rsg-2c')
-    parser.add_argument('-i', '--intervals', nargs='*', type=int, default=None, help='intervals for rsg task / for context 1')
-    parser.add_argument('-j', '--intervals2', nargs='*', type=int, default=None, help='intervals for rsg task for context 2, only with rsg-2c')
+    parser.add_argument('-c', '--config', default=None, help='create from a config file')
+    parser.add_argument('-t', '--trial_type', default='rsg-2c', help='type of trial to create')
+    parser.add_argument('-i', '--intervals', nargs='*', type=int, default=None, help='rsg intervals for context 1')
+    parser.add_argument('-j', '--intervals2', nargs='*', type=int, default=None, help='rsg intervals for context 2 (rsg-2c)')
     parser.add_argument('--motifs', type=str, help='path to motifs')
     parser.add_argument('-a', '--trial_args', nargs='*', help='terms to specify parameters of trial type')
     parser.add_argument('-l', '--trial_len', type=int, default=500)
     parser.add_argument('-n', '--n_trials', type=int, default=2000)
     args = parser.parse_args()
+    args = add_config_args(args, args.config)
+
+    args.argv = ' '.join(sys.argv)
 
     if args.trial_args is None:
         args.trial_args = []
@@ -282,7 +278,7 @@ if __name__ == '__main__':
         config_path = config_path_tmp[:-4] + '.json'
         with open(config_path, 'r') as f:
             config = json.load(f)
-        dset_type = config['t_type']
+        dset_type = config['trial_type']
 
         dset_len = len(dset)
         sample = random.sample(dset, 12)

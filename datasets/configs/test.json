@@ -1,28 +1,22 @@
 {
-  "argv": [
-    "dataset.py",
-    "create",
-    "test",
-    "-t",
-    "rsg-2c",
-    "-i",
-    "100",
-    "112",
-    "125",
-    "138",
-    "150",
-    "-j",
-    "150",
-    "162",
-    "175",
-    "188",
+  "mode": "create",
+  "name": "test",
+  "config": null,
+  "trial_type": "rsg-2c",
+  "intervals": null,
+  "intervals2": null,
+  "motifs": null,
+  "trial_args": [
+    "lt",
     "200",
-    "-n",
-    "20"
+    "gt",
+    "100"
   ],
-  "t_type": "rsg-2c",
+  "trial_len": 500,
   "n_trials": 20,
-  "t_len": 500,
-  "p_len": 5,
-  "max_ready": 80
+  "argv": "trials.py create test2 -c datasets/configs/test.json",
+  "pulse_len": 5,
+  "max_ready_time": 80,
+  "min_t": 100,
+  "max_t": 200
 }
