@@ -1,7 +1,8 @@
 import numpy as np
 import torch
+import matplotlib as mpl
+mpl.use('tkagg')
 import matplotlib.pyplot as plt
-
 import os
 import sys
 import json
@@ -9,12 +10,8 @@ import pdb
 
 import argparse
 
-
 sys.path.append('../')
-
 from testers import load_model_path
-
-
 
 def main(args):
 
@@ -51,7 +48,7 @@ def main(args):
 
 
     plt.plot(norms)
-    plt.show()
+    plt.savefig('figures/weight_changes.png')
 
 
 if __name__ == '__main__':

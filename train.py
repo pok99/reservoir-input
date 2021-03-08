@@ -224,12 +224,16 @@ class Trainer:
             return total_loss, etc
         return total_loss
 
-    def train_iteration(self, x, y, info):
+    def train_iteration(self, x, y, info, ix_callback=None):
         self.net.reset(self.args.res_x_init)
         self.optimizer.zero_grad()
 
         total_loss, etc = self.run_trial(x, y, info, extras=True)
         total_loss.backward()
+
+        if ix_callback is not None:
+            ix_callback(total_loss, etc)
+        self.optimizer.step()
 
         etc = {
             'ins': x,
@@ -276,11 +280,7 @@ class Trainer:
                 ix += 1
 
                 x, y, info = get_x_y_info(args, batch)
-                iter_loss, etc = self.train_iteration(x, y, info)
-
-                if ix_callback is not None:
-                    ix_callback(iter_loss, etc)
-                self.optimizer.step()
+                iter_loss, etc = self.train_iteration(x, y, info, ix_callback=ix_callback)
 
                 if iter_loss == -1:
                     logging.info(f'iteration {ix}: is nan. ending')
