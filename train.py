@@ -336,8 +336,8 @@ class Trainer:
 
 def parse_args():
     parser = argparse.ArgumentParser(description='')
-    parser.add_argument('-L', type=int, default=2, help='latent input dimension')
-    parser.add_argument('-T', type=int, default=1, help='task dimension')
+    parser.add_argument('-L', type=int, default=5, help='latent input dimension')
+    # parser.add_argument('-T', type=int, default=1, help='task dimension')
     parser.add_argument('-D', type=int, default=5, help='intermediate dimension')
     parser.add_argument('-N', type=int, default=50, help='number of neurons in reservoir')
     parser.add_argument('-Z', type=int, default=1, help='output dimension')
@@ -363,12 +363,9 @@ def parse_args():
     parser.add_argument('--no_bias', action='store_true')
     parser.add_argument('--out_act', type=str, default=None, help='output activation')
 
-    parser.add_argument('-d', '--dataset', type=str, default='datasets/rsg-sohn.pkl')
-    # need same number of inputs for the following two arguments. using them overwrites -d dataset
-    parser.add_argument('-c', '--contexts', type=str, nargs='+', default=[], help='list of datasets to use for context training')
-    parser.add_argument('-n', '--context_names', type=str, nargs='+', default=[], help='names of datasets used for context training')
+    parser.add_argument('-d', '--dataset', type=str, nargs='+', help='dataset(s) to use. >1 means different contexts')
     # high-level arguments that control dataset manipulations
-    parser.add_argument('--same_signal', action='store_true', help='use 1d input instead of separate ready/set pulses')
+    parser.add_argument('--separate_signal', action='store_true', help='use 2d input instead of combined ready/set pulses')
     parser.add_argument('--same_test', action='store_true', help='use entire dataset for both training and testing')
     
     parser.add_argument('--optimizer', choices=['adam', 'sgd', 'rmsprop', 'lbfgs'], default='adam')
@@ -381,7 +378,7 @@ def parse_args():
     parser.add_argument('--patience', type=int, default=2000, help='stop training if loss doesn\'t decrease. adam only')
     parser.add_argument('--l2_reg', type=float, default=0, help='amount of l2 regularization')
     parser.add_argument('--s_rate', default=None, type=float, help='scheduler rate. dont use for no scheduler')
-    parser.add_argument('--losses', type=str, nargs='+', choices=['mse', 'bce', 'mse-w', 'bce-w', 'mse-g', 'mse-w2'], default=[])
+    parser.add_argument('--loss', type=str, nargs='+', choices=['mse', 'bce', 'mse-w', 'bce-w', 'mse-g', 'mse-w2'], default=['mse'])
 
     # adam lambdas
     parser.add_argument('--l1', type=float, default=1, help='weight of normal loss')
@@ -452,35 +449,21 @@ def adjust_args(args):
     if args.train_parts == ['all']:
         args.train_parts = ['']
 
-    # set the dataset
-    config = get_config(args.dataset, ctype='data', to_bunch=True)
-    args.dset_type = config.t_type
-    if config.t_type.startswith('rsg'):
-        if config.t_type == 'rsg-bin':
-            args.out_act = 'none'
-        else:
-            args.out_act = 'exp'
-    elif config.t_type == 'copy':
-        args.dset_type = 'copy'
-        args.out_act = 'none'
-        args.L = 1
-    elif config.t_type == 'delay-copy':
-        args.dset_type = 'delay-copy'
-        args.out_act = 'none'
-        args.L = 1
-    elif config.t_type == 'copy-snip':
-        args.dset_type = 'copy-snip'
-        args.out_act = 'none'
-        args.L = 1
-
-    if args.same_signal:
-        args.L = 1
-
-    args.n_contexts = 0
-    assert len(args.contexts) == len(args.context_names) or len(args.context_names) == 0
-    if len(args.contexts) > 0:
-        args.n_contexts = len(args.contexts)
-        args.dataset = 'None'
+    args.dset_type = []
+    args.out_act = []
+    configs = []
+    args.T = len(args.dataset)
+    for dset in args.dataset:
+        config = get_config(dset, ctype='data', to_bunch=True)
+        configs.append(config)
+        args.dset_type.append(config.trial_type)
+        if config.trial_type.startswith('rsg'):
+            # exp nonlinearity constrains positive outputs which is useful for mse rules
+            if config.trial_type == 'rsg-bin':
+                out_act = 'none'
+            else:
+                out_act = 'exp'
+            args.out_act.append(out_act)
 
     # initializing logging
     # do this last, because we will be logging previous parameters into the config file

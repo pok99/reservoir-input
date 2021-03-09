@@ -23,6 +23,16 @@ eps = 1e-6
 mpl.rcParams['lines.markersize'] = 2
 mpl.rcParams['lines.linewidth'] = .5
 
+
+# given info about the trial, create the target in np form
+def get_target(args):
+    if args.trial_type.startswith('rsg'):
+        y = np.arange(args.t_len)
+        slope = 1 / args.t_p
+        y = y * slope - args.rsg[1] * slope
+        y = np.clip(y, 0, 1.5)
+    return y
+
 # toy ready set go dataset
 def create_dataset(args):
     name = args.name
@@ -33,142 +43,88 @@ def create_dataset(args):
 
     trials = []
     if t_type.startswith('rsg'):
-        # should generally not use rsg1 and use rsg instead
-        # old implementation with bug here for reproducibility
-        if t_type.startswith('rsg1'):
-            p_len = get_args_val(trial_args, 'plen', 5, int)
-            args.pulse_len = p_len
+        p_len = get_args_val(trial_args, 'plen', 5, int)
+        max_ready = get_args_val(trial_args, 'max_ready', 80, int)
+        args.pulse_len = p_len
+        args.max_ready_time = max_ready
+        if args.intervals is None:
+            min_t = get_args_val(trial_args, 'gt', p_len * 4, int)
+            max_t = get_args_val(trial_args, 'lt', t_len // 2 - p_len * 4, int)
+            args.min_t = min_t
+            args.max_t = max_t
+
+        # creating individual trials
+        for n in range(n_trials):
             if args.intervals is None:
-                # amount of time in between ready and set cues
-                min_t = get_args_val(trial_args, 'gt', p_len * 4, int)
-                max_t = get_args_val(trial_args, 'lt', t_len // 2 - p_len * 4, int)
-                args.min_t = min_t
-                args.max_t = max_t
-            for n in range(n_trials):
-                if args.intervals is None:
-                    t_p = np.random.randint(min_t, max_t)
-                else:
-                    # use one of the intervals that we desire
-                    num = random.choice(args.intervals)
-                    assert num < t_len / 2
-                    t_p = num
+                t_p = np.random.randint(min_t, max_t)
+            else:
+                t_p = random.choice(args.intervals)
+            ready_time = np.random.randint(p_len * 2, max_ready)
+            set_time = ready_time + t_p
+            go_time = set_time + t_p
 
-                ready_time = np.random.randint(p_len * 4, t_len - t_p * 2 - p_len * 4)
-                set_time = ready_time + t_p
-                go_time = set_time + t_p
+            assert go_time < t_len
 
-                assert go_time < t_len
+            trial = {
+                'trial_type': 'rsg',
+                'pulse_len': p_len,
+                'trial_len': t_len,
+                'rsg': (ready_time, set_time, go_time),
+                't_p': t_p
+            }
 
-                trial_x = np.zeros((t_len, 2))
-                trial_x[ready_time:ready_time+p_len, 0] = 1
-                trial_x[set_time:set_time+p_len, 1] = 1
+            trials.append(trial)
 
-                trial_y = np.zeros((t_len))
-                if t_type == 'rsg1-bin':
-                    trial_y[go_time:go_time+p_len] = 1
-                elif t_type == 'rsg1-sohn':
-                    # A = 3
-                    # alpha = (t_p - p_len) / t_p / np.log(4/3)
-                    # TODO: FIX THIS BUG WITH OFFSETS
-                    trial_y_temp = np.arange(t_len - set_time - p_len)
-                    trial_y_fn = lambda t: t / t_p
-                    trial_y[set_time+p_len:] = trial_y_fn(trial_y_temp)
-                    trial_y = np.clip(trial_y, 0, 2)
-                elif t_type == 'rsg1-window':
-                    trial_x = np.zeros((ready_time + 3 * t_p, 2))
-                    trial_x[ready_time:ready_time+p_len, 0] = 1
-                    trial_x[set_time:set_time+p_len, 1] = 1
-                    trial_y = np.zeros((ready_time + 3 * t_p))
+            # ready / set come in thru separate channels
+            # training should default to combining them
+            # disable combining via the --separate_signal flag
+            # trial_x = np.zeros((t_len, 2))
+            # trial_x[ready_time:ready_time+p_len, 0] = 1
+            # trial_x[set_time:set_time+p_len, 1] = 1
 
-                    A = 3
-                    alpha = (t_p - p_len) / t_p / np.log(4/3)
-                    trial_y_temp = np.arange(2 * t_p - p_len)
-                    trial_y_fn = lambda t: A * (np.exp(t / (alpha * t_p)) - 1)
-                    trial_y[set_time+p_len:] = trial_y_fn(trial_y_temp)
+        # elif t_type == 'rsg-2c':
+        #     # fixing the bug where distribution of start points is different for different intervals
+        #     p_len = get_args_val(trial_args, 'plen', 5, int)
+        #     max_ready = get_args_val(trial_args, 'max_ready', 80, int)
+        #     args.pulse_len = p_len
+        #     args.max_ready_time = max_ready
+        #     if args.intervals is None or args.intervals2 is None:
+        #         min_t = get_args_val(trial_args, 'gt', p_len * 4, int)
+        #         max_t = get_args_val(trial_args, 'lt', t_len // 2 - max_ready // 2 - p_len * 4, int)
+        #         mean_t = (min_t + max_t) / 2
+        #         args.min_t = min_t
+        #         args.max_t = max_t
+        #     for n in range(n_trials):
+        #         context = random.choice([0, 1])
+        #         if context == 0:
+        #             if args.intervals is None:
+        #                 t_p = np.random.randint(min_t, mean_t)
+        #             else:
+        #                 t_p = random.choice(args.intervals)
+        #         else:
+        #             if args.intervals2 is None:
+        #                 t_p = np.random.randint(mean_t, max_t)
+        #             else:
+        #                 t_p = random.choice(args.intervals2)
 
-                info = (ready_time, set_time, go_time)
-                trials.append((trial_x, trial_y, info))
+        #         ready_time = np.random.randint(p_len * 2, max_ready)
+        #         set_time = ready_time + t_p
+        #         go_time = set_time + t_p
+        #         assert go_time < t_len
 
-        elif t_type.startswith('rsg2'):
-            # fixed the bug where distribution of start points is different for different intervals
-            p_len = get_args_val(trial_args, 'plen', 5, int)
-            max_ready = get_args_val(trial_args, 'max_ready', 80, int)
-            args.pulse_len = p_len
-            args.max_ready_time = max_ready
-            if args.intervals is None:
-                min_t = get_args_val(trial_args, 'gt', p_len * 4, int)
-                max_t = get_args_val(trial_args, 'lt', t_len // 2 - p_len * 4, int)
-                args.min_t = min_t
-                args.max_t = max_t
-            for n in range(n_trials):
-                if args.intervals is None:
-                    t_p = np.random.randint(min_t, max_t)
-                else:
-                    t_p = random.choice(args.intervals)
-                ready_time = np.random.randint(p_len * 2, max_ready)
-                set_time = ready_time + t_p
-                go_time = set_time + t_p
+        #         # 2 channels for ready / set will be combined later
+        #         trial_x = np.zeros((t_len, 3))
+        #         trial_x[ready_time:ready_time+p_len, 0] = 1
+        #         trial_x[set_time:set_time+p_len, 1] = 1
+        #         trial_x[:,2] = context
 
-                assert go_time < t_len
+        #         trial_y = np.arange(t_len)
+        #         slope = 1 / t_p
+        #         trial_y = trial_y * slope - set_time * slope
+        #         trial_y = np.clip(trial_y, 0, 1.5)
 
-                # ready / set come in thru separate channels
-                # training should default to combining them
-                # disable combining via the --separate_signal flag
-                trial_x = np.zeros((t_len, 2))
-                trial_x[ready_time:ready_time+p_len, 0] = 1
-                trial_x[set_time:set_time+p_len, 1] = 1
-
-                trial_y = np.arange(t_len)
-                slope = 1 / t_p
-                trial_y = trial_y * slope - set_time * slope
-                trial_y = np.clip(trial_y, 0, 1.5)
-
-                info = (ready_time, set_time, go_time)
-                trials.append((trial_x, trial_y, info))
-
-        elif t_type == 'rsg-2c':
-            # fixing the bug where distribution of start points is different for different intervals
-            p_len = get_args_val(trial_args, 'plen', 5, int)
-            max_ready = get_args_val(trial_args, 'max_ready', 80, int)
-            args.pulse_len = p_len
-            args.max_ready_time = max_ready
-            if args.intervals is None or args.intervals2 is None:
-                min_t = get_args_val(trial_args, 'gt', p_len * 4, int)
-                max_t = get_args_val(trial_args, 'lt', t_len // 2 - max_ready // 2 - p_len * 4, int)
-                mean_t = (min_t + max_t) / 2
-                args.min_t = min_t
-                args.max_t = max_t
-            for n in range(n_trials):
-                context = random.choice([0, 1])
-                if context == 0:
-                    if args.intervals is None:
-                        t_p = np.random.randint(min_t, mean_t)
-                    else:
-                        t_p = random.choice(args.intervals)
-                else:
-                    if args.intervals2 is None:
-                        t_p = np.random.randint(mean_t, max_t)
-                    else:
-                        t_p = random.choice(args.intervals2)
-
-                ready_time = np.random.randint(p_len * 2, max_ready)
-                set_time = ready_time + t_p
-                go_time = set_time + t_p
-                assert go_time < t_len
-
-                # 2 channels for ready / set will be combined later
-                trial_x = np.zeros((t_len, 3))
-                trial_x[ready_time:ready_time+p_len, 0] = 1
-                trial_x[set_time:set_time+p_len, 1] = 1
-                trial_x[:,2] = context
-
-                trial_y = np.arange(t_len)
-                slope = 1 / t_p
-                trial_y = trial_y * slope - set_time * slope
-                trial_y = np.clip(trial_y, 0, 1.5)
-
-                info = (ready_time, set_time, go_time, context)
-                trials.append((trial_x, trial_y, info))
+        #         info = (ready_time, set_time, go_time, context)
+        #         trials.append((trial_x, trial_y, info))
 
     elif t_type.startswith('copy'):
         delay = get_args_val(trial_args, 'delay', 0, int)
@@ -256,13 +212,22 @@ if __name__ == '__main__':
     parser.add_argument('mode', default='load', choices=['create', 'load'])
     parser.add_argument('name')
     parser.add_argument('-c', '--config', default=None, help='create from a config file')
+
+    # general dataset arguments
     parser.add_argument('-t', '--trial_type', default='rsg-2c', help='type of trial to create')
-    parser.add_argument('-i', '--intervals', nargs='*', type=int, default=None, help='rsg intervals for context 1')
-    parser.add_argument('-j', '--intervals2', nargs='*', type=int, default=None, help='rsg intervals for context 2 (rsg-2c)')
-    parser.add_argument('--motifs', type=str, help='path to motifs')
-    parser.add_argument('-a', '--trial_args', nargs='*', help='terms to specify parameters of trial type')
     parser.add_argument('-l', '--trial_len', type=int, default=500)
     parser.add_argument('-n', '--n_trials', type=int, default=2000)
+
+    # rsg specific arguments
+    parser.add_argument('-i', '--intervals', nargs='*', type=int, default=None, help='select from rsg intervals')
+    parser.add_argument('--lt', type=int, default=None, help='rsg: less than')
+    parser.add_argument('--gt', type=int, default=None, help='rsg: greater than')
+    parser.add_argument('--plen', type=int, default=None, help='rsg: pulse length')
+    parser.add_argument('--max_ready', type=int, default=None, help='rsg: max ready time')
+
+    parser.add_argument('--motifs', type=str, help='path to motifs')
+    parser.add_argument('-a', '--trial_args', nargs='*', help='terms to specify parameters of trial type')
+    
     args = parser.parse_args()
     args = add_config_args(args, args.config)
 
