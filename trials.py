@@ -111,6 +111,9 @@ def create_dataset(args):
 
                 assert go_time < t_len
 
+                # ready / set come in thru separate channels
+                # training should default to combining them
+                # disable combining via the --separate_signal flag
                 trial_x = np.zeros((t_len, 2))
                 trial_x[ready_time:ready_time+p_len, 0] = 1
                 trial_x[set_time:set_time+p_len, 1] = 1
@@ -118,7 +121,7 @@ def create_dataset(args):
                 trial_y = np.arange(t_len)
                 slope = 1 / t_p
                 trial_y = trial_y * slope - set_time * slope
-                trial_y = np.clip(trial_y, 0, 2)
+                trial_y = np.clip(trial_y, 0, 1.5)
 
                 info = (ready_time, set_time, go_time)
                 trials.append((trial_x, trial_y, info))
@@ -153,14 +156,16 @@ def create_dataset(args):
                 go_time = set_time + t_p
                 assert go_time < t_len
 
-                trial_x = np.zeros((t_len, 2))
-                trial_x[ready_time:ready_time+p_len, 0] = (context + 1) / 2
+                # 2 channels for ready / set will be combined later
+                trial_x = np.zeros((t_len, 3))
+                trial_x[ready_time:ready_time+p_len, 0] = 1
                 trial_x[set_time:set_time+p_len, 1] = 1
+                trial_x[:,2] = context
 
                 trial_y = np.arange(t_len)
                 slope = 1 / t_p
                 trial_y = trial_y * slope - set_time * slope
-                trial_y = np.clip(trial_y, 0, 2)
+                trial_y = np.clip(trial_y, 0, 1.5)
 
                 info = (ready_time, set_time, go_time, context)
                 trials.append((trial_x, trial_y, info))
@@ -307,6 +312,8 @@ if __name__ == '__main__':
                     ml.set_markeredgecolor('dodgerblue')
                 else:
                     ax.plot(dset_range, sample[i][1], color='dodgerblue', label='go', lw=2)
+                    if dset_type == 'rsg-2c':
+                        ax.plot(dset_range, sample[i][0][:,2], color='violet', label='context', ls='--', lw=1)
 
                 ax.set_ylim([-.5, 2.5])
 
