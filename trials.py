@@ -31,16 +31,27 @@ def get_x(trial, args=None):
         x = np.zeros((5, trial['trial_len']))
         rt, st, gt = trial['rsg']
         plen = trial['pulse_len']
+        # ready pulse
         x[0, rt:rt+plen] = 1
+        # set pulse
+        x_set = np.zeros(trial['trial_len'])
+        x_set[st:st+plen] = 1
+        # perceptual shift
+        if args is not None and args.m_noise != 0:
+            x_set = shift_x(x_set, trial)
+        # are ready/set different signals?
         if args is not None and args.separate_signal:
-            x[1, st:st+plen] = 1
+            x[1] = x_set
         else:
-            x[0, st:st+plen] = 1
+            x[0] += x_set
+        if args is not None and args.x_noise != 0:
+            x = corrupt_x(args, x)
+        
     elif trial['trial_type'] == 'delay-copy':
         x = trial['x']
     return x
 
-def get_y(trial):
+def get_y(trial, args=None):
     if trial['trial_type'].startswith('rsg'):
         y = np.arange(trial['trial_len'])
         slope = 1 / trial['t_p']
@@ -50,6 +61,18 @@ def get_y(trial):
         y = trial['y']
     return y
 
+# ways to add noise to x
+def corrupt_x(args, x):
+    x += np.random.normal(scale=args.x_noise, size=x.shape)
+    return x
+
+def shift_x(args, x, trial):
+    if args.m_noise == 0:
+        return x
+    t_p = trial['t_p']
+    disp = int(np.random.normal(0, args.m_noise*t_p/50))
+    x = x.roll(disp)
+    return x
 
 def create_dataset(args):
     t_type = args.trial_type

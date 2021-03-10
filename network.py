@@ -20,7 +20,7 @@ DEFAULT_ARGS = {
     'Z': 2,
 
     'use_reservoir': True,
-    'res_init_std': 1.5,
+    'res_init_g': 1.5,
     'res_burn_steps': 200,
     'res_noise': 0,
     'bias': True,
@@ -55,9 +55,9 @@ class Reservoir(nn.Module):
         rng_pt = torch.get_rng_state()
         torch.manual_seed(self.args.res_seed)
         self.W_u = nn.Linear(self.args.D, self.args.N, bias=False)
-        self.W_u.weight.data = torch.normal(0, self.args.res_init_std, self.W_u.weight.shape) / np.sqrt(self.args.D)
+        self.W_u.weight.data = torch.normal(0, self.args.res_init_g, self.W_u.weight.shape) / np.sqrt(self.args.D)
         self.J = nn.Linear(self.args.N, self.args.N, bias=self.args.bias)
-        self.J.weight.data = torch.normal(0, self.args.res_init_std, self.J.weight.shape) / np.sqrt(self.args.N)
+        self.J.weight.data = torch.normal(0, self.args.res_init_g, self.J.weight.shape) / np.sqrt(self.args.N)
         self.W_ro = nn.Linear(self.args.N, self.args.Z, bias=self.args.bias)
         torch.set_rng_state(rng_pt)
 

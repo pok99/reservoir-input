@@ -62,6 +62,9 @@ class Trainer:
         trains, tests = create_loaders(self.args.dataset, self.args, split_test=True)
         self.train_set, self.train_loader = trains
         self.test_set, self.test_loader = tests
+        logging.info(f'Created data loaders using datasets:')
+        for ds in self.args.dataset:
+            logging.info(f'  {ds}')
         
         self.log_interval = self.args.log_interval
         if not self.args.no_log:
@@ -230,13 +233,6 @@ class Trainer:
         return total_loss.item(), etc
 
     def test(self):
-        # if n != 0:
-        #     assert n <= len(self.test_set)
-        #     batch_idxs = np.random.choice(len(self.test_set), n)
-        #     batch = [self.test_set[i] for i in batch_idxs]
-        # else:
-        #     batch = self.test_set
-
         with torch.no_grad():
             x, y, info = next(iter(self.test_loader))
             self.net.reset(self.args.res_x_init)
