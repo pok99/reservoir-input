@@ -70,11 +70,13 @@ def collater(samples):
     return xs, ys, infos
 
 # creates datasets and dataloaders
-def create_loaders(datasets, args, split_test=True, test_size=128):
+def create_loaders(datasets, args, split_test=True, test_size=128, shuffle=True, order_fn=None):
     train_sets = []
     test_sets = []
     for d in range(len(datasets)):
         dset = load_rb(datasets[d])
+        if not shuffle and order_fn is not None:
+            dset = sorted(dset, key=order_fn)
         if split_test:
             cutoff = round(.9 * len(dset))
             train_sets.append(dset[:cutoff])
@@ -87,13 +89,13 @@ def create_loaders(datasets, args, split_test=True, test_size=128):
         test_size = 128
     if split_test:
         train_set = TrialDataset(train_sets, args)
-        train_loader = DataLoader(train_set, batch_size=args.batch_size, collate_fn=collater, shuffle=True, drop_last=True)
+        train_loader = DataLoader(train_set, batch_size=args.batch_size, collate_fn=collater, shuffle=shuffle, drop_last=True)
         test_size = min(test_size, len(test_set))
-        test_loader = DataLoader(test_set, batch_size=test_size, collate_fn=collater, shuffle=True)
+        test_loader = DataLoader(test_set, batch_size=test_size, collate_fn=collater, shuffle=shuffle)
         return (train_set, train_loader), (test_set, test_loader)
     else:
         test_size = min(test_size, len(test_set))
-        test_loader = DataLoader(test_set, batch_size=test_size, collate_fn=collater, shuffle=True)
+        test_loader = DataLoader(test_set, batch_size=test_size, collate_fn=collater, shuffle=shuffle)
         return (test_set, test_loader)
 
 def get_criteria(args):

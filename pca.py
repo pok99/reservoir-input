@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+from torch.utils.data import Dataset, DataLoader
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.cm as cm
@@ -15,25 +16,23 @@ import argparse
 
 from testers import load_model_path
 from utils import get_config, load_rb
-from helpers import get_x_y_info
-
-
+from helpers import TrialDataset, collater, create_loaders
 
 def pca(args):
     config = get_config(args.model, to_bunch=True)
     net = load_model_path(args.model, config)
 
-    if args.dataset is None:
-        args.dataset = config.dataset
-    dset = load_rb(args.dataset)
+    # if args.dataset is None:
+    #     args.dataset = config.dataset
+    # dset = load_rb(args.dataset)
 
 
     nt = 800
 
     # sort by interval length
-    dset.sort(key = lambda x: x[2][2]-x[2][1])
-    interval = int(len(dset) / nt)
-    dset = dset[::interval]
+    # dset.sort(key = lambda x: x[2][2]-x[2][1])
+    # interval = int(len(dset) / nt)
+    # dset = dset[::interval] 
     # sort by start time
     # dset.sort(key = lambda x: x[2][0])
     # ixs = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, -4, -3, -2, -1]
@@ -41,27 +40,52 @@ def pca(args):
     # nt = len(dset)
     
 
-    x, y, info = get_x_y_info(config, dset)
+    # x, y, info = get_x_y_info(config, dset)
+    dset, loader = create_loaders(args.dataset, config, split_test=False, test_size=800, shuffle=True, order_fn=lambda x: x['t_p'])
+
+    # if test_size == 0:
+    #     test_size = 128
+    # if split_test:
+    #     train_set = TrialDataset(train_sets, args)
+    #     train_loader = DataLoader(train_set, batch_size=args.batch_size, collate_fn=collater, shuffle=True, drop_last=True)
+    #     test_size = min(test_size, len(test_set))
+    #     test_loader = DataLoader(test_set, batch_size=test_size, collate_fn=collater, shuffle=True)
+    #     return (train_set, train_loader), (test_set, test_loader)
+    # else:
+    #     test_size = min(test_size, len(test_set))
+    #     test_loader = DataLoader(test_set, batch_size=test_size, collate_fn=collater, shuffle=True)
+    #     return (test_set, test_loader)
+    # test_set, test_loader = create_loaders(config.dataset, config, split_test=False, shuffle=False)
+
+    batch = next(iter(loader))
+    # batch1 = torch.utils.data.Subset(dset, range(100))
+    # batch2 = torch.utils.data.Subset(dset, range(2000, 2100))
+    # pdb.set_trace()
+    # batch = torch.cat([batch1, batch2], axis=0)
+    # pdb.set_trace()
+    x, y, info = batch
 
     outs = []
     with torch.no_grad():
         net.reset()
 
-        for j in range(x.shape[1]):
+        for j in range(x.shape[2]):
             # run the step
-            net_in = x[:,j].reshape(-1, net.args.L)
+            net_in = x[:,:,j].reshape(-1, net.args.L + net.args.T)
             net_out, extras = net(net_in, extras=True)
             outs.append(extras['x'])
 
     A = torch.stack(outs, dim=1)
     A_cut = []
     for ix in range(x.shape[0]):
+        rsg = info[ix]['rsg']
         # A_cut.append(A[ix][info[ix][0]:info[ix][1]])
-        A_cut.append(A[ix][info[ix][1]:info[ix][2]])
+        A_cut.append(A[ix,rsg[0]:rsg[1]])
     A_cut = torch.cat(A_cut)
     u, s, v = torch.pca_lowrank(A_cut)
 
 
+    # pdb.set_trace()
     rank = 3
 
     if rank == 3:
@@ -124,29 +148,35 @@ def pca(args):
     #         # ending
     #         ax.scatter(t[0][-1], t[1][-1], t[2][-1], s=30, color=c, marker='o')
 
-    setting = 'production'
+    setting = 'estimation'
 
     # when using categories WITH CONTEXTS
     A_categories = {}
     for ix in range(x.shape[0]):
         traj = A[ix]
-        tinfo = info[ix]
-        interval = tinfo[1] - tinfo[0]
+        trsg = info[ix]['rsg']
+        interval = info[ix]['t_p']
         if setting == 'estimation':
-            traj_cut = traj[tinfo[0]:tinfo[1]]
+            traj_cut = traj[trsg[0]:trsg[1]]
         else:
-            traj_cut = traj[tinfo[1]:tinfo[2]]
-        group = (interval, tinfo[3])
+            traj_cut = traj[trsg[1]:trsg[2]]
+        group = (interval, x[ix][-1][0].item())
+        # pdb.set_trace()
         if group in A_categories:
             A_categories[group].append(traj_cut @ v[:, :rank])
+            # pdb.set_trace()
         else:
             A_categories[group] = [traj_cut @ v[:, :rank]]
 
     c1_colors = iter(cm.autumn(np.linspace(0, 1, 5)))
-    c2_colors = iter(cm.winter(np.linspace(0, 1, 5)))
+    c2_colors = iter(cm.winter(np.linspace(0, 1, 9)))
     
+    # pdb.set_trace()
 
-    for k,v in A_categories.items():
+    # order = sorted(A_categories.keys(), key=lambda x: x[0])
+
+    for k in sorted(A_categories.keys(), key=lambda x: x[0]):
+        v = A_categories[k]
         proj = sum(v) / len(v)
         if k[1] == 0:
             c = next(c1_colors)
@@ -184,7 +214,7 @@ if __name__ == '__main__':
 
     ap = argparse.ArgumentParser()
     ap.add_argument('model', type=str)
-    ap.add_argument('-d', '--dataset', type=str, default=None)
+    ap.add_argument('-d', '--dataset', type=str, nargs='+', default=[])
     args = ap.parse_args()
 
 
