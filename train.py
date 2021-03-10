@@ -3,8 +3,6 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from torch.utils.data import Dataset, DataLoader
-
 from scipy.optimize import minimize
 
 import os
@@ -21,47 +19,9 @@ import copy
 import pandas as pd
 
 from network import BasicNetwork, Reservoir
-from trials import get_x, get_y
 
 from utils import log_this, load_rb, get_config, fill_args, update_args
-from helpers import get_optimizer, get_scheduler, get_criteria, get_x_y_info
-
-# dataset that automatically creates trials composed of trial and context data
-class TrialDataset(Dataset):
-    def __init__(self, datasets, args):
-        self.datasets = datasets
-        self.args = args
-        self.max_idxs = np.array([len(ds) for ds in self.datasets])
-        self.x_Ts = []
-        for i, ds in enumerate(datasets):
-            x_T = np.zeros((args.T, ds[0]['trial_len']))
-            x_T[i] = 1
-            self.x_Ts.append(x_T)
-            if i != 0:
-                self.max_idxs[i] += self.max_idxs[i-1]
-
-    def __len__(self):
-        return self.max_idxs[-1]
-
-    def __getitem__(self, idx):
-        ds_id = np.argmax(self.max_idxs > idx)
-        if ds_id == 0:
-            trial = self.datasets[0][idx]
-        else:
-            trial = self.datasets[ds_id][idx - self.max_idxs[ds_id-1]]
-
-        x = get_x(trial, self.args)
-        x_T = self.x_Ts[ds_id]
-        x = np.concatenate((x, x_T))
-        y = get_y(trial)
-        return x, y, trial
-
-# turns data samples into stuff that can be run through network
-def collater(samples):
-    xs, ys, infos = list(zip(*samples))
-    xs = torch.as_tensor(np.stack(xs), dtype=torch.float)
-    ys = torch.as_tensor(np.stack(ys), dtype=torch.float)
-    return xs, ys, infos
+from helpers import get_optimizer, get_scheduler, get_criteria, create_loaders
 
 class Trainer:
     def __init__(self, args):
@@ -99,23 +59,9 @@ class Trainer:
         self.optimizer = get_optimizer(self.args, self.train_params)
         self.scheduler = get_scheduler(self.args, self.optimizer)
 
-        train_sets = []
-        test_sets = []
-        for d in range(self.args.T):
-            dset = load_rb(self.args.dataset[d])
-            if self.args.same_test:
-                train_sets.append(dset)
-                test_sets.append(dset)
-            else:
-                cutoff = round(.9 * len(dset))
-                train_sets.append(dset[:cutoff])
-                test_sets.append(dset[cutoff:])
-
-        self.train_set = TrialDataset(train_sets, self.args)
-        self.test_set = TrialDataset(test_sets, self.args)
-
-        self.train_loader = DataLoader(self.train_set, batch_size=self.args.batch_size, collate_fn=collater, shuffle=True, drop_last=True)
-        self.test_loader = DataLoader(self.test_set, batch_size=128, collate_fn=collater, shuffle=True, drop_last=True)
+        trains, tests = create_loaders(self.args.dataset, self.args, split_test=True)
+        self.train_set, self.train_loader = trains
+        self.test_set, self.test_loader = tests
         
         self.log_interval = self.args.log_interval
         if not self.args.no_log:
@@ -283,13 +229,13 @@ class Trainer:
         }
         return total_loss.item(), etc
 
-    def test(self, n=0):
-        if n != 0:
-            assert n <= len(self.test_set)
-            batch_idxs = np.random.choice(len(self.test_set), n)
-            batch = [self.test_set[i] for i in batch_idxs]
-        else:
-            batch = self.test_set
+    def test(self):
+        # if n != 0:
+        #     assert n <= len(self.test_set)
+        #     batch_idxs = np.random.choice(len(self.test_set), n)
+        #     batch = [self.test_set[i] for i in batch_idxs]
+        # else:
+        #     batch = self.test_set
 
         with torch.no_grad():
             x, y, info = next(iter(self.test_loader))
@@ -300,7 +246,6 @@ class Trainer:
 
     def train(self, ix_callback=None):
         ix = 0
-
         # for convergence testing
         running_min_error = float('inf')
         running_no_min = 0
@@ -308,9 +253,8 @@ class Trainer:
         running_loss = 0.0
         ending = False
         for e in range(self.args.n_epochs):
-            epoch_idx = 0
-            for ix, batch in enumerate(self.train_loader):
-                epoch_idx += self.args.batch_size
+            for epoch_idx, batch in enumerate(self.train_loader):
+                ix += 1
 
                 x, y, info = batch
                 iter_loss, etc = self.train_iteration(x, y, info, ix_callback=ix_callback)
@@ -322,12 +266,9 @@ class Trainer:
 
                 running_loss += iter_loss
 
-                if ix % self.log_interval == 0:
+                if ix % self.log_interval == 0 and ix != 0:
                     z = etc['outs'].numpy().squeeze()
-                    if ix == 0:
-                        avg_loss = running_loss / self.args.batch_size
-                    else:
-                        avg_loss = running_loss / self.args.batch_size / self.log_interval
+                    avg_loss = running_loss / self.args.batch_size / self.log_interval
                     test_loss, test_etc = self.test()
                     log_arr = [
                         f'iteration {ix}',

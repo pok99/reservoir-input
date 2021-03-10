@@ -70,6 +70,7 @@ def create_dataset(args):
             assert go_time < t_len
 
             trial = {
+                'id': n,
                 'trial_type': 'rsg',
                 'pulse_len': args.p_len,
                 'trial_len': t_len,
@@ -96,6 +97,7 @@ def create_dataset(args):
             y[s_len:] = x[:s_len]
 
             trial = {
+                'id': n,
                 'trial_type': 'delay-copy',
                 'trial_len': t_len,
                 'x': x,

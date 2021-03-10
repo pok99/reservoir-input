@@ -11,7 +11,7 @@ import pdb
 import json
 
 from helpers import sigmoid
-from utils import load_rb, get_config, fill_undefined_args
+from utils import load_rb, get_config, fill_args
 from testers import load_model_path, test_model
 
 # for plotting some instances of a trained model on a specified dataset
@@ -32,7 +32,7 @@ if args.config is None:
     config = get_config(args.model, ctype='model')
 else:
     config = json.load(open(args.config, 'r'))
-config = fill_undefined_args(args, config, overwrite_none=True)
+config = fill_args(args, config, overwrite_None=True)
 
 net = load_model_path(args.model, config=config)
 # assuming config is in the same folder as the model
@@ -49,7 +49,7 @@ if not args.no_plot:
     fig, ax = plt.subplots(3,4,sharex=True, sharey=True, figsize=(12,7))
     for i, ax in enumerate(fig.axes):
         ix, x, y, z, loss = data[i]
-        xr = np.arange(len(x))
+        xr = np.arange(x.shape[-1])
 
         ax.axvline(x=0, color='dimgray', alpha = 1)
         ax.axhline(y=0, color='dimgray', alpha = 1)
@@ -62,19 +62,19 @@ if not args.no_plot:
         # quick fix to 2d
         if len(x.shape) > 1:
             if 'rsg' in config.dataset:
-                x = x[:,0] + x[:,1]
+                x = x[0,:] + x[1,:]
             elif 'copy' in config.dataset:
-                x = x[:,0]
+                x = x[0,:]
         if 'rsg' in config.dataset:
             ax.scatter(xr, x, color='coral', alpha=0.5, s=3, label='input')
             ax.set_ylim([-.5,2])
         elif 'copy' in config.dataset:
             ax.plot(xr, x, color='coral', alpha=0.5, lw=1, label='input')
 
-        if 'mse' in config.losses or 'mse-w2' in config.losses:
+        if 'mse' in config.loss or 'mse-w2' in config.loss:
             ax.plot(xr, y, color='coral', alpha=1, lw=1, label='target')
             ax.plot(xr, z, color='cornflowerblue', alpha=1, lw=1.5, label='response')
-        elif 'bce' in config.losses:
+        elif 'bce' in config.loss:
             ax.scatter(xr, y, color='coral', alpha=0.5, s=3, label='target')
             ax.plot(xr, z, color='cornflowerblue', alpha=1, lw=1.5, label='response')
 

@@ -3,10 +3,14 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from torch.utils.data import Dataset, DataLoader
 
 import pdb
 
 import random
+
+from trials import get_x, get_y
+from utils import load_rb
 
 def sigmoid(x):
     return 1/(1 + np.exp(-x))
@@ -27,6 +31,70 @@ def get_scheduler(args, op):
     if args.s_rate is not None:
         return optim.lr_scheduler.MultiStepLR(op, milestones=[1,2,3], gamma=args.s_rate)
     return None
+
+# dataset that automatically creates trials composed of trial and context data
+class TrialDataset(Dataset):
+    def __init__(self, datasets, args):
+        self.datasets = datasets
+        self.args = args
+        self.max_idxs = np.array([len(ds) for ds in self.datasets])
+        self.x_Ts = []
+        for i, ds in enumerate(datasets):
+            x_T = np.zeros((args.T, ds[0]['trial_len']))
+            x_T[i] = 1
+            self.x_Ts.append(x_T)
+            if i != 0:
+                self.max_idxs[i] += self.max_idxs[i-1]
+
+    def __len__(self):
+        return self.max_idxs[-1]
+
+    def __getitem__(self, idx):
+        ds_id = np.argmax(self.max_idxs > idx)
+        if ds_id == 0:
+            trial = self.datasets[0][idx]
+        else:
+            trial = self.datasets[ds_id][idx - self.max_idxs[ds_id-1]]
+
+        x = get_x(trial, self.args)
+        x_T = self.x_Ts[ds_id]
+        x = np.concatenate((x, x_T))
+        y = get_y(trial)
+        return x, y, trial
+
+# turns data samples into stuff that can be run through network
+def collater(samples):
+    xs, ys, infos = list(zip(*samples))
+    xs = torch.as_tensor(np.stack(xs), dtype=torch.float)
+    ys = torch.as_tensor(np.stack(ys), dtype=torch.float)
+    return xs, ys, infos
+
+# creates datasets and dataloaders
+def create_loaders(datasets, args, split_test=True, test_size=128):
+    train_sets = []
+    test_sets = []
+    for d in range(len(datasets)):
+        dset = load_rb(datasets[d])
+        if split_test:
+            cutoff = round(.9 * len(dset))
+            train_sets.append(dset[:cutoff])
+            test_sets.append(dset[cutoff:])
+        else:
+            test_sets.append(dset)
+
+    test_set = TrialDataset(test_sets, args)
+    if test_size == 0:
+        test_size = 128
+    if split_test:
+        train_set = TrialDataset(train_sets, args)
+        train_loader = DataLoader(train_set, batch_size=args.batch_size, collate_fn=collater, shuffle=True, drop_last=True)
+        test_size = min(test_size, len(test_set))
+        test_loader = DataLoader(test_set, batch_size=test_size, collate_fn=collater, shuffle=True)
+        return (train_set, train_loader), (test_set, test_loader)
+    else:
+        test_size = min(test_size, len(test_set))
+        test_loader = DataLoader(test_set, batch_size=test_size, collate_fn=collater, shuffle=True)
+        return (test_set, test_loader)
 
 def get_criteria(args):
     criteria = []
