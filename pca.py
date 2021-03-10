@@ -22,166 +22,74 @@ def pca(args):
     config = get_config(args.model, to_bunch=True)
     net = load_model_path(args.model, config)
 
-    # if args.dataset is None:
-    #     args.dataset = config.dataset
-    # dset = load_rb(args.dataset)
+    if len(args.dataset) == 0:
+        args.dataset = config.dataset
 
+    setting = 'estimation'
+    test_size = 1000
 
-    nt = 800
-
-    # sort by interval length
-    # dset.sort(key = lambda x: x[2][2]-x[2][1])
-    # interval = int(len(dset) / nt)
-    # dset = dset[::interval] 
-    # sort by start time
-    # dset.sort(key = lambda x: x[2][0])
-    # ixs = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, -4, -3, -2, -1]
-    # dset = [dset[i] for i in ixs]
-    # nt = len(dset)
-    
-
-    # x, y, info = get_x_y_info(config, dset)
-    dset, loader = create_loaders(args.dataset, config, split_test=False, test_size=800, shuffle=True, order_fn=lambda x: x['t_p'])
-
-    # if test_size == 0:
-    #     test_size = 128
-    # if split_test:
-    #     train_set = TrialDataset(train_sets, args)
-    #     train_loader = DataLoader(train_set, batch_size=args.batch_size, collate_fn=collater, shuffle=True, drop_last=True)
-    #     test_size = min(test_size, len(test_set))
-    #     test_loader = DataLoader(test_set, batch_size=test_size, collate_fn=collater, shuffle=True)
-    #     return (train_set, train_loader), (test_set, test_loader)
-    # else:
-    #     test_size = min(test_size, len(test_set))
-    #     test_loader = DataLoader(test_set, batch_size=test_size, collate_fn=collater, shuffle=True)
-    #     return (test_set, test_loader)
-    # test_set, test_loader = create_loaders(config.dataset, config, split_test=False, shuffle=False)
-
-    batch = next(iter(loader))
-    # batch1 = torch.utils.data.Subset(dset, range(100))
-    # batch2 = torch.utils.data.Subset(dset, range(2000, 2100))
-    # pdb.set_trace()
-    # batch = torch.cat([batch1, batch2], axis=0)
-    # pdb.set_trace()
-    x, y, info = batch
+    dset, loader = create_loaders(args.dataset, config, split_test=False, test_size=test_size)
+    x, y, info = next(iter(loader))
 
     outs = []
     with torch.no_grad():
         net.reset()
-
         for j in range(x.shape[2]):
-            # run the step
             net_in = x[:,:,j].reshape(-1, net.args.L + net.args.T)
             net_out, extras = net(net_in, extras=True)
             outs.append(extras['x'])
 
     A = torch.stack(outs, dim=1)
     A_cut = []
+    # only choosing the relevant timestamps within which to do pca
     for ix in range(x.shape[0]):
         rsg = info[ix]['rsg']
-        # A_cut.append(A[ix][info[ix][0]:info[ix][1]])
-        A_cut.append(A[ix,rsg[0]:rsg[1]])
+        if setting == 'estimation':
+            A_cut.append(A[ix,rsg[0]:rsg[1]])
+        else:
+            A_cut.append(A[ix,rsg[1]:rsg[2]])
     A_cut = torch.cat(A_cut)
-    u, s, v = torch.pca_lowrank(A_cut)
-
-
     # pdb.set_trace()
-    rank = 3
+    u, s, v = torch.pca_lowrank(A_cut)
+    pdb.set_trace()
 
+    rank = 3
     if rank == 3:
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
         ax.grid(False)
         plt.axis('off')
 
-    # when not using categories
-    # A_proj = []
-    # for ix in range(x.shape[0]):
-    #     traj = A[ix]
-    #     tinfo = info[ix]
-    #     traj_cut = traj[tinfo[0]:tinfo[1]]
-    #     A_proj.append(traj_cut @ v[:, :rank])
-
-    # goal_colors = iter(cm.cool(np.linspace(.2, 1, nt)))
-    # for i in range(len(dset)):
-    #     t = A_proj[i].T
-    #     c = next(goal_colors)
-    #     # goal_colors = iter(cm.Oranges(np.linspace(.3, 1, t.shape[1])))
-    #     # ax.scatter(t[0], t[1], t[2], color=next(goal_colors))
-    #     ax.plot(t[0], t[1], color=c, lw=.8)
-    #     ax.scatter(t[0][0], t[1][0], s=20, color=c)
-    #     # ax.annotate(i, (t[0][0], t[1][0]))
-    #     print(len(t[0]))
-
-    # when using categories
-    # A_categories = {}
-    # for ix in range(x.shape[0]):
-    #     traj = A[ix]
-    #     tinfo = info[ix]
-    #     interval = tinfo[1] - tinfo[0]
-    #     # traj_cut = traj[tinfo[0]:tinfo[1]]
-    #     traj_cut = traj[tinfo[0]:tinfo[1]]
-    #     if interval in A_categories:
-    #         A_categories[interval].append(traj_cut @ v[:, :rank])
-    #     else:
-    #         A_categories[interval] = [traj_cut @ v[:, :rank]]
-
-    # goal_colors = iter(cm.cool(np.linspace(0, 1, len(A_categories))))
-    
-
-    # for k,v in A_categories.items():
-    #     proj = sum(v) / len(v)
-    #     c = next(goal_colors)
-
-    #     t = proj.T
-    #     if rank == 2:
-    #         plt.plot(t[0], t[1], color=c, lw=1)
-    #         plt.scatter(t[0][0], t[1][0], s=20, color=c)
-    #         plt.annotate(k, (t[0][-1], t[1][-1]))
-    #     elif rank == 3:
-            
-    #         ax.plot(t[0], t[1], t[2], color=c, lw=1)
-    #         # source
-    #         ax.scatter(t[0][0], t[1][0], t[2][0], s=40, color=c, marker='^')
-    #         # ax.annotate(k, (t[0][-1], t[1][-1], t[2][-1]))
-    #         # ax.text(t[0][-1], t[1][-1], t[2][-1], k, color=c)
-    #         # ending
-    #         ax.scatter(t[0][-1], t[1][-1], t[2][-1], s=30, color=c, marker='o')
-
-    setting = 'estimation'
-
     # when using categories WITH CONTEXTS
-    A_categories = {}
+    context_interval_As = {}
+    context_counts = np.ones(10).astype(int)
     for ix in range(x.shape[0]):
         traj = A[ix]
-        trsg = info[ix]['rsg']
+        rsg = info[ix]['rsg']
+        context = info[ix]['context']
         interval = info[ix]['t_p']
         if setting == 'estimation':
-            traj_cut = traj[trsg[0]:trsg[1]]
+            traj_cut = traj[rsg[0]:rsg[1]]
         else:
-            traj_cut = traj[trsg[1]:trsg[2]]
-        group = (interval, x[ix][-1][0].item())
-        # pdb.set_trace()
-        if group in A_categories:
-            A_categories[group].append(traj_cut @ v[:, :rank])
-            # pdb.set_trace()
+            traj_cut = traj[rsg[1]:rsg[2]]
+        traj_proj = traj_cut @ v[:, :rank]
+        group = (context, interval)
+        if group in context_interval_As:
+            context_interval_As[group].append(traj_proj)
         else:
-            A_categories[group] = [traj_cut @ v[:, :rank]]
+            context_counts[context] += 1
+            context_interval_As[group] = [traj_proj]
 
-    c1_colors = iter(cm.autumn(np.linspace(0, 1, 5)))
-    c2_colors = iter(cm.winter(np.linspace(0, 1, 9)))
-    
-    # pdb.set_trace()
+    context_colors = [
+        iter(cm.autumn(np.linspace(0, 1, context_counts[0]))),
+        iter(cm.winter(np.linspace(0, 1, context_counts[1])))
+    ]
 
-    # order = sorted(A_categories.keys(), key=lambda x: x[0])
-
-    for k in sorted(A_categories.keys(), key=lambda x: x[0]):
-        v = A_categories[k]
+    sorted_keys = sorted(context_interval_As.keys(), key=lambda x: x[1])
+    for k in sorted_keys:
+        v = context_interval_As[k]
         proj = sum(v) / len(v)
-        if k[1] == 0:
-            c = next(c1_colors)
-        else:
-            c = next(c2_colors)
+        c = next(context_colors[k[0]])
 
         t = proj.T
         if rank == 2:
@@ -189,33 +97,23 @@ def pca(args):
             plt.scatter(t[0][0], t[1][0], s=20, color=c)
             plt.annotate(k, (t[0][-1], t[1][-1]))
         elif rank == 3:
-            
             ax.plot(t[0], t[1], t[2], color=c, lw=1)
             if setting == 'estimation':
-                # source
-                ax.scatter(t[0][0], t[1][0], t[2][0], s=40, color=c, marker='^')
-                # ax.annotate(k, (t[0][-1], t[1][-1], t[2][-1]))
-                # ax.text(t[0][-1], t[1][-1], t[2][-1], k, color=c)
-                # ending
-                ax.scatter(t[0][-1], t[1][-1], t[2][-1], s=30, color=c, marker='o')
+                marker_a = '^'
+                marker_b = 'o'
             else:
-                ax.scatter(t[0][0], t[1][0], t[2][0], s=40, color=c, marker='o')
-                # ax.annotate(k, (t[0][-1], t[1][-1], t[2][-1]))
-                # ax.text(t[0][-1], t[1][-1], t[2][-1], k, color=c)
-                # ending
-                ax.scatter(t[0][-1], t[1][-1], t[2][-1], s=30, color=c, marker='s')
-
-
+                marker_a = 'o'
+                marker_b = 's'
+            ax.scatter(t[0][0], t[1][0], t[2][0], s=40, color=c, marker=marker_a)
+            ax.scatter(t[0][-1], t[1][-1], t[2][-1], s=30, color=c, marker=marker_b)
 
     plt.show()
 
 
 if __name__ == '__main__':
-
     ap = argparse.ArgumentParser()
     ap.add_argument('model', type=str)
     ap.add_argument('-d', '--dataset', type=str, nargs='+', default=[])
     args = ap.parse_args()
-
 
     pca(args)

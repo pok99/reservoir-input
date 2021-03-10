@@ -60,6 +60,7 @@ class TrialDataset(Dataset):
         x_T = self.x_Ts[ds_id]
         x = np.concatenate((x, x_T))
         y = get_y(trial, self.args)
+        trial['context'] = ds_id
         return x, y, trial
 
 # turns data samples into stuff that can be run through network
@@ -70,7 +71,7 @@ def collater(samples):
     return xs, ys, infos
 
 # creates datasets and dataloaders
-def create_loaders(datasets, args, split_test=True, test_size=128, shuffle=True, order_fn=None):
+def create_loaders(datasets, args, split_test=True, test_size=None, shuffle=True, order_fn=None):
     train_sets = []
     test_sets = []
     for d in range(len(datasets)):
@@ -85,7 +86,7 @@ def create_loaders(datasets, args, split_test=True, test_size=128, shuffle=True,
             test_sets.append(dset)
 
     test_set = TrialDataset(test_sets, args)
-    if test_size == 0:
+    if test_size is None:
         test_size = 128
     if split_test:
         train_set = TrialDataset(train_sets, args)
@@ -156,46 +157,11 @@ def get_output_activation(args):
         fn = lambda x: x
     return fn
 
-# given batch, get the x, y pairs and turn them into Tensors
-# def get_x_y_info(args, batch):
-#     x, y, info = list(zip(*batch))
-#     x = torch.as_tensor(x, dtype=torch.float).detach().clone()
-#     y = torch.as_tensor(y, dtype=torch.float).detach().clone()
-#     x = shift_x(args, x, info) # always needs to go before same_signal
-#     if args.same_signal:
-#         x = torch.sum(x, dim=-1)
-#     return x, y, info
-
 def get_dim(a):
     if hasattr(a, '__iter__'):
         return len(a)
     else:
         return 1
-
-# def corrupt_x(args, x):
-#     if args.x_noise == 0:
-#         return x
-#     pulses = torch.nonzero(x)[:,1].reshape(x.shape[0], args.L, -1).repeat(1,1,10).float()
-#     pulses += torch.randn_like(pulses) * args.x_noise
-#     pulses = torch.round(pulses).long()
-#     x = torch.zeros_like(x)
-#     for i in range(x.shape[0]):
-#         for j in range(args.L):
-#             nums, counts = torch.unique(pulses[i,j], return_counts=True)
-#             x[i,nums,j] = counts / 10
-#     if args.L == 1:
-#         x = x.squeeze(2)
-#     return x
-
-# def shift_x(args, x, info):
-#     if args.m_noise == 0:
-#         return x
-#     for i in range(x.shape[0]):
-#         t_p = info[i][1] - info[i][0]
-#         disp = int(np.random.normal(0, args.m_noise*t_p/50))
-#         x[i,:,0] = x[i,:,0].roll(disp)
-#     return x
-
 
 def mse2_loss(x, outs, info, l1, l2, extras=False):
     total_loss = 0.
