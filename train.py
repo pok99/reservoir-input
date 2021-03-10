@@ -235,6 +235,7 @@ class Trainer:
     def test(self):
         with torch.no_grad():
             x, y, info = next(iter(self.test_loader))
+            x, y = x.to(self.device), y.to(self.device)
             self.net.reset(self.args.res_x_init)
             total_loss, etc = self.run_trial(x, y, info, extras=True)
 
@@ -249,10 +250,10 @@ class Trainer:
         running_loss = 0.0
         ending = False
         for e in range(self.args.n_epochs):
-            for epoch_idx, batch in enumerate(self.train_loader):
+            for epoch_idx, (x, y, info) in enumerate(self.train_loader):
                 ix += 1
 
-                x, y, info = batch
+                x, y = x.to(self.device), y.to(self.device)
                 iter_loss, etc = self.train_iteration(x, y, info, ix_callback=ix_callback)
 
                 if iter_loss == -1:
