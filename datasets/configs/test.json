@@ -2,9 +2,10 @@
   "mode": "create",
   "name": "test",
   "config": null,
-  "trial_type": "rsg-2c",
+  "trial_type": "rsg",
+  "t_len": 500,
+  "n_trials": 20,
   "intervals": null,
-  "intervals2": null,
   "motifs": null,
   "trial_args": [
     "lt",
@@ -12,11 +13,9 @@
     "gt",
     "100"
   ],
-  "trial_len": 500,
-  "n_trials": 20,
-  "argv": "trials.py create test2 -c datasets/configs/test.json",
-  "pulse_len": 5,
-  "max_ready_time": 80,
+  "p_len": 5,
+  "max_ready": 80,
   "min_t": 100,
-  "max_t": 200
+  "max_t": 200,
+  "argv": "trials.py create test -t rsg -n 20 -a lt 200 gt 100"
 }

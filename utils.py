@@ -10,6 +10,7 @@ import json
 import csv
 import pickle
 import copy
+import pdb
 import re
 # import pandas as pd
 
@@ -34,7 +35,30 @@ def add_yaml_args(args, config_file):
             #     logging.warning(f'{c} is not set to begin with: {v}')
     return args
 
-def add_config_args(args, config_file, to_bunch=True):
+# combine two args, overwriting with the second
+def update_args(args, new_args, to_bunch=True):
+    dic = args if type(args) is dict else vars(args)
+    new_dic = new_args if type(new_args) is dict else vars(new_args)
+    dic.update(new_dic)
+    if to_bunch:
+        return Bunch(dic)
+    return dic
+
+# fills args with keys from default args, not overwriting unless *maybe* the Nones
+def fill_args(args, default_args, overwrite_None=False, to_bunch=True):
+    dic = args if type(args) is dict else vars(args)
+    new_dic = default_args if type(default_args) is dict else vars(default_args)
+    for k in new_dic.keys():
+        if k not in dic:
+            dic[k] = new_dic[k]
+        elif overwrite_None and dic[k] is None:
+            dic[k] = new_dic[k]
+    if to_bunch:
+        return Bunch(dic)
+    return dic
+
+# turn arbitrary file into args to be used
+def get_file_args(config_file, to_bunch=True):
     if config_file:
         try:
             # maybe it's yaml
@@ -42,36 +66,38 @@ def add_config_args(args, config_file, to_bunch=True):
         except:
             # maybe it's json
             config = json.load(open(config_file, 'r'))
-        dic = vars(args)
-        for c, v in config.items():
-            dic[c] = v
-    if to_bunch:
-        return Bunch(args)
     else:
-        return args
+        config = {}
+    if to_bunch:
+        try:
+            return Bunch(config)
+        except:
+            print('Bunchify failed!')
+    else:
+        return config
 
-# fills an argument dictionary with keys from a default dictionary
+
 # also works with dicts now
-def fill_undefined_args(args, default_args, overwrite_none=False, to_bunch=False):
-    # so we don't overwrite the original args
-    args = copy.deepcopy(args)
-    # takes care of default args not being a dict
-    if type(default_args) is not dict:
-        default_args = default_args.__dict__
-    # only change the args dictionary
-    if type(args) is dict:
-        args_dict = args
-    else:
-        args_dict = args.__dict__
-    for k in default_args.keys():
-        if k not in args_dict:
-            args_dict[k] = default_args[k]
-        elif overwrite_none and args_dict[k] is None:
-            args_dict[k] = default_args[k]
+# def fill_undefined_args(args, default_args, overwrite_none=False, to_bunch=False):
+#     # so we don't overwrite the original args
+#     args = copy.deepcopy(args)
+#     # takes care of default args not being a dict
+#     if type(default_args) is not dict:
+#         default_args = default_args.__dict__
+#     # only change the args dictionary
+#     if type(args) is dict:
+#         args_dict = args
+#     else:
+#         args_dict = args.__dict__
+#     for k in default_args.keys():
+#         if k not in args_dict:
+#             args_dict[k] = default_args[k]
+#         elif overwrite_none and args_dict[k] is None:
+#             args_dict[k] = default_args[k]
 
-    if to_bunch:
-        args = Bunch(**args_dict)
-    return args
+#     if to_bunch:
+#         args = Bunch(**args_dict)
+#     return args
 
 
 # produce run id and create log directory
@@ -118,10 +144,16 @@ def log_this(config, log_dir, log_name=None, checkpoints=False, use_id=True):
 class Bunch:
     def __init__(self, *args, **kwds):
         if len(args) > 0:
-            for k,v in args[0].__dict__.items():
-                self.__dict__[k] = copy.deepcopy(v)
-            # self.__dict__.update(args[0].__dict__)
+            if type(args[0]) is dict:
+                self.__dict__ = copy.deepcopy(args[0])
+            else:
+                for k,v in args[0].__dict__.items():
+                    self.__dict__[k] = copy.deepcopy(v)
+                # self.__dict__.update(args[0].__dict__)
         self.__dict__.update(kwds)
+
+    def __repr__(self):
+        return 'Bunch(' + str(self.__dict__) + ')'
 
     def to_json(self):
         return copy.deepcopy(self.__dict__)

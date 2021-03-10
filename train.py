@@ -2,6 +2,9 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
+
+from torch.utils.data import Dataset, DataLoader
+
 from scipy.optimize import minimize
 
 import os
@@ -15,11 +18,42 @@ import csv
 import math
 import json
 import copy
+import pandas as pd
 
 from network import BasicNetwork, Reservoir
+from trials import get_x, get_y
 
-from utils import log_this, load_rb, get_config, fill_undefined_args
+from utils import log_this, load_rb, get_config, fill_args, update_args
 from helpers import get_optimizer, get_scheduler, get_criteria, get_x_y_info
+
+class TrialDataset(Dataset):
+    def __init__(self, datasets, args):
+        self.datasets = datasets
+        self.args = args
+        self.max_idxs = np.array([len(ds) for ds in self.datasets])
+        self.x_Ts = []
+        for i, ds in enumerate(datasets):
+            x_T = np.zeros((args.T, ds[0]['trial_len']))
+            x_T[i] = 1
+            self.x_Ts.append(x_T)
+            if i != 0:
+                self.max_idxs[i] += self.max_idxs[i-1]
+
+    def __len__(self):
+        return self.max_idxs[-1]
+
+    def __getitem__(self, idx):
+        ds_id = np.argmax(self.max_idxs > idx)
+        if ds_id == 0:
+            trial = self.datasets[0][idx]
+        else:
+            trial = self.datasets[ds_id][idx - self.max_idxs[ds_id-1]]
+
+        x = get_x(trial, self.args)
+        x_T = self.x_Ts[ds_id]
+        x = np.concatenate((x, x_T))
+        y = get_y(trial)
+        return x, y, trial
 
 class Trainer:
     def __init__(self, args):
@@ -56,25 +90,54 @@ class Trainer:
         self.criteria = get_criteria(self.args)
         self.optimizer = get_optimizer(self.args, self.train_params)
         self.scheduler = get_scheduler(self.args, self.optimizer)
-        if self.args.dataset is None:
-            # means we're using contexts
-            raise NotImplementedError
-            dsets = []
-            for d in self.args.contexts:
-                dsets.append(load_rb(d))
-        else:
-            self.dset = load_rb(self.args.dataset)
+
+        datasets = []
+        # ds_map = {}
+        train_sets = []
+        test_sets = []
+        for d in range(self.args.T):
+            dset = json.load(open(self.args.dataset[d], 'r'))
+            # ds_map[dset[0]['trial_type']] = d
+
+            if self.args.same_test:
+                train_sets.append(dset)
+                test_sets.append(dset)
+            else:
+                cutoff = round(.9 * len(dset))
+                train_sets.append(dset[:cutoff])
+                test_sets.append(dset[cutoff:])
+
+        self.train_set = TrialDataset(train_sets, self.args)
+        self.test_set = TrialDataset(test_sets, self.args)
+        #         self.train_set = TrialDataset(dataset[:cutoff], ds_map, self.args)
+        #         self.test_set = TrialDataset(dataset[cutoff:], ds_map, self.args)
+        #         logging.info(f'Using separate training ({cutoff}) and test ({len(dataset) - cutoff}) sets.')
+
+        # self.train_set = TrialDataset(datasets, ds_map, self.args)
+        # self.test_set = TrialDataset(datasets, ds_map, self.args)
+
+        self.train_loader = DataLoader(self.train_set, batch_size=self.args.batch_size, shuffle=True, drop_last=True)
+        self.test_loader = DataLoader(self.test_set, batch_size=128, shuffle=True, drop_last=True)
+
+        # if self.args.dataset is None:
+        #     # means we're using contexts
+        #     raise NotImplementedError
+        #     dsets = []
+        #     for d in self.args.contexts:
+        #         dsets.append(load_rb(d))
+        # else:
+        #     self.dset = load_rb(self.args.dataset)
 
         # if using separate training and test sets, separate them out
-        if self.args.same_test:
-            self.train_set = self.dset
-            self.test_set = self.dset
-        else:
-            np.random.shuffle(self.dset)
-            cutoff = round(.9 * len(self.dset))
-            self.train_set = self.dset[:cutoff]
-            self.test_set = self.dset[cutoff:]
-            logging.info(f'Using separate training ({cutoff}) and test ({len(self.dset) - cutoff}) sets.')
+        # if self.args.same_test:
+        #     self.train_set = self.dset
+        #     self.test_set = self.dset
+        # else:
+        #     np.random.shuffle(self.dset)
+        #     cutoff = round(.9 * len(self.dset))
+        #     self.train_set = self.dset[:cutoff]
+        #     self.test_set = self.dset[cutoff:]
+        #     logging.info(f'Using separate training ({cutoff}) and test ({len(self.dset) - cutoff}) sets.')
         
         self.log_interval = self.args.log_interval
         if not self.args.no_log:
@@ -209,8 +272,8 @@ class Trainer:
     def run_trial(self, x, y, info, extras=False):
         total_loss = 0.
         outs = []
-        for j in range(x.shape[1]):
-            net_in = x[:,j].reshape(-1, self.args.L)
+        for j in range(x.shape[2]):
+            net_in = x[:,:,j].reshape(-1, self.args.L + self.args.T)
             net_out, extras = self.net(net_in, extras=True)
             outs.append(net_out)
 
@@ -251,17 +314,22 @@ class Trainer:
             batch = self.test_set
 
         with torch.no_grad():
-            x, y, info = get_x_y_info(args, batch)
+            # x, y, info = get_x_y_info(args, batch)
+
+            x, y, info = next(iter(self.test_loader))
+            x = torch.as_tensor(x, dtype=torch.float)
+            y = torch.as_tensor(y, dtype=torch.float)
             self.net.reset(self.args.res_x_init)
             total_loss, etc = self.run_trial(x, y, info, extras=True)
 
-        return total_loss.item() / len(batch), etc
+        return total_loss.item() / len(x), etc
 
     def train(self, ix_callback=None):
         ix = 0
 
         its_p_epoch = len(self.train_set) // self.args.batch_size
-        logging.info(f'Training set size {len(self.train_set)} | batch size {self.args.batch_size} --> {its_p_epoch} iterations / epoch')
+        # its_p_epoch = 1000
+        # logging.info(f'Training set size {len(self.train_set)} | batch size {self.args.batch_size} --> {its_p_epoch} iterations / epoch')
 
         # for convergence testing
         running_min_error = float('inf')
@@ -270,16 +338,22 @@ class Trainer:
         running_loss = 0.0
         ending = False
         for e in range(self.args.n_epochs):
-            np.random.shuffle(self.train_set)
             epoch_idx = 0
-            while epoch_idx < its_p_epoch:
-                epoch_idx += 1
-                batch = self.train_set[(epoch_idx-1) * self.args.batch_size:epoch_idx * self.args.batch_size]
-                if len(batch) < self.args.batch_size:
-                    break
-                ix += 1
+            # while epoch_idx < its_p_epoch:
+            for ix, batch in enumerate(self.train_loader):
+                epoch_idx += self.args.batch_size
+                
 
-                x, y, info = get_x_y_info(args, batch)
+                x, y, info = batch
+                x = torch.as_tensor(x, dtype=torch.float)
+                y = torch.as_tensor(y, dtype=torch.float)
+
+                # batch = self.train_set[(epoch_idx-1) * self.args.batch_size:epoch_idx * self.args.batch_size]
+                # if len(batch) < self.args.batch_size:
+                #     break
+                # ix += 1
+
+                # x, y, info = get_x_y_info(args, batch)
                 iter_loss, etc = self.train_iteration(x, y, info, ix_callback=ix_callback)
 
                 if iter_loss == -1:
@@ -434,11 +508,9 @@ def adjust_args(args):
 
     # in case we are loading from a model
     # if we don't use this we might end up with an error when loading model
-    # in case we are loading from a model
-    # if we don't use this we might end up with an error when loading model
     if args.model_path is not None:
         config = get_config(args.model_path)
-        args = fill_undefined_args(args, config, overwrite_none=True)
+        args = fill_args(args, config, overwrite_none=True)
         enforce_same = ['N', 'D', 'L', 'Z', 'T', 'net', 'bias', 'use_reservoir']
         for v in enforce_same:
             if v in config and args.__dict__[v] != config[v]:
@@ -450,20 +522,21 @@ def adjust_args(args):
         args.train_parts = ['']
 
     args.dset_type = []
-    args.out_act = []
+    # args.out_act = []
     configs = []
+    args.out_act = 'exp'
     args.T = len(args.dataset)
     for dset in args.dataset:
         config = get_config(dset, ctype='data', to_bunch=True)
         configs.append(config)
-        args.dset_type.append(config.trial_type)
-        if config.trial_type.startswith('rsg'):
-            # exp nonlinearity constrains positive outputs which is useful for mse rules
-            if config.trial_type == 'rsg-bin':
-                out_act = 'none'
-            else:
-                out_act = 'exp'
-            args.out_act.append(out_act)
+        # args.dset_type.append(config.trial_type)
+        # if config.trial_type.startswith('rsg'):
+        #     # exp nonlinearity constrains positive outputs which is useful for mse rules
+        #     if config.trial_type == 'rsg-bin':
+        #         out_act = 'none'
+        #     else:
+        #         out_act = 'exp'
+            # args.out_act.append(out_act)
 
     # initializing logging
     # do this last, because we will be logging previous parameters into the config file

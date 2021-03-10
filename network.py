@@ -10,7 +10,7 @@ import random
 import copy
 import sys
 
-from utils import Bunch, load_rb, fill_undefined_args
+from utils import Bunch, load_rb, fill_args
 from helpers import get_output_activation
 
 DEFAULT_ARGS = {
@@ -35,7 +35,7 @@ DEFAULT_ARGS = {
 class Reservoir(nn.Module):
     def __init__(self, args=DEFAULT_ARGS):
         super().__init__()
-        self.args = fill_undefined_args(args, DEFAULT_ARGS, to_bunch=True)
+        self.args = fill_args(args, DEFAULT_ARGS, to_bunch=True)
 
         if not hasattr(self.args, 'res_seed'):
             self.args.res_seed = random.randrange(1e6)
@@ -149,7 +149,7 @@ class Reservoir(nn.Module):
 class BasicNetwork(nn.Module):
     def __init__(self, args=DEFAULT_ARGS):
         super().__init__()
-        args = fill_undefined_args(args, DEFAULT_ARGS, to_bunch=True)
+        args = fill_args(args, DEFAULT_ARGS, to_bunch=True)
         self.args = args
        
         if not hasattr(self.args, 'network_seed'):
@@ -166,7 +166,7 @@ class BasicNetwork(nn.Module):
     def _init_vars(self):
         rng_pt = torch.get_rng_state()
         torch.manual_seed(self.args.network_seed)
-        self.W_f = nn.Linear(self.args.L, self.args.D, bias=self.args.bias)
+        self.W_f = nn.Linear(self.args.L + self.args.T, self.args.D, bias=self.args.bias)
         if self.args.use_reservoir:
             self.reservoir = Reservoir(self.args)
         else:
@@ -176,7 +176,7 @@ class BasicNetwork(nn.Module):
     def forward(self, o, extras=False):
         # pdb.set_trace()
         # pass through the forward part
-        u = self.W_f(o.reshape(-1, self.args.L))
+        u = self.W_f(o.reshape(-1, self.args.L + self.args.T))
         if self.args.use_reservoir:
             z, etc = self.reservoir(u, extras=True)
         else:

@@ -1,21 +1,21 @@
 {
-  "argv": [
-    "dataset.py",
-    "create",
-    "rsg-150-200",
-    "-t",
-    "rsg",
-    "-a",
-    "gt",
-    "150",
-    "lt",
-    "200"
-  ],
-  "t_type": "rsg",
-  "n_trials": 2000,
+  "mode": "create",
+  "name": "rsg-150-200",
+  "config": null,
+  "trial_type": "rsg",
   "t_len": 500,
+  "n_trials": 2000,
+  "intervals": null,
+  "motifs": null,
+  "trial_args": [
+    "lt",
+    "200",
+    "gt",
+    "150"
+  ],
   "p_len": 5,
   "max_ready": 80,
   "min_t": 150,
-  "max_t": 200
+  "max_t": 200,
+  "argv": "trials.py create rsg-150-200 -t rsg -a lt 200 gt 150 -n 2000"
 }
