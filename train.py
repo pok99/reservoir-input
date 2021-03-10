@@ -197,6 +197,8 @@ class Trainer:
 
     # runs an iteration where we want to match a certain trajectory
     def run_trial(self, x, y, info, extras=False):
+        self.net.reset(self.args.res_x_init)
+        self.net.x.to(self.device)
         total_loss = 0.
         outs = []
         for j in range(x.shape[2]):
@@ -215,9 +217,7 @@ class Trainer:
         return total_loss
 
     def train_iteration(self, x, y, info, ix_callback=None):
-        self.net.reset(self.args.res_x_init)
         self.optimizer.zero_grad()
-
         total_loss, etc = self.run_trial(x, y, info, extras=True)
         total_loss.backward()
 
@@ -236,7 +236,6 @@ class Trainer:
         with torch.no_grad():
             x, y, info = next(iter(self.test_loader))
             x, y = x.to(self.device), y.to(self.device)
-            self.net.reset(self.args.res_x_init)
             total_loss, etc = self.run_trial(x, y, info, extras=True)
 
         return total_loss.item() / len(x), etc
