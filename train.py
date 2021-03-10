@@ -26,6 +26,7 @@ from trials import get_x, get_y
 from utils import log_this, load_rb, get_config, fill_args, update_args
 from helpers import get_optimizer, get_scheduler, get_criteria, get_x_y_info
 
+# dataset that automatically creates trials composed of trial and context data
 class TrialDataset(Dataset):
     def __init__(self, datasets, args):
         self.datasets = datasets
@@ -54,6 +55,13 @@ class TrialDataset(Dataset):
         x = np.concatenate((x, x_T))
         y = get_y(trial)
         return x, y, trial
+
+# turns data samples into stuff that can be run through network
+def collater(samples):
+    xs, ys, infos = list(zip(*samples))
+    xs = torch.as_tensor(np.stack(xs), dtype=torch.float)
+    ys = torch.as_tensor(np.stack(ys), dtype=torch.float)
+    return xs, ys, infos
 
 class Trainer:
     def __init__(self, args):
@@ -91,14 +99,10 @@ class Trainer:
         self.optimizer = get_optimizer(self.args, self.train_params)
         self.scheduler = get_scheduler(self.args, self.optimizer)
 
-        datasets = []
-        # ds_map = {}
         train_sets = []
         test_sets = []
         for d in range(self.args.T):
-            dset = json.load(open(self.args.dataset[d], 'r'))
-            # ds_map[dset[0]['trial_type']] = d
-
+            dset = load_rb(self.args.dataset[d])
             if self.args.same_test:
                 train_sets.append(dset)
                 test_sets.append(dset)
@@ -109,35 +113,9 @@ class Trainer:
 
         self.train_set = TrialDataset(train_sets, self.args)
         self.test_set = TrialDataset(test_sets, self.args)
-        #         self.train_set = TrialDataset(dataset[:cutoff], ds_map, self.args)
-        #         self.test_set = TrialDataset(dataset[cutoff:], ds_map, self.args)
-        #         logging.info(f'Using separate training ({cutoff}) and test ({len(dataset) - cutoff}) sets.')
 
-        # self.train_set = TrialDataset(datasets, ds_map, self.args)
-        # self.test_set = TrialDataset(datasets, ds_map, self.args)
-
-        self.train_loader = DataLoader(self.train_set, batch_size=self.args.batch_size, shuffle=True, drop_last=True)
-        self.test_loader = DataLoader(self.test_set, batch_size=128, shuffle=True, drop_last=True)
-
-        # if self.args.dataset is None:
-        #     # means we're using contexts
-        #     raise NotImplementedError
-        #     dsets = []
-        #     for d in self.args.contexts:
-        #         dsets.append(load_rb(d))
-        # else:
-        #     self.dset = load_rb(self.args.dataset)
-
-        # if using separate training and test sets, separate them out
-        # if self.args.same_test:
-        #     self.train_set = self.dset
-        #     self.test_set = self.dset
-        # else:
-        #     np.random.shuffle(self.dset)
-        #     cutoff = round(.9 * len(self.dset))
-        #     self.train_set = self.dset[:cutoff]
-        #     self.test_set = self.dset[cutoff:]
-        #     logging.info(f'Using separate training ({cutoff}) and test ({len(self.dset) - cutoff}) sets.')
+        self.train_loader = DataLoader(self.train_set, batch_size=self.args.batch_size, collate_fn=collater, shuffle=True, drop_last=True)
+        self.test_loader = DataLoader(self.test_set, batch_size=128, collate_fn=collater, shuffle=True, drop_last=True)
         
         self.log_interval = self.args.log_interval
         if not self.args.no_log:
@@ -314,11 +292,7 @@ class Trainer:
             batch = self.test_set
 
         with torch.no_grad():
-            # x, y, info = get_x_y_info(args, batch)
-
             x, y, info = next(iter(self.test_loader))
-            x = torch.as_tensor(x, dtype=torch.float)
-            y = torch.as_tensor(y, dtype=torch.float)
             self.net.reset(self.args.res_x_init)
             total_loss, etc = self.run_trial(x, y, info, extras=True)
 
@@ -326,10 +300,6 @@ class Trainer:
 
     def train(self, ix_callback=None):
         ix = 0
-
-        its_p_epoch = len(self.train_set) // self.args.batch_size
-        # its_p_epoch = 1000
-        # logging.info(f'Training set size {len(self.train_set)} | batch size {self.args.batch_size} --> {its_p_epoch} iterations / epoch')
 
         # for convergence testing
         running_min_error = float('inf')
@@ -339,21 +309,10 @@ class Trainer:
         ending = False
         for e in range(self.args.n_epochs):
             epoch_idx = 0
-            # while epoch_idx < its_p_epoch:
             for ix, batch in enumerate(self.train_loader):
                 epoch_idx += self.args.batch_size
-                
 
                 x, y, info = batch
-                x = torch.as_tensor(x, dtype=torch.float)
-                y = torch.as_tensor(y, dtype=torch.float)
-
-                # batch = self.train_set[(epoch_idx-1) * self.args.batch_size:epoch_idx * self.args.batch_size]
-                # if len(batch) < self.args.batch_size:
-                #     break
-                # ix += 1
-
-                # x, y, info = get_x_y_info(args, batch)
                 iter_loss, etc = self.train_iteration(x, y, info, ix_callback=ix_callback)
 
                 if iter_loss == -1:
@@ -365,7 +324,10 @@ class Trainer:
 
                 if ix % self.log_interval == 0:
                     z = etc['outs'].numpy().squeeze()
-                    avg_loss = running_loss / self.args.batch_size / self.log_interval
+                    if ix == 0:
+                        avg_loss = running_loss / self.args.batch_size
+                    else:
+                        avg_loss = running_loss / self.args.batch_size / self.log_interval
                     test_loss, test_etc = self.test()
                     log_arr = [
                         f'iteration {ix}',
@@ -419,7 +381,6 @@ def parse_args():
     parser.add_argument('--net', type=str, default='basic', choices=['basic'])
 
     parser.add_argument('--train_parts', type=str, nargs='+', default=['W_ro', 'W_f'])
-    # parser.add_argument('--stride', type=int, default=1, help='stride of the W_f')
     
     # make sure model_config path is specified if you use any paths! it ensures correct dimensions, bias, etc.
     parser.add_argument('--model_config_path', type=str, default=None, help='config path corresponding to model load path')
@@ -430,7 +391,7 @@ def parse_args():
     
     # network manipulation
     parser.add_argument('--res_init_type', type=str, default='gaussian', help='')
-    parser.add_argument('--res_init_gaussian_std', type=float, default=1.5)
+    parser.add_argument('--res_init_g', type=float, default=1.5)
     parser.add_argument('--res_noise', type=float, default=0)
     parser.add_argument('--x_noise', type=float, default=0)
     parser.add_argument('--m_noise', type=float, default=0)
@@ -484,7 +445,7 @@ def parse_args():
     args = parser.parse_args()
     args.res_init_params = {}
     if args.res_init_type == 'gaussian':
-        args.res_init_params['std'] = args.res_init_gaussian_std
+        args.res_init_params['std'] = args.res_init_g
     args.bias = not args.no_bias
     return args
 
@@ -521,22 +482,8 @@ def adjust_args(args):
     if args.train_parts == ['all']:
         args.train_parts = ['']
 
-    args.dset_type = []
-    # args.out_act = []
-    configs = []
     args.out_act = 'exp'
     args.T = len(args.dataset)
-    for dset in args.dataset:
-        config = get_config(dset, ctype='data', to_bunch=True)
-        configs.append(config)
-        # args.dset_type.append(config.trial_type)
-        # if config.trial_type.startswith('rsg'):
-        #     # exp nonlinearity constrains positive outputs which is useful for mse rules
-        #     if config.trial_type == 'rsg-bin':
-        #         out_act = 'none'
-        #     else:
-        #         out_act = 'exp'
-            # args.out_act.append(out_act)
 
     # initializing logging
     # do this last, because we will be logging previous parameters into the config file

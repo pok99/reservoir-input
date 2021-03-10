@@ -17,5 +17,5 @@
   "max_ready": 80,
   "min_t": 150,
   "max_t": 200,
-  "argv": "trials.py create rsg-150-200 -t rsg -a lt 200 gt 150 -n 2000"
+  "argv": "trials.py create rsg-150-200 -t rsg -a lt 200 gt 150"
 }
