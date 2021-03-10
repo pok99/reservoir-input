@@ -32,6 +32,9 @@ class Trainer:
 
         self.net = BasicNetwork(self.args)
         self.net.to(self.device)
+        
+        print('resetting network')
+        self.net.reset(self.args.res_x_init, device=self.device)
 
         # getting number of elements of every parameter
         self.n_params = {}
@@ -197,8 +200,7 @@ class Trainer:
 
     # runs an iteration where we want to match a certain trajectory
     def run_trial(self, x, y, info, extras=False):
-        self.net.reset(self.args.res_x_init)
-        self.net.x.to(self.device)
+        self.net.reset(self.args.res_x_init, device=self.device)
         total_loss = 0.
         outs = []
         for j in range(x.shape[2]):
@@ -263,7 +265,7 @@ class Trainer:
                 running_loss += iter_loss
 
                 if ix % self.log_interval == 0 and ix != 0:
-                    z = etc['outs'].numpy().squeeze()
+                    z = etc['outs'].cpu().numpy().squeeze()
                     avg_loss = running_loss / self.args.batch_size / self.log_interval
                     test_loss, test_etc = self.test()
                     log_arr = [
@@ -275,7 +277,7 @@ class Trainer:
                     logging.info(log_str)
 
                     if not self.args.no_log:
-                        self.log_checkpoint(ix, etc['ins'].numpy(), etc['goals'].numpy(), z, running_loss, avg_loss)
+                        self.log_checkpoint(ix, etc['ins'].cpu().numpy(), etc['goals'].cpu().numpy(), z, running_loss, avg_loss)
                     running_loss = 0.0
 
                     # convergence based on no avg loss decrease after patience samples

@@ -112,7 +112,7 @@ class Reservoir(nn.Module):
             return z, etc
         return z
 
-    def reset(self, res_state=None, burn_in=True):
+    def reset(self, res_state=None, burn_in=True, device=None):
         if res_state is None:
             # load specified hidden state from seed
             res_state = self.args.res_x_seed
@@ -138,6 +138,9 @@ class Reservoir(nn.Module):
         else:
             print('not any of these types, something went wrong')
             pdb.set_trace()
+
+        if device is not None:
+            self.x = self.x.to(device)
 
         if self.dynamics_mode == 1:
             self.r = self.activation(self.x)
@@ -174,7 +177,6 @@ class BasicNetwork(nn.Module):
         torch.set_rng_state(rng_pt)
 
     def forward(self, o, extras=False):
-        # pdb.set_trace()
         # pass through the forward part
         u = self.W_f(o.reshape(-1, self.args.L + self.args.T))
         if self.args.use_reservoir:
@@ -190,8 +192,8 @@ class BasicNetwork(nn.Module):
         else:
             return z, {'u': u}
 
-    def reset(self, res_state=None):
+    def reset(self, res_state=None, device=None):
         if self.args.use_reservoir:
-            self.reservoir.reset(res_state=res_state)
+            self.reservoir.reset(res_state=res_state, device=device)
 
             
