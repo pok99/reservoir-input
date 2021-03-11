@@ -203,16 +203,31 @@ class Trainer:
         self.net.reset(self.args.res_x_init, device=self.device)
         total_loss = 0.
         outs = []
+        if self.args.k != 0:
+            k_cur = np.random.randint(self.args.k // 2, self.args.k * 3 // 2)
+            k_counter = [0, 0]
         for j in range(x.shape[2]):
             net_in = x[:,:,j].reshape(-1, self.args.L + self.args.T)
             net_out, extras = self.net(net_in, extras=True)
             outs.append(net_out)
+            if self.args.k != 0:
+                k_counter[1] += 1
+                if k_counter[1] == k_cur:
+                    k_counter = [k_counter[0]+1, 0]
+                    k_cur = np.random.randint(self.args.k // 2, self.args.k * 3 // 2)
+                    self.net.reservoir.x.detach_()
+                    for c in self.criteria:
+                        # pdb.set_trace()
+                        total_loss += c(net_out.squeeze(), y[:,j].squeeze(), info)
 
         net_outs = torch.cat(outs, dim=1)
-        net_targets = y
-        for c in self.criteria:
-            total_loss += c(net_outs, net_targets, info)
-
+        if self.args.k != 0:
+            total_loss *= x.shape[2] / k_counter[0]
+        else:
+            net_targets = y
+            for c in self.criteria:
+                total_loss += c(net_outs, net_targets, info)
+        
         if extras:
             etc = {'outs': net_outs,}
             return total_loss, etc
@@ -343,6 +358,7 @@ def parse_args():
     parser.add_argument('--same_test', action='store_true', help='use entire dataset for both training and testing')
     
     parser.add_argument('--optimizer', choices=['adam', 'sgd', 'rmsprop', 'lbfgs'], default='adam')
+    parser.add_argument('--k', type=int, default=50, help='k for t-bptt. use 0 for full bptt')
 
     # adam parameters
     parser.add_argument('--batch_size', type=int, default=1, help='size of minibatch used')
