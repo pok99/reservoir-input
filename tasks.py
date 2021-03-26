@@ -24,6 +24,8 @@ eps = 1e-6
 mpl.rcParams['lines.markersize'] = 2
 mpl.rcParams['lines.linewidth'] = .5
 
+c_order = ['coral', 'cornflowerblue', 'salmon', 'lavender']
+
 
 # given info about the trial, create the x and y in np form
 def get_x(trial, args=None):
@@ -49,6 +51,8 @@ def get_x(trial, args=None):
         
     elif trial['trial_type'] == 'delay-copy':
         x = trial['x']
+    elif trial['trial_type'] == 'flip-flop':
+        x = trial['x']
     return x
 
 def get_y(trial, args=None):
@@ -58,6 +62,8 @@ def get_y(trial, args=None):
         y = y * slope - trial['rsg'][1] * slope
         y = np.clip(y, 0, 1.5)
     elif trial['trial_type'] == 'delay-copy':
+        y = trial['y']
+    elif trial['trial_type'] == 'flip-flop':
         y = trial['y']
     return y
 
@@ -129,6 +135,42 @@ def create_dataset(args):
 
             trials.append(trial)
 
+    elif t_type == 'flip-flop':
+
+        for n in range(n_trials):
+
+            x = np.zeros((args.dim, t_len))
+            y = np.zeros((args.dim, t_len))
+            keys = []
+            for i in range(args.dim):
+                cum_xlen = 0
+                keys.append([])
+                while cum_xlen < t_len:
+                    cum_xlen += np.random.geometric(args.geop) + args.p_len
+                    if cum_xlen < t_len:
+                        sign = np.random.choice([-1, 1])
+                        x[i, cum_xlen - args.p_len:cum_xlen] = sign
+                        keys[i].append(sign * (cum_xlen - args.p_len))
+
+                for j in range(len(keys[i])):
+                    if j == len(keys[i]) - 1:
+                        y[i, np.abs(keys[i][j]):] = np.sign(keys[i][j])
+                        continue
+                    idxs = np.abs(keys[i][j:j+2])
+                    y[i, idxs[0]:idxs[1]] = np.sign(keys[i][j])
+
+            trial = {
+                'id': n,
+                'trial_type': 'flip-flop',
+                'pulse_len': args.p_len,
+                'dim': args.dim,
+                'trial_len': t_len,
+                'x': x,
+                'y': y
+            }
+
+            trials.append(trial)
+
     else:
         raise NotImplementedError
 
@@ -149,6 +191,11 @@ def get_trial_args(args):
         targs.n_freqs = get_targs_val(tarr, 'n_freqs', 20, int)
         targs.f_range = get_targs_val(tarr, 'f_range', [10, 40], float, n_vals=2)
         targs.amp = get_targs_val(tarr, 'amp', 1, float)
+
+    elif args.trial_type == 'flip-flop':
+        targs.dim = get_targs_val(tarr, 'dim', 3, int)
+        targs.p_len = get_targs_val(tarr, 'pl', 5, int)
+        targs.geop = get_targs_val(tarr, 'p', .02, float)
 
     return targs
 
@@ -188,7 +235,7 @@ if __name__ == '__main__':
     parser.add_argument('-l', '--t_len', type=int, default=500)
     parser.add_argument('-n', '--n_trials', type=int, default=2000)
 
-    # rsg specific arguments
+    # rsg arguments
     parser.add_argument('-i', '--intervals', nargs='*', type=int, default=None, help='select from rsg intervals')
 
     parser.add_argument('--motifs', type=str, help='path to motifs')
@@ -243,6 +290,11 @@ if __name__ == '__main__':
             elif dset_type == 'delay-copy':
                 ax.plot(dset_range, trial_x, color='coral', lw=1)
                 ax.plot(dset_range, trial_y, color='dodgerblue', lw=1)
+
+            elif dset_type == 'flip-flop':
+                for j in range(trial['dim']):
+                    ax.plot(dset_range, trial_x[j], color=c_order[j], lw=.5)
+                    ax.plot(dset_range, trial_y[j], color=c_order[j], lw=1, ls='--', alpha=.9)
 
         handles, labels = ax.get_legend_handles_labels()
         #fig.legend(handles, labels, loc='lower center')
