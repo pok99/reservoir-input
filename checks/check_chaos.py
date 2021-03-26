@@ -18,10 +18,10 @@ colors = ['moccasin', 'springgreen', 'royalblue', 'cornflowerblue']
 # these are the differences between 
 def single_std():
     g = 1.5
-    N = 200
-    r_noise = 0.5
+    N = 500
+    r_noise = 0.1
     n_unique_nets = 9
-    n_steps = 600
+    n_steps = 2000
     n_reps = 3
     all_dists = []
     for rep in range(n_unique_nets):

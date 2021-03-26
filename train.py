@@ -199,7 +199,7 @@ class Trainer:
 
 
     # runs an iteration where we want to match a certain trajectory
-    def run_trial(self, x, y, info, extras=False):
+    def run_trial(self, x, y, info, extras=False, testing=False):
         self.net.reset(self.args.res_x_init, device=self.device)
         total_loss = 0.
         outs = []
@@ -215,10 +215,13 @@ class Trainer:
                 if k_counter[1] == k_cur:
                     k_counter = [k_counter[0]+1, 0]
                     k_cur = np.random.randint(self.args.k // 2, self.args.k * 3 // 2)
-                    self.net.reservoir.x.detach_()
                     for c in self.criteria:
                         # pdb.set_trace()
                         total_loss += c(net_out.squeeze(), y[:,j].squeeze(), info)
+                        if not testing:
+                            # self.net.reservoir.x = self.net.reservoir.x.clone().detach()
+                            total_loss.backward(retain_graph=True)
+                        self.net.reservoir.x = self.net.reservoir.x.detach()
 
         net_outs = torch.cat(outs, dim=1)
         if self.args.k != 0:
@@ -227,6 +230,8 @@ class Trainer:
             net_targets = y
             for c in self.criteria:
                 total_loss += c(net_outs, net_targets, info)
+            if not testing:
+                total_loss.backward()
         
         if extras:
             etc = {'outs': net_outs,}
@@ -236,7 +241,7 @@ class Trainer:
     def train_iteration(self, x, y, info, ix_callback=None):
         self.optimizer.zero_grad()
         total_loss, etc = self.run_trial(x, y, info, extras=True)
-        total_loss.backward()
+        # total_loss.backward()
 
         if ix_callback is not None:
             ix_callback(total_loss, etc)
@@ -253,7 +258,7 @@ class Trainer:
         with torch.no_grad():
             x, y, info = next(iter(self.test_loader))
             x, y = x.to(self.device), y.to(self.device)
-            total_loss, etc = self.run_trial(x, y, info, extras=True)
+            total_loss, etc = self.run_trial(x, y, info, extras=True, testing=True)
 
         return total_loss.item() / len(x), etc
 
@@ -328,8 +333,8 @@ def parse_args():
     parser = argparse.ArgumentParser(description='')
     parser.add_argument('-L', type=int, default=5, help='latent input dimension')
     # parser.add_argument('-T', type=int, default=1, help='task dimension')
-    parser.add_argument('-D', type=int, default=5, help='intermediate dimension')
-    parser.add_argument('-N', type=int, default=50, help='number of neurons in reservoir')
+    parser.add_argument('-D', type=int, default=50, help='intermediate dimension')
+    parser.add_argument('-N', type=int, default=200, help='number of neurons in reservoir')
     parser.add_argument('-Z', type=int, default=1, help='output dimension')
 
     parser.add_argument('--net', type=str, default='basic', choices=['basic'])
@@ -358,7 +363,7 @@ def parse_args():
     parser.add_argument('--same_test', action='store_true', help='use entire dataset for both training and testing')
     
     parser.add_argument('--optimizer', choices=['adam', 'sgd', 'rmsprop', 'lbfgs'], default='adam')
-    parser.add_argument('--k', type=int, default=50, help='k for t-bptt. use 0 for full bptt')
+    parser.add_argument('--k', type=int, default=0, help='k for t-bptt. use 0 for full bptt')
 
     # adam parameters
     parser.add_argument('--batch_size', type=int, default=1, help='size of minibatch used')

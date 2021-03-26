@@ -49,9 +49,7 @@ def pca(args):
         else:
             A_cut.append(A[ix,rsg[1]:rsg[2]])
     A_cut = torch.cat(A_cut)
-    # pdb.set_trace()
     u, s, v = torch.pca_lowrank(A_cut)
-    pdb.set_trace()
 
     rank = 3
     if rank == 3:
