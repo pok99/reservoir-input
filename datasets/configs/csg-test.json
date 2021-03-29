@@ -1,0 +1,17 @@
+{
+  "mode": "create",
+  "name": "csg-test",
+  "config": null,
+  "trial_type": "csg",
+  "t_len": 500,
+  "n_trials": 20,
+  "intervals": null,
+  "motifs": null,
+  "trial_args": [],
+  "p_len": 5,
+  "max_cue": 80,
+  "max_set": 200,
+  "min_t": 20,
+  "max_t": 230,
+  "argv": "tasks.py create csg-test -t csg -n 20"
+}

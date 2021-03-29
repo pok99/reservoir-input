@@ -37,28 +37,34 @@ class TrialDataset(Dataset):
     def __init__(self, datasets, args):
         self.datasets = datasets
         self.args = args
-        self.max_idxs = np.array([len(ds) for ds in self.datasets])
-        self.x_Ts = []
+        # arrays of just the context cues
+        self.x_contexts = []
+        # cumulative lengths of datasets
+        self.max_idxs = [0]
         for i, ds in enumerate(datasets):
-            x_T = np.zeros((args.T, ds[0]['trial_len']))
-            x_T[i] = 1
-            self.x_Ts.append(x_T)
-            if i != 0:
-                self.max_idxs[i] += self.max_idxs[i-1]
+            x_ctx = np.zeros((args.T, ds[0]['trial_len']))
+            # setting context cue for appropriate task
+            x_ctx[i] = 1
+            self.x_contexts.append(x_ctx)
+            if i != args.T - 1:
+                self.max_idxs.append(self.max_idxs[i] + len(ds))
 
     def __len__(self):
         return self.max_idxs[-1]
 
     def __getitem__(self, idx):
+        # index into the appropriate dataset to get the trial
         ds_id = np.argmax(self.max_idxs > idx)
         if ds_id == 0:
             trial = self.datasets[0][idx]
         else:
             trial = self.datasets[ds_id][idx - self.max_idxs[ds_id-1]]
 
+        # combine context cue with actual trial x to get final x
         x = get_x(trial, self.args)
-        x_T = self.x_Ts[ds_id]
-        x = np.concatenate((x, x_T))
+        x_cts = self.x_contexts[ds_id]
+        x = np.concatenate((x, x_cts))
+        # don't need to do that with y
         y = get_y(trial, self.args)
         trial['context'] = ds_id
         return x, y, trial

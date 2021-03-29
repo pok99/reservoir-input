@@ -48,6 +48,15 @@ def get_x(trial, args=None):
             x[0] += x_set
         if args is not None and args.x_noise != 0:
             x = corrupt_x(args, x)
+
+    elif trial['trial_type'].startswith('csg'):
+        x = np.zeros((5, trial['trial_len']))
+        ct, st, gt = trial['csg']
+        plen = trial['pulse_len']
+        # cue pulse
+        x[0, ct:ct+plen] = trial['t_percentile']
+        # set pulse
+        x[0, st:st+plen] = 1
         
     elif trial['trial_type'] == 'delay-copy':
         x = trial['x']
@@ -60,6 +69,11 @@ def get_y(trial, args=None):
         y = np.arange(trial['trial_len'])
         slope = 1 / trial['t_p']
         y = y * slope - trial['rsg'][1] * slope
+        y = np.clip(y, 0, 1.5)
+    elif trial['trial_type'].startswith('csg'):
+        y = np.arange(trial['trial_len'])
+        slope = 1 / trial['t_p']
+        y = y * slope - trial['csg'][1] * slope
         y = np.clip(y, 0, 1.5)
     elif trial['trial_type'] == 'delay-copy':
         y = trial['y']
@@ -109,6 +123,33 @@ def create_dataset(args):
 
             trials.append(trial)
 
+    if t_type.startswith('csg'):
+        for n in range(n_trials):
+            if args.intervals is None:
+                t_p = np.random.randint(args.min_t, args.max_t)
+                t_percentile = (t_p - args.min_t) / (args.max_t - args.min_t)
+            else:
+                ix = np.random.randint(len(args.intervals))
+                t_p = args.intervals[ix]
+                t_percentile = ix / len(args.intervals)
+            cue_time = np.random.randint(args.p_len * 2, args.max_cue)
+            set_time = cue_time + np.random.randint(args.p_len * 2, args.max_cue)
+            go_time = set_time + t_p
+
+            assert go_time < t_len
+
+            trial = {
+                'id': n,
+                'trial_type': 'csg',
+                'pulse_len': args.p_len,
+                'trial_len': t_len,
+                't_percentile': t_percentile,
+                'csg': (cue_time, set_time, go_time),
+                't_p': t_p
+            }
+
+            trials.append(trial)
+
     elif t_type == 'delay-copy':
         s_len = t_len // 2
         x_r = np.arange(s_len)
@@ -132,13 +173,10 @@ def create_dataset(args):
                 'x': x,
                 'y': y
             }
-
             trials.append(trial)
 
     elif t_type == 'flip-flop':
-
         for n in range(n_trials):
-
             x = np.zeros((args.dim, t_len))
             y = np.zeros((args.dim, t_len))
             keys = []
@@ -168,7 +206,6 @@ def create_dataset(args):
                 'x': x,
                 'y': y
             }
-
             trials.append(trial)
 
     else:
@@ -183,6 +220,14 @@ def get_trial_args(args):
     if args.trial_type.startswith('rsg'):
         targs.p_len = get_targs_val(tarr, 'pl', 5, int)
         targs.max_ready = get_targs_val(tarr, 'max_ready', 80, int)
+        if args.intervals is None:
+            targs.min_t = get_targs_val(tarr, 'gt', targs.p_len * 4, int)
+            targs.max_t = get_targs_val(tarr, 'lt', args.t_len // 2 - targs.p_len * 4, int)
+
+    elif args.trial_type.startswith('csg'):
+        targs.p_len = get_targs_val(tarr, 'pl', 5, int)
+        targs.max_cue = get_targs_val(tarr, 'max_cue', 80, int)
+        targs.max_set = get_targs_val(tarr, 'max_set', 200, int)
         if args.intervals is None:
             targs.min_t = get_targs_val(tarr, 'gt', targs.p_len * 4, int)
             targs.max_t = get_targs_val(tarr, 'lt', args.t_len // 2 - targs.p_len * 4, int)
@@ -275,7 +320,7 @@ if __name__ == '__main__':
             trial_x = get_x(trial)
             trial_y = get_y(trial)
 
-            if dset_type.startswith('rsg'):
+            if dset_type.startswith('rsg') or dset_type.startswith('csg'):
                 trial_x = np.sum(trial_x, axis=0)
                 ml, sl, bl = ax.stem(dset_range, trial_x, use_line_collection=True, linefmt='coral', label='ready/set')
                 ml.set_markerfacecolor('coral')
