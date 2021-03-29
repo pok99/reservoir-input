@@ -29,7 +29,8 @@ c_order = ['coral', 'cornflowerblue', 'salmon', 'lavender']
 
 # given info about the trial, create the x and y in np form
 def get_x(trial, args=None):
-    if trial['trial_type'].startswith('rsg'):
+    ttype = trial['trial_type']
+    if ttype.startswith('rsg'):
         x = np.zeros((5, trial['trial_len']))
         rt, st, gt = trial['rsg']
         plen = trial['pulse_len']
@@ -49,7 +50,7 @@ def get_x(trial, args=None):
         if args is not None and args.x_noise != 0:
             x = corrupt_x(args, x)
 
-    elif trial['trial_type'].startswith('csg'):
+    elif ttype.startswith('csg'):
         x = np.zeros((5, trial['trial_len']))
         ct, st, gt = trial['csg']
         plen = trial['pulse_len']
@@ -58,27 +59,65 @@ def get_x(trial, args=None):
         # set pulse
         x[0, st:st+plen] = 1
         
-    elif trial['trial_type'] == 'delay-copy':
+    elif ttype == 'delay-copy':
         x = trial['x']
-    elif trial['trial_type'] == 'flip-flop':
+    elif ttype == 'flip-flop':
         x = trial['x']
+
+    elif ttype.endswith('pro') or ttype.endswith('anti'):
+        x = np.zeros((5, trial['trial_len']))
+        fix = trial['fix']
+        stim = trial['stim']
+        stimulus = trial['stimulus']
+        # 0 is fixation
+        # the remainder are stimulus
+        if ttype.startswith('delay'):
+            x[0,:stim] = 1
+            x[1,fix:] = stimulus[0]
+            x[2,fix:] = stimulus[1]
+        elif ttype.startswith('memory'):
+            memory = trial['memory']
+            x[0,:memory] = 1
+            x[1,fix:stim] = stimulus[0]
+            x[2,fix:stim] = stimulus[1]
+
     return x
 
 def get_y(trial, args=None):
-    if trial['trial_type'].startswith('rsg'):
+    ttype = trial['trial_type']
+    if ttype.startswith('rsg'):
         y = np.arange(trial['trial_len'])
         slope = 1 / trial['t_p']
         y = y * slope - trial['rsg'][1] * slope
         y = np.clip(y, 0, 1.5)
-    elif trial['trial_type'].startswith('csg'):
+    elif ttype.startswith('csg'):
         y = np.arange(trial['trial_len'])
         slope = 1 / trial['t_p']
         y = y * slope - trial['csg'][1] * slope
         y = np.clip(y, 0, 1.5)
-    elif trial['trial_type'] == 'delay-copy':
+    elif ttype == 'delay-copy':
         y = trial['y']
-    elif trial['trial_type'] == 'flip-flop':
+    elif ttype == 'flip-flop':
         y = trial['y']
+
+    elif ttype.endswith('pro') or ttype.endswith('anti'):
+        x = np.zeros((5, trial['trial_len']))
+        stim = trial['stim']
+        stimulus = trial['stimulus']
+        y = np.zeros((5, trial['trial_len']))
+        if ttype.startswith('delay'):
+            y[0,:stim] = 1
+            y[1,stim:] = stimulus[0]
+            y[2,stim:] = stimulus[1]
+        elif ttype.startswith('memory'):
+            memory = trial['memory']
+            y[0,:memory] = 1
+            y[1,memory:] = stimulus[0]
+            y[2,memory:] = stimulus[1]
+        # reversing output stimulus for anti condition
+        if ttype.endswith('anti'):
+            y[1:,] = -y[1:,]
+
     return y
 
 # ways to add noise to x
@@ -208,6 +247,39 @@ def create_dataset(args):
             }
             trials.append(trial)
 
+    elif t_type == 'delay-pro' or t_type == 'delay-anti':
+        assert args.fix_t + args.stim_t < args.t_len
+        for n in range(n_trials):
+            theta = np.random.random() * 2 * np.pi
+            stimulus = [np.cos(theta), np.sin(theta)]
+
+            trial = {
+                'id': n,
+                'trial_type': t_type,
+                'trial_len': t_len,
+                'stimulus': stimulus,
+                'fix': args.fix_t,
+                'stim': args.fix_t + args.stim_t
+            }
+            trials.append(trial)
+
+    elif t_type == 'memory-pro' or t_type == 'memory-anti':
+        assert args.fix_t + args.stim_t + args.memory_t < args.t_len
+        for n in range(n_trials):
+            theta = np.random.random() * 2 * np.pi
+            stimulus = [np.cos(theta), np.sin(theta)]
+
+            trial = {
+                'id': n,
+                'trial_type': t_type,
+                'trial_len': t_len,
+                'stimulus': stimulus,
+                'fix': args.fix_t,
+                'stim': args.fix_t + args.stim_t,
+                'memory': args.fix_t + args.stim_t + args.memory_t
+            }
+            trials.append(trial)
+
     else:
         raise NotImplementedError
 
@@ -241,6 +313,15 @@ def get_trial_args(args):
         targs.dim = get_targs_val(tarr, 'dim', 3, int)
         targs.p_len = get_targs_val(tarr, 'pl', 5, int)
         targs.geop = get_targs_val(tarr, 'p', .02, float)
+
+    elif args.trial_type == 'delay-pro' or args.trial_type == 'delay-anti':
+        targs.fix_t = get_targs_val(tarr, 'fix', 50, int)
+        targs.stim_t = get_targs_val(tarr, 'stim', 100, int)
+
+    elif args.trial_type == 'memory-pro' or args.trial_type == 'memory-anti':
+        targs.fix_t = get_targs_val(tarr, 'fix', 50, int)
+        targs.stim_t = get_targs_val(tarr, 'stim', 100, int)
+        targs.memory_t = get_targs_val(tarr, 'memory', 50, int)
 
     return targs
 
@@ -340,6 +421,14 @@ if __name__ == '__main__':
                 for j in range(trial['dim']):
                     ax.plot(dset_range, trial_x[j], color=c_order[j], lw=.5)
                     ax.plot(dset_range, trial_y[j], color=c_order[j], lw=1, ls='--', alpha=.9)
+
+            elif dset_type.endswith('pro') or dset_type.endswith('anti'):
+                ax.plot(dset_range, trial_x[0], color='grey', lw=1, ls='--', alpha=.6)
+                ax.plot(dset_range, trial_x[1], color='salmon', lw=1, ls='--', alpha=.6)
+                ax.plot(dset_range, trial_x[2], color='dodgerblue', lw=1, ls='--', alpha=.6)
+                ax.plot(dset_range, trial_y[0], color='grey', lw=2)
+                ax.plot(dset_range, trial_y[1], color='salmon', lw=2)
+                ax.plot(dset_range, trial_y[2], color='dodgerblue', lw=2)
 
         handles, labels = ax.get_legend_handles_labels()
         #fig.legend(handles, labels, loc='lower center')

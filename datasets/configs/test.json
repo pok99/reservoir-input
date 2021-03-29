@@ -1,0 +1,14 @@
+{
+  "mode": "create",
+  "name": "test",
+  "config": null,
+  "trial_type": "delay-pro",
+  "t_len": 300,
+  "n_trials": 20,
+  "intervals": null,
+  "motifs": null,
+  "trial_args": [],
+  "fix_t": 50,
+  "stim_t": 100,
+  "argv": "tasks.py create test -t delay-pro -n 20 -l 300"
+}

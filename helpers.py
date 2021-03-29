@@ -45,6 +45,8 @@ class TrialDataset(Dataset):
             x_ctx = np.zeros((args.T, ds[0]['trial_len']))
             # setting context cue for appropriate task
             x_ctx[i] = 1
+            # this is for transient context cue
+            # x_ctx[i,10:20] = 1
             self.x_contexts.append(x_ctx)
             if i != args.T - 1:
                 self.max_idxs.append(self.max_idxs[i] + len(ds))
