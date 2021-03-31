@@ -33,6 +33,8 @@ class Task:
         self.dset_id = dset_id
         self.n = n
 
+        self.context = None
+
     def get_x(self):
         pass
 
@@ -299,7 +301,7 @@ def get_task_args(args):
         targs.max_ready = get_tval(tarr, 'max_ready', 80, int)
         if args.intervals is None:
             targs.min_t = get_tval(tarr, 'gt', targs.p_len * 4, int)
-            targs.max_t = get_tval(tarr, 'lt', args.t_len // 2 - targs.p_len * 4, int)
+            targs.max_t = get_tval(tarr, 'lt', args.t_len // 2 - targs.p_len * 4 - targs.max_ready, int)
 
     elif args.t_type.startswith('csg'):
         targs.p_len = get_tval(tarr, 'pl', 5, int)
@@ -388,7 +390,7 @@ if __name__ == '__main__':
     elif args.mode == 'load':
         dset = load_rb(args.name)
         t_type = dset[0].t_type
-        x_range = np.arange(dset[0].t_len)
+        xr = np.arange(dset[0].t_len)
 
         samples = random.sample(dset, 12)
         fig, ax = plt.subplots(3,4,sharex=True, sharey=True, figsize=(10,6))
@@ -409,33 +411,33 @@ if __name__ == '__main__':
 
             if t_type.startswith('rsg') or t_type.startswith('csg'):
                 trial_x = np.sum(trial_x, axis=0)
-                ml, sl, bl = ax.stem(x_range, trial_x, use_line_collection=True, linefmt='coral', label='ready/set')
+                ml, sl, bl = ax.stem(xr, trial_x, use_line_collection=True, linefmt='coral', label='ready/set')
                 ml.set_markerfacecolor('coral')
                 ml.set_markeredgecolor('coral')
                 if t_type == 'rsg-bin':
-                    ml, sl, bl = ax.stem(x_range, [1], use_line_collection=True, linefmt='dodgerblue', label='go')
+                    ml, sl, bl = ax.stem(xr, [1], use_line_collection=True, linefmt='dodgerblue', label='go')
                     ml.set_markerfacecolor('dodgerblue')
                     ml.set_markeredgecolor('dodgerblue')
                 else:
-                    ax.plot(x_range, trial_y, color='dodgerblue', label='go', lw=2)
+                    ax.plot(xr, trial_y, color='dodgerblue', label='go', lw=2)
 
             elif t_type == 'delay-copy':
                 for j in range(trial.dim):
-                    ax.plot(x_range, trial_x[j], color=c_order[j], ls='--', lw=1)
-                    ax.plot(x_range, trial_y[j], color=c_order[j], lw=1)
+                    ax.plot(xr, trial_x[j], color=c_order[j], ls='--', lw=1)
+                    ax.plot(xr, trial_y[j], color=c_order[j], lw=1)
 
             elif t_type == 'flip-flop':
                 for j in range(trial.dim):
-                    ax.plot(x_range, trial_x[j], color=c_order[j], lw=.5)
-                    ax.plot(x_range, trial_y[j], color=c_order[j], lw=1, ls='--', alpha=.9)
+                    ax.plot(xr, trial_x[j], color=c_order[j], lw=.5)
+                    ax.plot(xr, trial_y[j], color=c_order[j], lw=1, ls='--', alpha=.9)
 
             elif t_type.endswith('pro') or t_type.endswith('anti'):
-                ax.plot(x_range, trial_x[0], color='grey', lw=1, ls='--', alpha=.6)
-                ax.plot(x_range, trial_x[1], color='salmon', lw=1, ls='--', alpha=.6)
-                ax.plot(x_range, trial_x[2], color='dodgerblue', lw=1, ls='--', alpha=.6)
-                ax.plot(x_range, trial_y[0], color='grey', lw=2)
-                ax.plot(x_range, trial_y[1], color='salmon', lw=2)
-                ax.plot(x_range, trial_y[2], color='dodgerblue', lw=2)
+                ax.plot(xr, trial_x[0], color='grey', lw=1, ls='--', alpha=.6)
+                ax.plot(xr, trial_x[1], color='salmon', lw=1, ls='--', alpha=.6)
+                ax.plot(xr, trial_x[2], color='dodgerblue', lw=1, ls='--', alpha=.6)
+                ax.plot(xr, trial_y[0], color='grey', lw=2)
+                ax.plot(xr, trial_y[1], color='salmon', lw=2)
+                ax.plot(xr, trial_y[2], color='dodgerblue', lw=2)
 
         handles, labels = ax.get_legend_handles_labels()
         #fig.legend(handles, labels, loc='lower center')

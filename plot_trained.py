@@ -14,6 +14,8 @@ from helpers import sigmoid
 from utils import load_rb, get_config, fill_args
 from testers import load_model_path, test_model
 
+from tasks import *
+
 # for plotting some instances of a trained model on a specified dataset
 
 parser = argparse.ArgumentParser()

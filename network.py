@@ -15,8 +15,8 @@ from helpers import get_activation, get_output_activation
 
 DEFAULT_ARGS = {
     'L': 2,
-    'D_in': 5,
-    'D_out': 5,
+    'D1': 5,
+    'D2': 5,
     'N': 50,
     'Z': 2,
 
@@ -272,7 +272,7 @@ class M2Reservoir(nn.Module):
         else:
             with TorchSeed(self.args.res_seed):
                 self.W_u = nn.Linear(self.args.D1, self.args.N, bias=False)
-                self.W_u.weight.data = torch.normal(0, self.args.res_init_g, self.W_u.weight.shape) / np.sqrt(self.args.D)
+                self.W_u.weight.data = torch.normal(0, self.args.res_init_g, self.W_u.weight.shape) / np.sqrt(self.args.D1)
                 self.J = nn.Linear(self.args.N, self.args.N, bias=self.args.bias)
                 self.J.weight.data = torch.normal(0, self.args.res_init_g, self.J.weight.shape) / np.sqrt(self.args.N)
                 self.W_ro = nn.Linear(self.args.N, self.args.D2, bias=self.args.bias)

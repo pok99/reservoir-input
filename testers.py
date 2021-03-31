@@ -8,7 +8,7 @@ import pdb
 import json
 import sys
 
-from network import BasicNetwork
+from network import BasicNetwork, M2Net
 from utils import Bunch, load_rb
 
 from helpers import get_criteria, create_loaders
@@ -19,7 +19,8 @@ def load_model_path(path, config):
         config = Bunch(**config)
     config.model_path = path
 
-    net = BasicNetwork(config)
+    # net = BasicNetwork(config)
+    net = M2Net(config)
 
     net.eval()
     return net
@@ -29,7 +30,7 @@ def load_model_path(path, config):
 def test_model(net, config, n_tests=0, dset_base='.'):
     test_set, test_loader = create_loaders(config.dataset, config, split_test=False, test_size=n_tests)
     x, y, info = next(iter(test_loader))
-    dset_idx = [t['id'] for t in info]
+    dset_idx = [t.n for t in info]
 
     criteria = get_criteria(config)
 

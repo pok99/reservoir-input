@@ -18,10 +18,11 @@ import json
 import copy
 import pandas as pd
 
-from network import BasicNetwork, Reservoir
 
 from utils import log_this, load_rb, get_config, fill_args, update_args
 from helpers import get_optimizer, get_scheduler, get_criteria, create_loaders
+
+from tasks import Task, RSG
 
 from trainer import Trainer
 
@@ -29,14 +30,14 @@ from trainer import Trainer
 def parse_args():
     parser = argparse.ArgumentParser(description='')
     parser.add_argument('-L', type=int, default=5, help='latent input dimension')
-    # parser.add_argument('-T', type=int, default=1, help='task dimension')
-    parser.add_argument('-D', type=int, default=50, help='intermediate dimension')
+    parser.add_argument('--D1', type=int, default=50, help='u dimension')
+    parser.add_argument('--D2', type=int, default=200, help='v dimension')
     parser.add_argument('-N', type=int, default=200, help='number of neurons in reservoir')
     parser.add_argument('-Z', type=int, default=1, help='output dimension')
 
-    parser.add_argument('--net', type=str, default='basic', choices=['basic'])
+    parser.add_argument('--net', type=str, default='M2', choices=['basic', 'M2'])
 
-    parser.add_argument('--train_parts', type=str, nargs='+', default=['W_ro', 'W_f'])
+    parser.add_argument('--train_parts', type=str, nargs='+', default=['M_u', 'M_ro'])
     
     # make sure model_config path is specified if you use any paths! it ensures correct dimensions, bias, etc.
     parser.add_argument('--model_config_path', type=str, default=None, help='config path corresponding to model load path')
@@ -53,7 +54,7 @@ def parse_args():
     parser.add_argument('--m_noise', type=float, default=0)
     parser.add_argument('--no_bias', action='store_true')
     parser.add_argument('--m1_act', type=str, default='none', help='act fn bw M_f and W_f')
-    parser.add_argument('--m2_act', type=str, default='none', help='act fn bw M_ro and W_ro')
+    parser.add_argument('--m2_act', type=str, default='none', help='act fn bw W_ro and M_ro')
     parser.add_argument('--out_act', type=str, default=None, help='output activation')
 
     parser.add_argument('-d', '--dataset', type=str, nargs='+', help='dataset(s) to use. >1 means different contexts')
@@ -102,10 +103,6 @@ def parse_args():
     parser.add_argument('--slurm_id', type=int, default=None)
 
     args = parser.parse_args()
-    args.res_init_params = {}
-    if args.res_init_type == 'gaussian':
-        args.res_init_params['std'] = args.res_init_g
-    args.bias = not args.no_bias
     return args
 
 def adjust_args(args):
@@ -141,6 +138,7 @@ def adjust_args(args):
     if args.train_parts == ['all']:
         args.train_parts = ['']
 
+    args.bias = not args.no_bias
     args.out_act = 'exp'
     args.T = len(args.dataset)
 
@@ -178,7 +176,7 @@ if __name__ == '__main__':
 
     trainer = Trainer(args)
     logging.info(f'Initialized trainer. Using device {trainer.device}, optimizer {args.optimizer}.')
-    n_iters = 0
+
     if args.optimizer == 'lbfgs':
         best_loss, n_iters = trainer.optimize_lbfgs()
     elif args.optimizer in ['sgd', 'rmsprop', 'adam']:
@@ -196,7 +194,7 @@ if __name__ == '__main__':
                 args.res_seed, args.m_noise, args.res_noise,
                 args.dataset, n_iters, '-'.join(args.train_parts), best_loss
             ]
-            if args.optimizer == 'adam':
+            if args.optimizer != 'lbfgs':
                 labels_csv.extend(['lr', 'epochs'])
                 vals_csv.extend([args.lr, args.n_epochs])
 

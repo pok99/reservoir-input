@@ -9,7 +9,6 @@ import pdb
 
 import random
 
-from tasks import get_x, get_y
 from utils import load_rb
 
 def sigmoid(x):
@@ -38,37 +37,36 @@ class TrialDataset(Dataset):
         self.datasets = datasets
         self.args = args
         # arrays of just the context cues
-        self.x_contexts = []
+        self.x_ctxs = []
         # cumulative lengths of datasets
-        self.max_idxs = [0]
+        self.max_idxs = np.zeros(len(datasets), dtype=int)
         for i, ds in enumerate(datasets):
-            x_ctx = np.zeros((args.T, ds[0]['trial_len']))
+            x_ctx = np.zeros((args.T, ds[0].t_len))
             # setting context cue for appropriate task
             x_ctx[i] = 1
             # this is for transient context cue
             # x_ctx[i,10:20] = 1
-            self.x_contexts.append(x_ctx)
-            if i != args.T - 1:
-                self.max_idxs.append(self.max_idxs[i] + len(ds))
+            self.x_ctxs.append(x_ctx)
+            self.max_idxs[i] = self.max_idxs[i-1] + len(ds)
 
     def __len__(self):
         return self.max_idxs[-1]
 
     def __getitem__(self, idx):
         # index into the appropriate dataset to get the trial
-        ds_id = np.argmax(self.max_idxs > idx)
-        if ds_id == 0:
+        ds_idx = np.argmax(self.max_idxs > idx)
+        if ds_idx == 0:
             trial = self.datasets[0][idx]
         else:
-            trial = self.datasets[ds_id][idx - self.max_idxs[ds_id-1]]
+            trial = self.datasets[ds_idx][idx - self.max_idxs[ds_idx-1]]
 
         # combine context cue with actual trial x to get final x
-        x = get_x(trial, self.args)
-        x_cts = self.x_contexts[ds_id]
+        x = trial.get_x(self.args)
+        x_cts = self.x_ctxs[ds_idx]
         x = np.concatenate((x, x_cts))
         # don't need to do that with y
-        y = get_y(trial, self.args)
-        trial['context'] = ds_id
+        y = trial.get_y(self.args)
+        trial.context = ds_idx
         return x, y, trial
 
 # turns data samples into stuff that can be run through network
@@ -80,24 +78,24 @@ def collater(samples):
 
 # creates datasets and dataloaders
 def create_loaders(datasets, args, split_test=True, test_size=None, shuffle=True, order_fn=None):
-    train_sets = []
-    test_sets = []
+    dsets_train = []
+    dsets_test = []
     for d in range(len(datasets)):
         dset = load_rb(datasets[d])
         if not shuffle and order_fn is not None:
             dset = sorted(dset, key=order_fn)
         if split_test:
             cutoff = round(.9 * len(dset))
-            train_sets.append(dset[:cutoff])
-            test_sets.append(dset[cutoff:])
+            dsets_train.append(dset[:cutoff])
+            dsets_test.append(dset[cutoff:])
         else:
-            test_sets.append(dset)
+            dsets_test.append(dset)
 
-    test_set = TrialDataset(test_sets, args)
+    test_set = TrialDataset(dsets_test, args)
     if test_size is None:
         test_size = 128
     if split_test:
-        train_set = TrialDataset(train_sets, args)
+        train_set = TrialDataset(dsets_train, args)
         train_loader = DataLoader(train_set, batch_size=args.batch_size, collate_fn=collater, shuffle=shuffle, drop_last=True)
         test_size = min(test_size, len(test_set))
         test_loader = DataLoader(test_set, batch_size=test_size, collate_fn=collater, shuffle=shuffle)
