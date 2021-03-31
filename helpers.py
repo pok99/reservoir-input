@@ -9,7 +9,7 @@ import pdb
 
 import random
 
-from trials import get_x, get_y
+from tasks import get_x, get_y
 from utils import load_rb
 
 def sigmoid(x):
@@ -156,14 +156,21 @@ def get_criteria(args):
         raise NotImplementedError
     return criteria
 
-def get_output_activation(args):
-    if args.out_act == 'exp':
+def get_activation(name):
+    if name == 'exp':
         fn = torch.exp
-    elif args.out_act == 'relu':
+    elif name == 'relu':
         fn = nn.ReLU()
-    elif args.out_act == 'none':
+    elif name == 'sigmoid':
+        fn = nn.Sigmoid()
+    elif name == 'tanh':
+        fn = nn.Tanh()
+    elif name == 'none':
         fn = lambda x: x
     return fn
+
+def get_output_activation(args):
+    return get_activation(args.out_act)
 
 def get_dim(a):
     if hasattr(a, '__iter__'):

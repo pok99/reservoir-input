@@ -2,13 +2,18 @@
   "mode": "create",
   "name": "test",
   "config": null,
-  "trial_type": "delay-pro",
-  "t_len": 300,
+  "t_type": "delay-copy",
+  "t_len": 500,
   "n_trials": 20,
   "intervals": null,
   "motifs": null,
-  "trial_args": [],
-  "fix_t": 50,
-  "stim_t": 100,
-  "argv": "tasks.py create test -t delay-pro -n 20 -l 300"
+  "task_args": [],
+  "dim": 2,
+  "n_freqs": 20,
+  "f_range": [
+    10,
+    40
+  ],
+  "amp": 1,
+  "argv": "tasks.py create test -t delay-copy -n 20"
 }
