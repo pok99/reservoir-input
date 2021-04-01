@@ -24,7 +24,7 @@ eps = 1e-6
 mpl.rcParams['lines.markersize'] = 2
 mpl.rcParams['lines.linewidth'] = .5
 
-c_order = ['coral', 'cornflowerblue', 'forestgreen', 'orchid']
+c_order = ['coral', 'cornflowerblue', 'magenta', 'orchid']
 
 
 class Task:
@@ -230,14 +230,14 @@ class FlipFlop(Task):
         self.keys = keys
 
     def get_x(self, args=None):
-        x = np.zeros((self.dim, self.t_len))
+        x = np.zeros((5, self.t_len))
         for i in range(self.dim):
             for idx in self.keys[i]:
                 x[i, abs(idx):abs(idx)+self.p_len] = np.sign(idx)
         return x
 
     def get_y(self, args=None):
-        y = np.zeros((self.dim, self.t_len))
+        y = np.zeros((5, self.t_len))
         for i in range(self.dim):
             for j in range(len(self.keys[i])):
                 # the desired key we care about
@@ -250,6 +250,43 @@ class FlipFlop(Task):
                     idxs = np.abs(self.keys[i][j:j+2])
                     y[i, idxs[0]:idxs[1]] = sign
         return y
+
+class DurationDisc(Task):
+    def __init__(self, args, dset_id=None, n=None):
+        super().__init__(args.t_len, dset_id, n)
+
+        s1_t = np.random.randint(args.min_d, args.max_ready)
+        s1_len, s2_len = np.random.randint(args.min_d, args.max_d, 2)
+        s2_t = s1_t + s1_len + np.random.randint(args.min_d, args.max_int)
+
+        self.t_type = args.t_type
+        self.s1 = [s1_t, s1_len]
+        self.s2 = [s2_t, s2_len]
+        self.cue_id = np.random.choice([1, -1])
+        self.cue_t = args.cue_t
+        self.select_t = args.select_t
+
+    def get_x(self, args=None):
+        x = np.zeros((5, self.t_len))
+        s1, s1l = self.s1
+        s2, s2l = self.s2
+        x[0, s1:s1+s1l] = 1
+        x[1, s2:s2+s2l] = 1
+        if self.cue_id == 1:
+            x[2, self.cue_t:] = 1
+        else:
+            x[3, self.cue_t:] = 1
+        return x
+
+    def get_y(self, args=None):
+        y = np.zeros((5, self.t_len))
+        is_opposite = (self.s1[1] < self.s2[1]) ^ (self.cue_id == 1)
+        if is_opposite:
+            y[0, self.select_t:] = 1
+        else:
+            y[1, self.select_t:] = 1
+        return y
+
 
 # ways to add noise to x
 def corrupt_x(args, x):
@@ -282,6 +319,10 @@ def create_dataset(args):
     elif t_type == 'memory-pro' or t_type == 'memory-anti':
         assert args.fix_t + args.stim_t + args.memory_t < args.t_len
         TaskObj = MemoryProAnti
+    elif t_type == 'dur-disc':
+        assert args.max_ready + args.max_d * 2 + args.max_int < args.cue_t
+        assert args.cue_t < args.select_t
+        TaskObj = DurationDisc
     else:
         raise NotImplementedError
 
@@ -330,6 +371,14 @@ def get_task_args(args):
         targs.fix_t = get_tval(tarr, 'fix', 50, int)
         targs.stim_t = get_tval(tarr, 'stim', 100, int)
         targs.memory_t = get_tval(tarr, 'memory', 50, int)
+
+    elif args.t_type == 'dur-disc':
+        targs.max_ready = get_tval(tarr, 'max_ready', 20, int)
+        targs.min_d = get_tval(tarr, 'gt', 10, int)
+        targs.max_d = get_tval(tarr, 'lt', 50, int)
+        targs.max_int = get_tval(tarr, 'max_int', 50, int)
+        targs.cue_t = get_tval(tarr, 'cue_t', 200, int)
+        targs.select_t = get_tval(tarr, 'select_t', 220, int)
 
     return targs
 
@@ -438,6 +487,14 @@ if __name__ == '__main__':
                 ax.plot(xr, trial_y[0], color='grey', lw=2)
                 ax.plot(xr, trial_y[1], color='salmon', lw=2)
                 ax.plot(xr, trial_y[2], color='dodgerblue', lw=2)
+
+            elif t_type == 'dur-disc':
+                ax.plot(xr, trial_x[0], color=c_order[0], lw=.5)
+                ax.plot(xr, trial_x[1], color=c_order[0], lw=.5)
+                ax.plot(xr, trial_x[2], color=c_order[1], lw=.5)
+                ax.plot(xr, trial_x[3], color=c_order[2], lw=.5)
+                ax.plot(xr, trial_y[0], color=c_order[1], lw=1, ls='--', alpha=.9)
+                ax.plot(xr, trial_y[1], color=c_order[2], lw=1, ls='--', alpha=.9)
 
         handles, labels = ax.get_legend_handles_labels()
         #fig.legend(handles, labels, loc='lower center')

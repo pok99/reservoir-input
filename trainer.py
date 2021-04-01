@@ -76,7 +76,7 @@ class Trainer:
             self.vis_samples = []
             self.csv_path = open(os.path.join(self.log.run_dir, f'losses_{self.run_id}.csv'), 'a')
             self.writer = csv.writer(self.csv_path, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
-            self.writer.writerow(['ix', 'avg_loss'])
+            self.writer.writerow(['ix', 'train_loss', 'test_loss'])
             self.plot_checkpoint_path = os.path.join(self.log.run_dir, f'checkpoints_{self.run_id}.pkl')
             self.save_model_path = os.path.join(self.log.run_dir, f'model_{self.run_id}.pth')
 
@@ -95,85 +95,50 @@ class Trainer:
             os.remove(self.save_model_path)
         torch.save(self.net.state_dict(), self.save_model_path)
 
-    def log_checkpoint(self, ix, x, y, z, total_loss, avg_loss):
-        self.writer.writerow([ix, avg_loss])
+    def log_checkpoint(self, ix, x, y, z, train_loss, test_loss):
+        self.writer.writerow([ix, train_loss, test_loss])
         self.csv_path.flush()
 
         self.log_model(ix)
 
         # we can save individual samples at each checkpoint, that's not too bad space-wise
         if self.args.log_checkpoint_samples:
-            self.vis_samples.append([ix, x, y, z, total_loss, avg_loss])
+            self.vis_samples.append([ix, x, y, z, train_loss, test_loss])
             if os.path.exists(self.plot_checkpoint_path):
                 os.remove(self.plot_checkpoint_path)
             with open(self.plot_checkpoint_path, 'wb') as f:
                 pickle.dump(self.vis_samples, f)
 
-    # def train_trial(self, x, y, info):
-
-
     # runs an iteration where we want to match a certain trajectory
-    def run_trial(self, x, y, info, extras=False, testing=False):
+    def run_trial(self, x, y, info, training=True, extras=False):
         self.net.reset(self.args.res_x_init, device=self.device)
         trial_loss = 0.
         k_loss = 0.
         outs = []
-        if self.args.k != 0:
+        # setting up k for t-BPTT
+        if training and self.args.k != 0:
             k = self.args.k
         else:
+            # k to full n means normal BPTT
             k = x.shape[2]
-        # if self.args.k != 0:
-        #     k_counter = 0.
-            #  number of steps to take before backprop update
-            # k_cur = np.random.randint(self.args.k // 2, self.args.k * 3 // 2)
-            # k[0] counts how many updates have taken place
-            # k[1] counts how many steps it's been since last update
-            # k_counter = [0, 0]
         for j in range(x.shape[2]):
             net_in = x[:,:,j].reshape(-1, self.args.L + self.args.T)
             net_out, extras = self.net(net_in, extras=True)
             outs.append(net_out)
-            # truncated k-BPTT
+            # t-BPTT with parameter k
             if (j+1) % k == 0:
+                k_outs = torch.cat(outs[-k:], dim=1)
+                k_targets = y[:,j+1-k:j+1]
                 for c in self.criteria:
-                    k_outs = torch.cat(outs[-k:], dim=1)
-                    k_targets = y[:,j+1-k:j+1]
-                    # pdb.set_trace()
                     k_loss += c(k_outs, k_targets, info)
-                    trial_loss += k_loss.detach().item()
-                    if not testing:
-                        # self.net.reservoir.x = self.net.reservoir.x.clone().detach()
-                        # trial_loss.backward(retain_graph=True)
-                        k_loss.backward()
-                        # pdb.set_trace()
-                    k_loss = 0.
-                    self.net.reservoir.x = self.net.reservoir.x.detach()
-
-
-            # if self.args.k != 0:
-            #     k_counter += 1
-            #     if k_counter[1] == k_cur:
-            #         k_counter = [k_counter[0]+1, 0]
-            #         k_cur = np.random.randint(self.args.k // 2, self.args.k * 3 // 2)
-            #         for c in self.criteria:
-            #             # pdb.set_trace()
-            #             total_loss += c(net_out.squeeze(), y[:,j].squeeze(), info)
-            #             if not testing:
-            #                 # self.net.reservoir.x = self.net.reservoir.x.clone().detach()
-            #                 total_loss.backward(retain_graph=True)
-            #             self.net.reservoir.x = self.net.reservoir.x.detach()
+                trial_loss += k_loss.detach().item()
+                if training:
+                    k_loss.backward()
+                k_loss = 0.
+                self.net.reservoir.x = self.net.reservoir.x.detach()
 
         net_outs = torch.cat(outs, dim=1)
-        # if self.args.k != 0:
-        #     total_loss *= x.shape[2] / k
-        # else:
-        #     net_targets = y
-        #     for c in self.criteria:
-        #         total_loss += c(net_outs, net_targets, info)
-        #     if not testing:
-        #         total_loss.backward()
-        
-        # pdb.set_trace()
+
         if extras:
             etc = {'outs': net_outs,}
             return trial_loss, etc
@@ -181,11 +146,10 @@ class Trainer:
 
     def train_iteration(self, x, y, info, ix_callback=None):
         self.optimizer.zero_grad()
-        total_loss, etc = self.run_trial(x, y, info, extras=True)
-        # total_loss.backward()
+        trial_loss, etc = self.run_trial(x, y, info, extras=True)
 
         if ix_callback is not None:
-            ix_callback(total_loss, etc)
+            ix_callback(trial_loss, etc)
         self.optimizer.step()
 
         etc = {
@@ -193,13 +157,19 @@ class Trainer:
             'goals': y,
             'outs': etc['outs'].detach()
         }
-        return total_loss / len(x), etc
+        return trial_loss / len(x), etc
 
     def test(self):
         with torch.no_grad():
             x, y, info = next(iter(self.test_loader))
             x, y = x.to(self.device), y.to(self.device)
-            total_loss, etc = self.run_trial(x, y, info, extras=True, testing=True)
+            total_loss, etc = self.run_trial(x, y, info, training=False, extras=True)
+
+        etc = {
+            'ins': x,
+            'goals': y,
+            'outs': etc['outs'].detach()
+        }
 
         return total_loss / len(x), etc
 
@@ -225,20 +195,20 @@ class Trainer:
 
                 running_loss += iter_loss
 
-                if ix % self.log_interval == 0 and ix != 0:
+                if ix % self.log_interval == 0:
                     z = etc['outs'].cpu().numpy().squeeze()
-                    avg_loss = running_loss / self.args.batch_size / self.log_interval
+                    train_loss = running_loss / self.log_interval
                     test_loss, test_etc = self.test()
                     log_arr = [
                         f'iteration {ix}',
-                        f'loss {avg_loss:.3f}',
+                        f'loss {train_loss:.3f}',
                         f'test loss {test_loss:.3f}',
                     ]
                     log_str = '\t| '.join(log_arr)
                     logging.info(log_str)
 
                     if not self.args.no_log:
-                        self.log_checkpoint(ix, etc['ins'].cpu().numpy(), etc['goals'].cpu().numpy(), z, running_loss, avg_loss)
+                        self.log_checkpoint(ix, etc['ins'].cpu().numpy(), etc['goals'].cpu().numpy(), z, train_loss, test_loss)
                     running_loss = 0.0
 
                     # convergence based on no avg loss decrease after patience samples
@@ -250,7 +220,7 @@ class Trainer:
                     else:
                         running_no_min += self.log_interval
                     if running_no_min > self.args.patience:
-                        logging.info(f'iteration {ix}: no min for {args.patience} samples. ending')
+                        logging.info(f'iteration {ix}: no min for {self.args.patience} samples. ending')
                         ending = True
                 if ending:
                     break
