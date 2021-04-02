@@ -9,12 +9,14 @@ import json
 import sys
 
 from network import BasicNetwork, M2Net
-from utils import Bunch, load_rb
+from utils import Bunch, load_rb, get_config
 
 from helpers import get_criteria, create_loaders
 
 
-def load_model_path(path, config):
+def load_model_path(path, config=None):
+    if config is None:
+        config = get_config(path)
     if type(config) is dict:
         config = Bunch(**config)
     config.model_path = path
@@ -27,10 +29,12 @@ def load_model_path(path, config):
 
 # given a model and a dataset, see how well the model does on it
 # works with plot_trained.py
-def test_model(net, config, n_tests=0, dset_base='.'):
+def test_model(net, config, n_tests=0):
     test_set, test_loader = create_loaders(config.dataset, config, split_test=False, test_size=n_tests)
     x, y, info = next(iter(test_loader))
     dset_idx = [t.n for t in info]
+
+    # pdb.set_trace()
 
     criteria = get_criteria(config)
 
@@ -49,9 +53,10 @@ def test_model(net, config, n_tests=0, dset_base='.'):
 
         net_outs = torch.cat(outs, dim=1)
         net_targets = y
+        # pdb.set_trace()
         for c in criteria:
             for k in range(len(x)):
-                losses[k] += c(net_outs[k], net_targets[k], info[k]).item()
+                losses[k] += c(net_outs[k], net_targets[k], info[k], single=True).item()
 
     ins = x
     goals = y
@@ -61,7 +66,7 @@ def test_model(net, config, n_tests=0, dset_base='.'):
     # else:
     outs = net_outs
 
-    data = list(zip(dset_idx, ins, goals, outs, losses))
+    data = list(zip(dset_idx, ins, goals, outs, losses, info))
     final_loss = np.mean(losses)
     return data, final_loss
 

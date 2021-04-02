@@ -73,11 +73,11 @@ def parse_args():
     parser.add_argument('--patience', type=int, default=2000, help='stop training if loss doesn\'t decrease. adam only')
     parser.add_argument('--l2_reg', type=float, default=0, help='amount of l2 regularization')
     parser.add_argument('--s_rate', default=None, type=float, help='scheduler rate. dont use for no scheduler')
-    parser.add_argument('--loss', type=str, nargs='+', choices=['mse', 'bce', 'mse-w', 'bce-w', 'mse-g', 'mse-w2'], default=['mse'])
+    parser.add_argument('--loss', type=str, nargs='+', default=['mse'])
 
     # adam lambdas
     parser.add_argument('--l1', type=float, default=1, help='weight of normal loss')
-    parser.add_argument('--l2', type=float, default=0.5, help='weight of secondary (windowed/goal) loss')
+    parser.add_argument('--l2', type=float, default=1, help='weight of secondary (windowed/goal) loss')
     parser.add_argument('--l3', type=float, default=100, help='bce: weight of positive examples')
     parser.add_argument('--l4', type=float, default=10, help='bce-w: weight of positive examples')
 

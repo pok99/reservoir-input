@@ -109,18 +109,18 @@ def get_criteria(args):
     criteria = []
     if 'mse' in args.loss:
         fn = nn.MSELoss(reduction='sum')
-        def mse(o, t, i=None):
+        def mse(o, t, i=None, single=False):
             return args.l1 * fn(t, o)
         criteria.append(mse)
     if 'bce' in args.loss:
         weights = args.l3 * torch.ones(1)
         fn = nn.BCEWithLogitsLoss(reduction='sum', pos_weight=weights)
-        def bce(o, t, i=None):
+        def bce(o, t, i=None, single=False):
             return args.l1 * fn(t, o)
         criteria.append(bce)
     if 'mse-w' in args.loss:
         fn = nn.MSELoss(reduction='sum')
-        def mse_w(o, t, i):
+        def mse_w(o, t, i, single=False):
             loss = 0.
             if len(o.shape) == 1:
                 o = o.unsqueeze(0)
@@ -133,10 +133,31 @@ def get_criteria(args):
                 loss += t.shape[1] / t_p * fn(o[j,t_set:t_go+t_p+1], t[j,t_set:t_go+t_p+1])
             return args.l2 * loss
         criteria.append(mse_w)
+    if 'mse-e' in args.loss:
+        fn = nn.MSELoss(reduction='none')
+        def mse_e(o, t, i, single=False):
+            loss = 0.
+            if single:
+                o = o.unsqueeze(0)
+                t = t.unsqueeze(0)
+                i = [i]
+            for j in range(len(t)):
+                # last dimension is number of timesteps
+                xr = torch.arange(t.shape[-1], dtype=torch.float)
+                _, t_s, t_g = i[j].rsg
+                t_p = i[j].t_p
+                # exponential loss centred at go time
+                # dropping to 0.5 at set time
+                lam = -np.log(2) / t_p
+                xr[:t_g] = torch.exp(-lam * (xr[:t_g] - t_g))
+                xr[t_g:] = torch.exp(lam * (xr[t_g:] - t_g))
+                loss += torch.dot(xr, fn(o[j], t[j]))
+            return args.l2 * loss
+        criteria.append(mse_e)
     if 'bce-w' in args.loss:
         weights = args.l4 * torch.ones(1)
         fn = nn.BCEWithLogitsLoss(reduction='sum', pos_weight=weights)
-        def bce_w(o, t, i):
+        def bce_w(o, t, i, single=False):
             loss = 0.
             if len(o.shape) == 1:
                 o = o.unsqueeze(0)

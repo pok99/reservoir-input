@@ -20,7 +20,7 @@ from tasks import *
 
 parser = argparse.ArgumentParser()
 parser.add_argument('model', help='path to a model file, to be loaded into pytorch')
-parser.add_argument('-d', '--dataset', help='path to a dataset of trials')
+parser.add_argument('-d', '--dataset', nargs='+', help='path to a dataset of trials')
 parser.add_argument('--noise', default=0, help='noise to add to trained weights')
 parser.add_argument('-r', '--res_noise', default=None, type=float)
 parser.add_argument('-m', '--m_noise', default=None, type=float)
@@ -51,7 +51,7 @@ if not args.no_plot:
 
     fig, ax = plt.subplots(3,4,sharex=True, sharey=True, figsize=(12,7))
     for i, ax in enumerate(fig.axes):
-        ix, x, y, z, loss = data[i]
+        ix, x, y, z, loss, info = data[i]
         xr = np.arange(x.shape[-1])
 
         ax.axvline(x=0, color='dimgray', alpha = 1)
@@ -61,6 +61,10 @@ if not args.no_plot:
         ax.spines['right'].set_visible(False)
         ax.spines['left'].set_visible(False)
         ax.spines['bottom'].set_visible(False)
+
+        r, s, g = info.rsg
+        y_prod = np.argmax(z >= 1)
+        resp = y_prod - s
 
         # quick fix to 2d
         if len(x.shape) > 1:
@@ -74,7 +78,7 @@ if not args.no_plot:
         elif 'copy' in config.dataset:
             ax.plot(xr, x, color='coral', alpha=0.5, lw=1, label='input')
 
-        if 'mse' in config.loss or 'mse-w2' in config.loss:
+        if 'mse' in config.loss or 'mse-e' in config.loss:
             ax.plot(xr, y, color='coral', alpha=1, lw=1, label='target')
             ax.plot(xr, z, color='cornflowerblue', alpha=1, lw=1.5, label='response')
         elif 'bce' in config.loss:
@@ -82,7 +86,7 @@ if not args.no_plot:
             ax.plot(xr, z, color='cornflowerblue', alpha=1, lw=1.5, label='response')
 
         ax.tick_params(axis='both', color='white')
-        ax.set_title(f'trial {ix}, avg loss {np.round(float(loss), 2)}', size='small')
+        ax.set_title(f'trial {ix}, loss {np.round(float(loss), 2)}, t_p {info.t_p}, r {resp}', size='small')
 
 
     fig.text(0.5, 0.04, 'timestep', ha='center', va='center')

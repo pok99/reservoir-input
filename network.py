@@ -225,8 +225,10 @@ class M2Net(nn.Module):
 
     def _init_vars(self):
         with TorchSeed(self.args.network_seed):
-            self.M_u = nn.Linear(self.args.L + self.args.T, self.args.D1, bias=self.args.bias)
-            self.M_ro = nn.Linear(self.args.D2, self.args.Z, bias=self.args.bias)
+            D1 = self.args.D1 if self.args.D1 != 0 else self.args.N
+            D2 = self.args.D2 if self.args.D2 != 0 else self.args.N
+            self.M_u = nn.Linear(self.args.L + self.args.T, D1, bias=self.args.bias)
+            self.M_ro = nn.Linear(D2, self.args.Z, bias=self.args.bias)
         self.reservoir = M2Reservoir(self.args)
 
     def forward(self, o, extras=False):
@@ -271,12 +273,22 @@ class M2Reservoir(nn.Module):
             self.load_state_dict(torch.load(self.args.res_path))
         else:
             with TorchSeed(self.args.res_seed):
-                self.W_u = nn.Linear(self.args.D1, self.args.N, bias=False)
-                self.W_u.weight.data = torch.normal(0, self.args.res_init_g, self.W_u.weight.shape) / np.sqrt(self.args.D1)
+                if self.args.D1 != 0:
+                    self.W_u = nn.Linear(self.args.D1, self.args.N, bias=False)
+                    torch.nn.init.normal_(self.W_u.weight.data, std=self.args.res_init_g / np.sqrt(self.args.D1))
+                    # self.W_u.weight.data = torch.normal(0, self.args.res_init_g, self.W_u.weight.shape) / np.sqrt(self.args.D1)
+                    # pdb.set_trace()
+                else:
+                    self.W_u = nn.Identity()
                 self.J = nn.Linear(self.args.N, self.args.N, bias=self.args.bias)
-                self.J.weight.data = torch.normal(0, self.args.res_init_g, self.J.weight.shape) / np.sqrt(self.args.N)
-                self.W_ro = nn.Linear(self.args.N, self.args.D2, bias=self.args.bias)
-                self.W_ro.weight.data = torch.normal(0, self.args.res_init_g, self.W_ro.weight.shape) / np.sqrt(self.args.N)
+                # self.J.weight.data = torch.normal(0, self.args.res_init_g, self.J.weight.shape) / np.sqrt(self.args.N)
+                torch.nn.init.normal_(self.J.weight.data, std=self.args.res_init_g / np.sqrt(self.args.N))
+                if self.args.D2 != 0:
+                    self.W_ro = nn.Linear(self.args.N, self.args.D2, bias=self.args.bias)
+                    # self.W_ro.weight.data = torch.normal(0, self.args.res_init_g, self.W_ro.weight.shape) / np.sqrt(self.args.N)
+                    torch.nn.init.normal_(self.W_ro.weight.data, std=self.args.res_init_g / np.sqrt(self.args.D2))
+                else:
+                    self.W_ro = nn.Identity()
 
     def burn_in(self, steps):
         for i in range(steps):

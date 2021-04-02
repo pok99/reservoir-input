@@ -62,13 +62,15 @@ class RSG(Task):
         x = np.zeros((5, self.t_len))
         rt, st, gt = self.rsg
         # ready pulse
-        x[0, rt:rt+self.p_len] = 1
+        x_ready = np.zeros(self.t_len)
+        x_ready[rt:rt+self.p_len] = 1
         # set pulse
         x_set = np.zeros(self.t_len)
         x_set[st:st+self.p_len] = 1
         # perceptual shift
         if args is not None and args.m_noise != 0:
-            x_set = shift_x(x_set, trial)
+            x_ready = shift_x(x_ready, args.m_noise, self.t_p)
+        x[0] = x_ready
         # are ready/set different signals?
         if args is not None and args.separate_signal:
             x[1] = x_set
@@ -293,12 +295,11 @@ def corrupt_x(args, x):
     x += np.random.normal(scale=args.x_noise, size=x.shape)
     return x
 
-def shift_x(args, x, trial):
-    if args.m_noise == 0:
+def shift_x(x, m_noise, t_p):
+    if m_noise == 0:
         return x
-    t_p = trial['t_p']
-    disp = int(np.random.normal(0, args.m_noise*t_p/50))
-    x = x.roll(disp)
+    disp = int(np.random.normal(0, m_noise*t_p/50))
+    x = np.roll(x, disp)
     return x
 
 def create_dataset(args):
@@ -469,6 +470,8 @@ if __name__ == '__main__':
                     ml.set_markeredgecolor('dodgerblue')
                 else:
                     ax.plot(xr, trial_y, color='dodgerblue', label='go', lw=2)
+                    if t_type.startswith('rsg'):
+                        ax.set_title(str(trial.rsg) + ' -> ' + str(trial.t_p))
 
             elif t_type == 'delay-copy':
                 for j in range(trial.dim):
