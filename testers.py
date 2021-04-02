@@ -56,7 +56,7 @@ def test_model(net, config, n_tests=0):
         # pdb.set_trace()
         for c in criteria:
             for k in range(len(x)):
-                losses[k] += c(net_outs[k], net_targets[k], info[k], single=True).item()
+                losses[k] += c(net_outs[k], net_targets[k], i=info[k], t_ix=0, single=True).item()
 
     ins = x
     goals = y

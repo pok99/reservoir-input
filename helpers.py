@@ -109,20 +109,20 @@ def get_criteria(args):
     criteria = []
     if 'mse' in args.loss:
         fn = nn.MSELoss(reduction='sum')
-        def mse(o, t, i=None, single=False):
+        def mse(o, t, **kwargs):
             return args.l1 * fn(t, o)
         criteria.append(mse)
     if 'bce' in args.loss:
         weights = args.l3 * torch.ones(1)
         fn = nn.BCEWithLogitsLoss(reduction='sum', pos_weight=weights)
-        def bce(o, t, i=None, single=False):
+        def bce(o, t, **kwargs):
             return args.l1 * fn(t, o)
         criteria.append(bce)
     if 'mse-w' in args.loss:
         fn = nn.MSELoss(reduction='sum')
         def mse_w(o, t, i, single=False):
             loss = 0.
-            if len(o.shape) == 1:
+            if single:
                 o = o.unsqueeze(0)
                 t = t.unsqueeze(0)
                 i = [i]
@@ -135,7 +135,7 @@ def get_criteria(args):
         criteria.append(mse_w)
     if 'mse-e' in args.loss:
         fn = nn.MSELoss(reduction='none')
-        def mse_e(o, t, i, single=False):
+        def mse_e(o, t, i, t_ix, single=False):
             loss = 0.
             if single:
                 o = o.unsqueeze(0)
@@ -143,14 +143,21 @@ def get_criteria(args):
                 i = [i]
             for j in range(len(t)):
                 # last dimension is number of timesteps
-                xr = torch.arange(t.shape[-1], dtype=torch.float)
-                _, t_s, t_g = i[j].rsg
+                t_len = t.shape[-1]
+                xr = torch.arange(t_len, dtype=torch.float)
+                # placement of go signal in subset of timesteps
+                t_g = i[j].rsg[2] - t_ix
                 t_p = i[j].t_p
                 # exponential loss centred at go time
                 # dropping to 0.5 at set time
                 lam = -np.log(2) / t_p
-                xr[:t_g] = torch.exp(-lam * (xr[:t_g] - t_g))
+                # left half, only use if go time is to the right
+                if t_g > 0:
+                    xr[:t_g] = torch.exp(-lam * (xr[:t_g] - t_g))
+                # right half, can use regardless because python indexing is nice
                 xr[t_g:] = torch.exp(lam * (xr[t_g:] - t_g))
+                # normalize, just numerically calculate area
+                xr = xr / torch.sum(xr) * t_len
                 loss += torch.dot(xr, fn(o[j], t[j]))
             return args.l2 * loss
         criteria.append(mse_e)

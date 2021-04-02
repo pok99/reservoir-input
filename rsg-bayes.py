@@ -15,7 +15,7 @@ def main():
     model_path = 'logs/train_part1_1,2/model_best.pth'
     # model_path = 'logs/train_part1_1,2_2/model_best.pth'
     # model_path = 'logs/train_part_1,2/model_best.pth'
-    # model_path = 'logs/train_part_1,2_N1k/model_best.pth'
+    model_path = 'logs/train_part_1,2_N500/model_best.pth'
     # model_path = 'logs/train_part1'
     config = get_config(model_path, to_bunch=True)
     # config.dataset = ['datasets/rsg-150-200.pkl', 'datasets/rsg-100-150.pkl']
@@ -37,7 +37,7 @@ def main():
         y_set = np.argmax(d[2] > 0)
         y_target = np.argmax(d[2] >= 1)
         y_prod = np.argmax(d[3] >= 1)
-        ys.append((y_target - y_set, y_prod))
+        ys.append((y_target - y_set, y_prod - y_set))
         y_ready_set.append((y_set - y_ready, y_target - y_set))
 
 

@@ -127,10 +127,11 @@ class Trainer:
             outs.append(net_out)
             # t-BPTT with parameter k
             if (j+1) % k == 0:
+                # the first timestep with which to do BPTT
                 k_outs = torch.cat(outs[-k:], dim=1)
                 k_targets = y[:,j+1-k:j+1]
                 for c in self.criteria:
-                    k_loss += c(k_outs, k_targets, info)
+                    k_loss += c(k_outs, k_targets, t_ix=j+1-k, info=info)
                 trial_loss += k_loss.detach().item()
                 if training:
                     k_loss.backward()
