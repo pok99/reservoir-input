@@ -81,11 +81,13 @@ class RSG(Task):
         return x
 
     def get_y(self, args=None):
+        yy = np.zeros((5, self.t_len))
         y = np.arange(self.t_len)
         slope = 1 / self.t_p
         y = y * slope - self.rsg[1] * slope
         y = np.clip(y, 0, 1.5)
-        return y
+        yy[0] = y
+        return yy
 
 class CSG(Task):
     def __init__(self, args, dset_id=None, n=None):
@@ -111,16 +113,18 @@ class CSG(Task):
     def get_x(self, args=None):
         x = np.zeros((5, self.t_len))
         ct, st, gt = self.csg
-        x[0, ct:ct+self.p_len] = self.t_percentile
+        x[0, ct:ct+self.p_len] = 0.5 + 0.5 * self.t_percentile
         x[0, st:st+self.p_len] = 1
         return x
 
     def get_y(self, args=None):
+        yy = np.zeros((5, self.t_len))
         y = np.arange(self.t_len)
         slope = 1 / self.t_p
         y = y * slope - self.csg[1] * slope
         y = np.clip(y, 0, 1.5)
-        return y
+        yy[0] = y
+        return yy
 
 class DelayProAnti(Task):
     def __init__(self, args, dset_id=None, n=None):

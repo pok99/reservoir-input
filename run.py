@@ -22,7 +22,7 @@ import pandas as pd
 from utils import log_this, load_rb, get_config, fill_args, update_args
 from helpers import get_optimizer, get_scheduler, get_criteria, create_loaders
 
-from tasks import Task, RSG
+from tasks import *
 
 from trainer import Trainer
 

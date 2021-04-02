@@ -118,22 +118,11 @@ def get_criteria(args):
         def bce(o, t, **kwargs):
             return args.l1 * fn(t, o)
         criteria.append(bce)
-    if 'mse-w' in args.loss:
-        fn = nn.MSELoss(reduction='sum')
-        def mse_w(o, t, i, single=False):
-            loss = 0.
-            if single:
-                o = o.unsqueeze(0)
-                t = t.unsqueeze(0)
-                i = [i]
-            for j in range(len(t)):
-                t_set, t_go = i[j][1], i[j][2]
-                t_p = t_go - t_set
-                # using interval from t_set to t_go + t_p
-                loss += t.shape[1] / t_p * fn(o[j,t_set:t_go+t_p+1], t[j,t_set:t_go+t_p+1])
-            return args.l2 * loss
-        criteria.append(mse_w)
     if 'mse-e' in args.loss:
+        # ONLY FOR RSG AND CSG, WITH [1D] OUTPUT
+        # exponential decaying loss from the go time on both sides
+        # loss is 1 at go time, 0.5 at set time
+        # normalized to the number of timesteps taken
         fn = nn.MSELoss(reduction='none')
         def mse_e(o, t, i, t_ix, single=False):
             loss = 0.
@@ -158,26 +147,9 @@ def get_criteria(args):
                 xr[t_g:] = torch.exp(lam * (xr[t_g:] - t_g))
                 # normalize, just numerically calculate area
                 xr = xr / torch.sum(xr) * t_len
-                loss += torch.dot(xr, fn(o[j], t[j]))
+                loss += torch.dot(xr, fn(o[j], t[j][0]))
             return args.l2 * loss
         criteria.append(mse_e)
-    if 'bce-w' in args.loss:
-        weights = args.l4 * torch.ones(1)
-        fn = nn.BCEWithLogitsLoss(reduction='sum', pos_weight=weights)
-        def bce_w(o, t, i, single=False):
-            loss = 0.
-            if len(o.shape) == 1:
-                o = o.unsqueeze(0)
-                t = t.unsqueeze(0)
-                i = [i]
-            for j in range(len(t)):
-                t_set, t_go = i[j][1], i[j][2]
-                t_p = t_go - t_set
-                # using interval from t_set to t_go + t_p
-                # normalizing by length of the whole trial over length of penalized window
-                loss += t.shape[1] / t_p * fn(o[j,t_set:t_set+t_p+1], t[j,t_set:t_go+t_p+1])
-            return args.l2 * loss
-        criteria.append(bce_w)
     if len(criteria) == 0:
         raise NotImplementedError
     return criteria
@@ -204,38 +176,4 @@ def get_dim(a):
     else:
         return 1
 
-def mse2_loss(x, outs, info, l1, l2, extras=False):
-    total_loss = 0.
-    first_ts = []
-    if len(outs.shape) == 1:
-        x = x.unsqueeze(0)
-        outs = outs.unsqueeze(0)
-        info = [info]
-    for j in range(len(x)):
-        # pdb.set_trace()
-        ready, go = info[j][0], info[j][2]
-        # getting the index of the first timestep where output is above threshold
-        first_t = torch.nonzero(outs[j][ready:] > l1)
-        if len(first_t) == 0:
-            first_t = torch.tensor(len(x[j])) - 1
-        else:
-            first_t = first_t[0,0] + ready
-        targets = None
-        # losses defined on interval b/w go and first_t
-        if go > first_t:
-            relevant_outs = outs[j][first_t:go+1]
-            targets = torch.zeros_like(relevant_outs)
-            weights = torch.arange(go+1-first_t,0,-1)
-        elif go < first_t:
-            relevant_outs = outs[j][go:first_t + 1]
-            targets = l1 * torch.ones_like(relevant_outs)
-            weights = torch.arange(0,first_t+1-go,1)
-        first_ts.append(first_t)
-        if targets is not None:
-            mse2_loss = torch.sum(weights * torch.square(targets - relevant_outs))
-            # mse2_loss = diff * nn.MSELoss(reduction='sum')(targets, relevant_outs)
-            total_loss += mse2_loss
-    if extras:
-        first_t_avg = sum(first_ts) / len(first_ts)
-        return l2 * total_loss, first_t_avg
     return l2 * total_loss

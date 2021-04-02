@@ -79,7 +79,7 @@ if not args.no_plot:
             ax.plot(xr, x, color='coral', alpha=0.5, lw=1, label='input')
 
         if 'mse' in config.loss or 'mse-e' in config.loss:
-            ax.plot(xr, y, color='coral', alpha=1, lw=1, label='target')
+            ax.plot(xr, y[0], color='coral', alpha=1, lw=1, label='target')
             ax.plot(xr, z, color='cornflowerblue', alpha=1, lw=1.5, label='response')
         elif 'bce' in config.loss:
             ax.scatter(xr, y, color='coral', alpha=0.5, s=3, label='target')
