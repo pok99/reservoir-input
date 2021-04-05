@@ -69,6 +69,9 @@ class TrialDataset(Dataset):
         trial.context = ds_idx
         return x, y, trial
 
+    def get_dset_idx(self, idx):
+        return np.argmax(self.max_idxs > idx)
+
 # turns data samples into stuff that can be run through network
 def collater(samples):
     xs, ys, infos = list(zip(*samples))
@@ -147,7 +150,7 @@ def get_criteria(args):
                 xr[t_g:] = torch.exp(lam * (xr[t_g:] - t_g))
                 # normalize, just numerically calculate area
                 xr = xr / torch.sum(xr) * t_len
-                loss += torch.dot(xr, fn(o[j], t[j][0]))
+                loss += torch.dot(xr, fn(o[j][0], t[j][0]))
             return args.l2 * loss
         criteria.append(mse_e)
     if len(criteria) == 0:

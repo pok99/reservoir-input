@@ -51,7 +51,8 @@ def test_model(net, config, n_tests=0):
             net_out = net(net_in)
             outs.append(net_out)
 
-        net_outs = torch.cat(outs, dim=1)
+        # pdb.set_trace()
+        net_outs = torch.stack(outs, dim=2)
         net_targets = y
         # pdb.set_trace()
         for c in criteria:

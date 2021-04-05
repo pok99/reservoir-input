@@ -20,6 +20,7 @@ from tasks import *
 
 parser = argparse.ArgumentParser()
 parser.add_argument('model', help='path to a model file, to be loaded into pytorch')
+# parser.add_argument('-Z', type=int, help='output dimension')
 parser.add_argument('-d', '--dataset', nargs='+', help='path to a dataset of trials')
 parser.add_argument('--noise', default=0, help='noise to add to trained weights')
 parser.add_argument('-r', '--res_noise', default=None, type=float)
@@ -62,9 +63,7 @@ if not args.no_plot:
         ax.spines['left'].set_visible(False)
         ax.spines['bottom'].set_visible(False)
 
-        r, s, g = info.rsg
-        y_prod = np.argmax(z >= 1)
-        resp = y_prod - s
+        # pdb.set_trace()
 
         # quick fix to 2d
         if len(x.shape) > 1:
@@ -80,13 +79,13 @@ if not args.no_plot:
 
         if 'mse' in config.loss or 'mse-e' in config.loss:
             ax.plot(xr, y[0], color='coral', alpha=1, lw=1, label='target')
-            ax.plot(xr, z, color='cornflowerblue', alpha=1, lw=1.5, label='response')
+            ax.plot(xr, z[0], color='cornflowerblue', alpha=1, lw=1.5, label='response')
         elif 'bce' in config.loss:
             ax.scatter(xr, y, color='coral', alpha=0.5, s=3, label='target')
             ax.plot(xr, z, color='cornflowerblue', alpha=1, lw=1.5, label='response')
 
         ax.tick_params(axis='both', color='white')
-        ax.set_title(f'trial {ix}, loss {np.round(float(loss), 2)}, t_p {info.t_p}, r {resp}', size='small')
+        ax.set_title(f'trial {ix}, loss {np.round(float(loss), 2)}', size='small')
 
 
     fig.text(0.5, 0.04, 'timestep', ha='center', va='center')

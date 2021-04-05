@@ -33,7 +33,7 @@ def parse_args():
     parser.add_argument('--D1', type=int, default=50, help='u dimension')
     parser.add_argument('--D2', type=int, default=200, help='v dimension')
     parser.add_argument('-N', type=int, default=200, help='number of neurons in reservoir')
-    parser.add_argument('-Z', type=int, default=1, help='output dimension')
+    parser.add_argument('-Z', type=int, default=5, help='output dimension')
 
     parser.add_argument('--net', type=str, default='M2', choices=['basic', 'M2'])
 
