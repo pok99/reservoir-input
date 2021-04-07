@@ -9,42 +9,33 @@ def create_parameters(name):
     mapping = {}
     ix = 1
 
-    Ds = [10, 50]
-    Ns = [200]
+    D1s = [10, 50]
+    D2s = [10, 50]
+    Ns = [500]
 
     lr = 1e-4
     n_epochs = 20
     patience = 4000
-    batch_size = 2
-    l2 = 0.5
+    batch_size = 4
 
-    # keep the same network seeds
+    # keep the same network seeds across reservoirs
     preserve_seed = True
 
     # usually have this off but if we wanna check models, set it on
     log_checkpoint_models = False
 
     n_seeds = 2
-    n_rseeds = 1
+    n_rseeds = 3
 
-    m_noises = [0, 2]
+    m_noises = [0, 2, 5]
     r_noises = [0.01]
-    train_parts = [[''], ['W_f', 'W_ro']]
+    train_parts = [[''], ['M_u', 'M_ro']]
 
     datasets = [
-        'datasets/rsg-2c.pkl'
-        # 'datasets/rsg-sohn-100-200.pkl',
-        # 'datasets/rsg-sohn-150-200.pkl',
-        # 'datasets/rsg-sohn-100-150.pkl',
-        # 'datasets/rsg-sohn-50-100.pkl',
-        # 'datasets/rsg-sohn-50-150.pkl',
-        # 'datasets/rsg-sohn-50-200.pkl',
-        # 'datasets/rsg-sohn.pkl'
-        # 'datasets/copy-snip-200.pkl',
-        # 'datasets/copy-delay-20.pkl'
+        ['datasets/rsg-100-150.pkl', 'datasets/rsg-150-200.pkl']
     ]
     losses = [
-        'mse', 'mse-w'
+        'mse-e'
     ]
 
     # losses = [
@@ -73,14 +64,15 @@ def create_parameters(name):
     seed_samples = [11, 12]
     rseed_samples = [1, 2, 3]
 
-    for (d, nN, nD, rnoise, mnoise, tp, seed, rseed) in product(datasets, Ns, Ds, r_noises, m_noises, train_parts, range(n_seeds), range(n_rseeds)):
-        if nD > nN:
+    for (d, nN, nD1, nD2, rnoise, mnoise, tp, seed, rseed) in product(datasets, Ns, D1s, D2s, r_noises, m_noises, train_parts, range(n_seeds), range(n_rseeds)):
+        if nD1 > nN or nD2 > nN:
             continue
         run_params = {}
         run_params['dataset'] = d
         run_params['losses'] = losses
         # run_params['l2'] = l2
-        run_params['D'] = nD
+        run_params['D1'] = nD1
+        run_params['D2'] = nD2
         run_params['N'] = nN
 
         # these parameters only useful when training with adam

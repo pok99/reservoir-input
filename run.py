@@ -77,9 +77,7 @@ def parse_args():
 
     # adam lambdas
     parser.add_argument('--l1', type=float, default=1, help='weight of normal loss')
-    parser.add_argument('--l2', type=float, default=1, help='weight of secondary (windowed/goal) loss')
-    parser.add_argument('--l3', type=float, default=100, help='bce: weight of positive examples')
-    parser.add_argument('--l4', type=float, default=10, help='bce-w: weight of positive examples')
+    parser.add_argument('--l2', type=float, default=1, help='weight of exponential loss')
 
     # lbfgs-scipy parameters
     parser.add_argument('--maxiter', type=int, default=10000, help='limit to # iterations. lbfgs-scipy only')
