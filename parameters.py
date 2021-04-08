@@ -4,7 +4,7 @@ import json
 import argparse
 import random
 
-def create_parameters(name):
+def create_parameters(debug):
 
     mapping = {}
     ix = 1
@@ -25,7 +25,7 @@ def create_parameters(name):
     log_checkpoint_models = False
 
     n_seeds = 2
-    n_rseeds = 3
+    n_rseeds = 9
 
     m_noises = [0, 2, 5]
     r_noises = [0.01]
@@ -34,24 +34,23 @@ def create_parameters(name):
     datasets = [
         ['datasets/rsg-100-150.pkl', 'datasets/rsg-150-200.pkl']
     ]
-    losses = [
+    loss = [
         'mse-e'
     ]
 
-    # losses = [
-    #     'mse'
-    # ]
-
-    debug = False
     if debug:
-        Ns = [100]
-        Ds = [30]
+        datasets = [['datasets/rsg-100-150.pkl']]
+        Ns = [80]
+        D1s = [20]
+        D2s = [10]
         n_seeds = 1
         n_rseeds = 1
-        noises = [0]
-        n_epochs = 5
+        m_noises = [0]
+        r_noises = [0]
+        n_epochs = 2
         patience = 1000
-        train_parts = [['W_f', 'W_ro']]
+        batch_size = 1
+        train_parts = [['M_u', 'M_ro']]
 
     if preserve_seed:
         seed_samples = random.sample(range(1000), n_seeds)
@@ -61,15 +60,17 @@ def create_parameters(name):
     # seed_samples = [811, 946, 122]
     # rseed_samples = [492, 496, 291, 127, 727]
 
-    seed_samples = [11, 12]
-    rseed_samples = [1, 2, 3]
+    seed_offset = 20
+    rseed_offset = 20
+    seed_samples = [i + seed_offset for i in range(n_seeds)]
+    rseed_samples = [i + rseed_offset for i in range(n_rseeds)]
 
     for (d, nN, nD1, nD2, rnoise, mnoise, tp, seed, rseed) in product(datasets, Ns, D1s, D2s, r_noises, m_noises, train_parts, range(n_seeds), range(n_rseeds)):
         if nD1 > nN or nD2 > nN:
             continue
         run_params = {}
         run_params['dataset'] = d
-        run_params['losses'] = losses
+        run_params['loss'] = loss
         # run_params['l2'] = l2
         run_params['D1'] = nD1
         run_params['D2'] = nD2
@@ -105,11 +106,17 @@ def create_parameters(name):
 
     n_commands = ix - 1
 
+    if debug:
+        name = 'debug'
+    else:
+        name = 'params'
     fname = os.path.join('slurm_params', name + '.json')
     with open(fname, 'w') as f:
         json.dump(mapping, f, indent=2)
-
-    print(f'Produced {n_commands} run commands in {fname}. Use with:\nsbatch --array=1-{n_commands} slurm_train.sbatch')
+    if debug:
+        print(f'Produced {n_commands} run commands in {fname}. Use with:\nsbatch --array=1-{n_commands} slurm_debug.sbatch')
+    else:
+        print(f'Produced {n_commands} run commands in {fname}. Use with:\nsbatch --array=1-{n_commands} slurm_train.sbatch')
 
     return mapping
 
@@ -125,7 +132,7 @@ def apply_parameters(filename, args):
 
 if __name__ == '__main__':
     p = argparse.ArgumentParser()
-    p.add_argument('-n', '--name', type=str, default='params')
+    p.add_argument('-d', '--debug', action='store_true')
     args = p.parse_args()
 
-    create_parameters(args.name)
+    create_parameters(args.debug)

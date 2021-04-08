@@ -83,6 +83,7 @@ def collater(samples):
 def create_loaders(datasets, args, split_test=True, test_size=None, shuffle=True, order_fn=None):
     dsets_train = []
     dsets_test = []
+    print(datasets)
     for d in range(len(datasets)):
         dset = load_rb(datasets[d])
         if not shuffle and order_fn is not None:
