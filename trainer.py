@@ -27,7 +27,7 @@ from helpers import get_optimizer, get_scheduler, get_criteria, create_loaders
 class Trainer:
     def __init__(self, args):
         self.args = args
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.device = torch.device('cuda' if torch.cuda.is_available() and args.use_cuda else 'cpu')
 
         # self.net = BasicNetwork(self.args)
         self.net = M2Net(self.args)

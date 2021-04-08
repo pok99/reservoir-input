@@ -4,17 +4,18 @@ import numpy as np
 
 import argparse
 p = argparse.ArgumentParser()
-p.add_argument('id', default='')
+p.add_argument('csv')
 args = p.parse_args()
 
-results = pd.read_csv(f'logs/{args.id}.csv')
+results = pd.read_csv(args.csv, quotechar='|')
 
-results = results[results.dset == 'datasets/rsg2.pkl']
-results = results.sort_values('dset')
+results = results.sort_values(['tparts', 'rseed'])
+
+del results['dset']
 
 #results = results.sort_values('loss')
 
-#print(results)
+# print(results)
 
 with pd.option_context('display.max_rows', None, 'display.max_columns', None):  # more options can be specified also
     print(results)

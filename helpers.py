@@ -83,7 +83,6 @@ def collater(samples):
 def create_loaders(datasets, args, split_test=True, test_size=None, shuffle=True, order_fn=None):
     dsets_train = []
     dsets_test = []
-    print(datasets)
     for d in range(len(datasets)):
         dset = load_rb(datasets[d])
         if not shuffle and order_fn is not None:
@@ -112,7 +111,7 @@ def create_loaders(datasets, args, split_test=True, test_size=None, shuffle=True
 def get_criteria(args):
     criteria = []
     if 'mse' in args.loss:
-        fn = nn.MSELoss(reduction='sum')
+        fn = nn.MSELoss(reduction='mean')
         def mse(o, t, **kwargs):
             return args.l1 * fn(t, o)
         criteria.append(mse)
@@ -151,6 +150,7 @@ def get_criteria(args):
                 xr[t_g:] = torch.exp(lam * (xr[t_g:] - t_g))
                 # normalize, just numerically calculate area
                 xr = xr / torch.sum(xr) * t_len
+                # only the first dimension matters for rsg and csg output
                 loss += torch.dot(xr, fn(o[j][0], t[j][0]))
             return args.l2 * loss
         criteria.append(mse_e)

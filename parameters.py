@@ -16,10 +16,7 @@ def create_parameters(debug):
     lr = 1e-4
     n_epochs = 20
     patience = 4000
-    batch_size = 4
-
-    # keep the same network seeds across reservoirs
-    preserve_seed = True
+    batch_size = 2
 
     # usually have this off but if we wanna check models, set it on
     log_checkpoint_models = False
@@ -29,13 +26,13 @@ def create_parameters(debug):
 
     m_noises = [0, 2, 5]
     r_noises = [0.01]
-    train_parts = [[''], ['M_u', 'M_ro']]
+    train_parts = [['all'], ['M_u', 'M_ro']]
 
     datasets = [
         ['datasets/rsg-100-150.pkl', 'datasets/rsg-150-200.pkl']
     ]
-    loss = [
-        'mse-e'
+    losses = [
+        ['mse-e']
     ]
 
     if debug:
@@ -52,52 +49,37 @@ def create_parameters(debug):
         batch_size = 1
         train_parts = [['M_u', 'M_ro']]
 
-    if preserve_seed:
-        seed_samples = random.sample(range(1000), n_seeds)
-
-    rseed_samples = random.sample(range(1000), n_rseeds)
-
-    # seed_samples = [811, 946, 122]
-    # rseed_samples = [492, 496, 291, 127, 727]
-
     seed_offset = 20
     rseed_offset = 20
     seed_samples = [i + seed_offset for i in range(n_seeds)]
     rseed_samples = [i + rseed_offset for i in range(n_rseeds)]
 
-    for (d, nN, nD1, nD2, rnoise, mnoise, tp, seed, rseed) in product(datasets, Ns, D1s, D2s, r_noises, m_noises, train_parts, range(n_seeds), range(n_rseeds)):
+    for (d, nN, nD1, nD2, loss, rnoise, mnoise, tp, seed, rseed) in product(datasets, Ns, D1s, D2s, losses, r_noises, m_noises, train_parts, range(n_seeds), range(n_rseeds)):
         if nD1 > nN or nD2 > nN:
             continue
         run_params = {}
         run_params['dataset'] = d
         run_params['loss'] = loss
-        # run_params['l2'] = l2
+
         run_params['D1'] = nD1
         run_params['D2'] = nD2
         run_params['N'] = nN
 
         # these parameters only useful when training with adam
+        run_params['optimizer'] = 'adam'
         run_params['lr'] = lr
         run_params['n_epochs'] = n_epochs
         run_params['patience'] = patience
         run_params['batch_size'] = batch_size
-
-        # run_params['optimizer'] = 'lbfgs-scipy'
-        run_params['optimizer'] = 'adam'
-        # run_params['s_rate'] = 0.2
 
         run_params['train_parts'] = tp
 
         run_params['res_noise'] = rnoise
         run_params['m_noise'] = mnoise
 
-        run_params['same_signal'] = False
-
-        # keep the seed the same across all runs sharing network seeds
-        # but use a totally random one otherwise. train.py will take care of it
-        if preserve_seed:
-            run_params['seed'] = seed_samples[seed]
+        run_params['seed'] = seed_samples[seed]
         run_params['res_seed'] = rseed_samples[rseed]
+        run_params['res_x_seed'] = 0
 
         run_params['log_checkpoint_models'] = log_checkpoint_models
 

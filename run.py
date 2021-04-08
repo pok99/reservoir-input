@@ -19,12 +19,20 @@ import copy
 import pandas as pd
 
 
-from utils import log_this, load_rb, get_config, fill_args, update_args
+from utils import log_this, load_rb, get_config, fill_args, update_args, get_file_args
 from helpers import get_optimizer, get_scheduler, get_criteria, create_loaders
 
 from tasks import *
 
 from trainer import Trainer
+
+network_params = [
+    'L', 'D1', 'D2', 'N', 'Z', 'net', 'x_noise', 'm_noise', 'res_noise', 'res_init_g',
+    'train_parts', 'model_path', 'model_config_path', 
+    'separate_signal', 'same_test',
+    'optimizer', 'k', 'batch_size', 'lr', 'n_epochs', 'conv_type', 'patience', 'l2_reg', 's_rate', 'loss', 'l1', 'l2',
+    'seed', 'res_seed', 'res_x_seed', 'res_burn_steps', 'res_x_init'
+]
 
 
 def parse_args():
@@ -38,13 +46,15 @@ def parse_args():
     parser.add_argument('--net', type=str, default='M2', choices=['basic', 'M2'])
 
     parser.add_argument('--train_parts', type=str, nargs='+', default=['M_u', 'M_ro'])
+
+    parser.add_argument('-c', '--config', type=str, default=None, help='use args from config file')
     
     # make sure model_config path is specified if you use any paths! it ensures correct dimensions, bias, etc.
     parser.add_argument('--model_config_path', type=str, default=None, help='config path corresponding to model load path')
     parser.add_argument('--model_path', type=str, default=None, help='start training from certain model. superseded by below')
-    parser.add_argument('--Wro_path', type=str, default=None, help='start training from certain Wro')
-    parser.add_argument('--Wf_path', type=str, default=None, help='start training from certain Wf')
-    parser.add_argument('--J_path', type=str, default=None, help='saved reservoir. should be saved with seed tho')
+    # parser.add_argument('--Wro_path', type=str, default=None, help='start training from certain Wro')
+    # parser.add_argument('--Wf_path', type=str, default=None, help='start training from certain Wf')
+    # parser.add_argument('--J_path', type=str, default=None, help='saved reservoir. should be saved with seed tho')
     
     # network manipulation
     # parser.add_argument('--res_init_type', type=str, default='gaussian', help='')
@@ -97,14 +107,26 @@ def parse_args():
     parser.add_argument('--log_checkpoint_samples', action='store_true')
 
     parser.add_argument('--name', type=str, default='test')
-    parser.add_argument('--param_path', type=str, default=None)
+    parser.add_argument('--slurm_param_path', type=str, default=None)
     parser.add_argument('--slurm_id', type=int, default=None)
+    parser.add_argument('--use_cuda', action='store_true')
 
     args = parser.parse_args()
     return args
 
 def adjust_args(args):
     # don't use logging.info before we initialize the logger!! or else stuff is gonna fail
+
+    # dealing with slurm. do this first!! before anything else
+    # needs to be before seed setting, so we can set it
+    if args.slurm_id is not None:
+        from parameters import apply_parameters
+        args = apply_parameters(args.slurm_param_path, args)
+
+    # loading from a config file
+    if args.config is not None:
+        config = get_file_args(args.config)
+        args = update_args(args, config)
 
     # setting seeds
     if args.res_seed is None:
@@ -116,13 +138,9 @@ def adjust_args(args):
     np.random.seed(args.seed)
     random.seed(args.seed)
 
-    # dealing with slurm. do this first!! before anything else other than seed setting, which we want to override
-    if args.slurm_id is not None:
-        from parameters import apply_parameters
-        args = apply_parameters(args.param_path, args)
-
     # in case we are loading from a model
     # if we don't use this we might end up with an error when loading model
+    # uses a new seed
     if args.model_path is not None:
         config = get_config(args.model_path)
         args = fill_args(args, config, overwrite_none=True)
