@@ -117,7 +117,7 @@ def get_criteria(args):
     if 'mse' in args.loss:
         # do this in a roundabout way due to truncated bptt
         fn = nn.MSELoss(reduction='sum')
-        def mse(o, t, i, single=False, **kwargs):
+        def mse(o, t, i, t_ix, single=False):
             # last dimension is number of timesteps
             # divide by batch size to avoid doing so logging and in test
             # needs all the contexts to be the same length
@@ -128,9 +128,13 @@ def get_criteria(args):
                 i = [i]
             for j in range(len(t)):
                 length = i[j].t_len
-                loss += fn(t, o) / length / 
-
-            return args.l1 * fn(t, o) / length / args.batch_size
+                if t_ix + t.shape[-1] <= length:
+                    loss += fn(t, o) / length
+                elif t_ix < length:
+                    t_adj = t[j,:,:length-t_ix]
+                    o_adj = o[j,:,:length-t_ix]
+                    loss += fn(t_adj, o_adj) / length
+            return args.l1 * loss / args.batch_size
         criteria.append(mse)
     if 'bce' in args.loss:
         weights = args.l3 * torch.ones(1)
