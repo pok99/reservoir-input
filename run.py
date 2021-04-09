@@ -26,6 +26,7 @@ from tasks import *
 
 from trainer import Trainer
 
+# TODO
 network_params = [
     'L', 'D1', 'D2', 'N', 'Z', 'net', 'x_noise', 'm_noise', 'res_noise', 'res_init_g',
     'train_parts', 'model_path', 'model_config_path', 
@@ -138,6 +139,7 @@ def adjust_args(args):
     np.random.seed(args.seed)
     random.seed(args.seed)
 
+    # TODO
     # in case we are loading from a model
     # if we don't use this we might end up with an error when loading model
     # uses a new seed
@@ -154,8 +156,12 @@ def adjust_args(args):
     if args.train_parts == ['all']:
         args.train_parts = ['']
 
+    # TODO
     args.bias = not args.no_bias
-    args.out_act = 'exp'
+    if 'rsg' in args.dataset[0]:
+        args.out_act = 'exp'
+    else:
+        args.out_act = 'none'
     args.T = len(args.dataset)
 
     # initializing logging

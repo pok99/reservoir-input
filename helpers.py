@@ -74,10 +74,14 @@ class TrialDataset(Dataset):
 
 # turns data samples into stuff that can be run through network
 def collater(samples):
-    xs, ys, infos = list(zip(*samples))
-    xs = torch.as_tensor(np.stack(xs), dtype=torch.float)
-    ys = torch.as_tensor(np.stack(ys), dtype=torch.float)
-    return xs, ys, infos
+    xs, ys, trials = list(zip(*samples))
+    # pad xs and ys to be the length of the max-length example
+    max_len = max([x.shape[-1] for x in xs])
+    xs_pad = [np.pad(x, ([0,0],[0,max_len-x.shape[-1]])) for x in xs]
+    ys_pad = [np.pad(y, ([0,0],[0,max_len-y.shape[-1]])) for y in ys]
+    xs = torch.as_tensor(np.stack(xs_pad), dtype=torch.float)
+    ys = torch.as_tensor(np.stack(ys_pad), dtype=torch.float)
+    return xs, ys, trials
 
 # creates datasets and dataloaders
 def create_loaders(datasets, args, split_test=True, test_size=None, shuffle=True, order_fn=None):
@@ -111,9 +115,22 @@ def create_loaders(datasets, args, split_test=True, test_size=None, shuffle=True
 def get_criteria(args):
     criteria = []
     if 'mse' in args.loss:
-        fn = nn.MSELoss(reduction='mean')
-        def mse(o, t, **kwargs):
-            return args.l1 * fn(t, o)
+        # do this in a roundabout way due to truncated bptt
+        fn = nn.MSELoss(reduction='sum')
+        def mse(o, t, i, single=False, **kwargs):
+            # last dimension is number of timesteps
+            # divide by batch size to avoid doing so logging and in test
+            # needs all the contexts to be the same length
+            loss = 0.
+            if single:
+                o = o.unsqueeze(0)
+                t = t.unsqueeze(0)
+                i = [i]
+            for j in range(len(t)):
+                length = i[j].t_len
+                loss += fn(t, o) / length / 
+
+            return args.l1 * fn(t, o) / length / args.batch_size
         criteria.append(mse)
     if 'bce' in args.loss:
         weights = args.l3 * torch.ones(1)
@@ -152,7 +169,7 @@ def get_criteria(args):
                 xr = xr / torch.sum(xr) * t_len
                 # only the first dimension matters for rsg and csg output
                 loss += torch.dot(xr, fn(o[j][0], t[j][0]))
-            return args.l2 * loss
+            return args.l2 * loss / args.batch_size
         criteria.append(mse_e)
     if len(criteria) == 0:
         raise NotImplementedError

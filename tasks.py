@@ -24,7 +24,7 @@ eps = 1e-6
 mpl.rcParams['lines.markersize'] = 2
 mpl.rcParams['lines.linewidth'] = .5
 
-c_order = ['coral', 'cornflowerblue', 'magenta', 'orchid']
+cols = ['coral', 'cornflowerblue', 'magenta', 'orchid']
 
 
 class Task:
@@ -383,7 +383,7 @@ def get_task_args(args):
         targs.max_d = get_tval(tarr, 'lt', 50, int)
         targs.max_int = get_tval(tarr, 'max_int', 50, int)
         targs.cue_t = get_tval(tarr, 'cue_t', 200, int)
-        targs.select_t = get_tval(tarr, 'select_t', 220, int)
+        targs.select_t = get_tval(tarr, 'select_t', 240, int)
 
     return targs
 
@@ -443,7 +443,7 @@ if __name__ == '__main__':
         save_dataset(dset, args.name, config=config)
     elif args.mode == 'load':
         dset = load_rb(args.name)
-        t_type = dset[0].t_type
+        t_type = type(dset[0])
         xr = np.arange(dset[0].t_len)
 
         samples = random.sample(dset, 12)
@@ -463,7 +463,7 @@ if __name__ == '__main__':
             trial_x = trial.get_x()
             trial_y = trial.get_y()
 
-            if t_type.startswith('rsg') or t_type.startswith('csg'):
+            if t_type in [RSG, CSG]:
                 trial_x = np.sum(trial_x, axis=0)
                 ml, sl, bl = ax.stem(xr, trial_x, use_line_collection=True, linefmt='coral', label='ready/set')
                 ml.set_markerfacecolor('coral')
@@ -477,31 +477,31 @@ if __name__ == '__main__':
                     if t_type.startswith('rsg'):
                         ax.set_title(str(trial.rsg) + ' -> ' + str(trial.t_p))
 
-            elif t_type == 'delay-copy':
+            elif t_type is DelayCopy:
                 for j in range(trial.dim):
-                    ax.plot(xr, trial_x[j], color=c_order[j], ls='--', lw=1)
-                    ax.plot(xr, trial_y[j], color=c_order[j], lw=1)
+                    ax.plot(xr, trial_x[j], color=cols[j], ls='--', lw=1)
+                    ax.plot(xr, trial_y[j], color=cols[j], lw=1)
 
-            elif t_type == 'flip-flop':
+            elif t_type is FlipFlop:
                 for j in range(trial.dim):
-                    ax.plot(xr, trial_x[j], color=c_order[j], lw=.5)
-                    ax.plot(xr, trial_y[j], color=c_order[j], lw=1, ls='--', alpha=.9)
+                    ax.plot(xr, trial_x[j], color=cols[j], lw=.5)
+                    ax.plot(xr, trial_y[j], color=cols[j], lw=1, ls='--', alpha=.9)
 
-            elif t_type.endswith('pro') or t_type.endswith('anti'):
+            elif t_type in [DelayProAnti, MemoryProAnti]:
                 ax.plot(xr, trial_x[0], color='grey', lw=1, ls='--', alpha=.6)
                 ax.plot(xr, trial_x[1], color='salmon', lw=1, ls='--', alpha=.6)
                 ax.plot(xr, trial_x[2], color='dodgerblue', lw=1, ls='--', alpha=.6)
-                ax.plot(xr, trial_y[0], color='grey', lw=2)
-                ax.plot(xr, trial_y[1], color='salmon', lw=2)
-                ax.plot(xr, trial_y[2], color='dodgerblue', lw=2)
+                ax.plot(xr, trial_y[0], color='grey', lw=1.5)
+                ax.plot(xr, trial_y[1], color='salmon', lw=1.5)
+                ax.plot(xr, trial_y[2], color='dodgerblue', lw=1.5)
 
-            elif t_type == 'dur-disc':
-                ax.plot(xr, trial_x[0], color=c_order[0], lw=.5)
-                ax.plot(xr, trial_x[1], color=c_order[0], lw=.5)
-                ax.plot(xr, trial_x[2], color=c_order[1], lw=.5)
-                ax.plot(xr, trial_x[3], color=c_order[2], lw=.5)
-                ax.plot(xr, trial_y[0], color=c_order[1], lw=1, ls='--', alpha=.9)
-                ax.plot(xr, trial_y[1], color=c_order[2], lw=1, ls='--', alpha=.9)
+            elif t_type is DurationDisc:
+                ax.plot(xr, trial_x[0], color='grey', lw=1, ls='--')
+                ax.plot(xr, trial_x[1], color='grey', lw=1, ls='--')
+                ax.plot(xr, trial_x[2], color='salmon', lw=1, ls='--')
+                ax.plot(xr, trial_x[3], color='dodgerblue', lw=1, ls='--')
+                ax.plot(xr, trial_y[0], color='salmon', lw=1.5)
+                ax.plot(xr, trial_y[1], color='dodgerblue', lw=1.5)
 
         handles, labels = ax.get_legend_handles_labels()
         #fig.legend(handles, labels, loc='lower center')

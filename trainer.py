@@ -129,7 +129,7 @@ class Trainer:
             if (j+1) % k == 0:
                 # the first timestep with which to do BPTT
                 k_outs = torch.stack(outs[-k:], dim=2)
-                k_targets = y[:,j+1-k:j+1]
+                k_targets = y[:,:,j+1-k:j+1]
                 for c in self.criteria:
                     k_loss += c(k_outs, k_targets, i=info, t_ix=j+1-k)
                 trial_loss += k_loss.detach().item()
@@ -158,7 +158,7 @@ class Trainer:
             'goals': y,
             'outs': etc['outs'].detach()
         }
-        return trial_loss / len(x), etc
+        return trial_loss, etc
 
     def test(self):
         with torch.no_grad():

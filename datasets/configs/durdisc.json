@@ -1,0 +1,18 @@
+{
+  "mode": "create",
+  "name": "durdisc",
+  "config": null,
+  "t_type": "dur-disc",
+  "t_len": 500,
+  "n_trials": 20,
+  "intervals": null,
+  "motifs": null,
+  "task_args": [],
+  "max_ready": 20,
+  "min_d": 10,
+  "max_d": 50,
+  "max_int": 50,
+  "cue_t": 200,
+  "select_t": 240,
+  "argv": "tasks.py create durdisc -t dur-disc -n 20"
+}

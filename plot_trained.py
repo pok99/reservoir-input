@@ -37,6 +37,7 @@ if args.config is None:
 else:
     config = json.load(open(args.config, 'r'))
 config = fill_args(args, config, overwrite_None=True)
+dsets = config.dataset
 
 net = load_model_path(args.model, config=config)
 # assuming config is in the same folder as the model
@@ -62,22 +63,19 @@ if not args.no_plot:
         ax.spines['right'].set_visible(False)
         ax.spines['left'].set_visible(False)
         ax.spines['bottom'].set_visible(False)
+        
+        if type(info) in [DelayProAnti, MemoryProAnti]:
+            ax.plot(xr, x[0], color='grey', lw=1, ls='--', alpha=.4)
+            ax.plot(xr, x[1], color='salmon', lw=1, ls='--', alpha=.4)
+            ax.plot(xr, x[2], color='dodgerblue', lw=1, ls='--', alpha=.4)
+            ax.plot(xr, y[0], color='grey', lw=1.5, ls=':')
+            ax.plot(xr, y[1], color='salmon', lw=1.5, ls=':')
+            ax.plot(xr, y[2], color='dodgerblue', lw=1.5, ls=':')
+            ax.plot(xr, z[0], color='grey', lw=2)
+            ax.plot(xr, z[1], color='salmon', lw=2)
+            ax.plot(xr, z[2], color='dodgerblue', lw=2)
 
-        # pdb.set_trace()
-
-        # quick fix to 2d
-        if len(x.shape) > 1:
-            if 'rsg' in config.dataset:
-                x = x[0,:] + x[1,:]
-            elif 'copy' in config.dataset:
-                x = x[0,:]
-        if 'rsg' in config.dataset:
-            ax.scatter(xr, x, color='coral', alpha=0.5, s=3, label='input')
-            ax.set_ylim([-.5,2])
-        elif 'copy' in config.dataset:
-            ax.plot(xr, x, color='coral', alpha=0.5, lw=1, label='input')
-
-        if 'mse' in config.loss or 'mse-e' in config.loss:
+        elif type(info) in [RSG, CSG]:
             ax.plot(xr, y[0], color='coral', alpha=1, lw=1, label='target')
             ax.plot(xr, z[0], color='cornflowerblue', alpha=1, lw=1.5, label='response')
         elif 'bce' in config.loss:
