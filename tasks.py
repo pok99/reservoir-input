@@ -59,7 +59,6 @@ class RSG(Task):
         self.t_p = t_p
 
     def get_x(self, args=None):
-        x = np.zeros((5, self.t_len))
         rt, st, gt = self.rsg
         # ready pulse
         x_ready = np.zeros(self.t_len)
@@ -67,27 +66,31 @@ class RSG(Task):
         # set pulse
         x_set = np.zeros(self.t_len)
         x_set[st:st+self.p_len] = 1
+        # are ready/set different signals? different x sizes depending
+        if args is not None and args.separate_signal:
+            x = np.zeros((2, self.t_len))
+            x[1] = x_set
+        else:
+            x = np.zeros((1, self.t_len))
+            x[0] = x_set
         # perceptual shift
         if args is not None and args.m_noise != 0:
             x_ready = shift_x(x_ready, args.m_noise, self.t_p)
-        x[0] = x_ready
-        # are ready/set different signals?
-        if args is not None and args.separate_signal:
-            x[1] = x_set
-        else:
-            x[0] += x_set
+        x[0] += x_ready
+        # noisy up/down corruption
         if args is not None and args.x_noise != 0:
             x = corrupt_x(args, x)
         return x
 
     def get_y(self, args=None):
-        yy = np.zeros((5, self.t_len))
         y = np.arange(self.t_len)
         slope = 1 / self.t_p
         y = y * slope - self.rsg[1] * slope
+        # so the output value is not too large
         y = np.clip(y, 0, 1.5)
-        yy[0] = y
-        return yy
+        # RSG output is only 1D
+        y = y.reshape(1, self.t_len)
+        return y
 
 class CSG(Task):
     def __init__(self, args, dset_id=None, n=None):
@@ -111,20 +114,19 @@ class CSG(Task):
         self.t_p = t_p
 
     def get_x(self, args=None):
-        x = np.zeros((5, self.t_len))
+        x = np.zeros((1, self.t_len))
         ct, st, gt = self.csg
         x[0, ct:ct+self.p_len] = 0.5 + 0.5 * self.t_percentile
         x[0, st:st+self.p_len] = 1
         return x
 
     def get_y(self, args=None):
-        yy = np.zeros((5, self.t_len))
         y = np.arange(self.t_len)
         slope = 1 / self.t_p
         y = y * slope - self.csg[1] * slope
         y = np.clip(y, 0, 1.5)
-        yy[0] = y
-        return yy
+        y = y.reshape(1, -1)
+        return y
 
 class DelayProAnti(Task):
     def __init__(self, args, dset_id=None, n=None):
@@ -139,7 +141,7 @@ class DelayProAnti(Task):
         self.stim = self.fix + args.stim_t
 
     def get_x(self, args=None):
-        x = np.zeros((5, self.t_len))
+        x = np.zeros((3, self.t_len))
         # 0 is fixation, the remainder are stimulus
         x[0,:self.stim] = 1
         x[1,self.fix:] = self.stimulus[0]
@@ -147,7 +149,7 @@ class DelayProAnti(Task):
         return x
 
     def get_y(self, args=None):
-        y = np.zeros((5, self.t_len))
+        y = np.zeros((3, self.t_len))
         y[0,:self.stim] = 1
         y[1,self.stim:] = self.stimulus[0]
         y[2,self.stim:] = self.stimulus[1]
@@ -169,14 +171,14 @@ class MemoryProAnti(Task):
         self.memory = self.stim + args.memory_t
 
     def get_x(self, args=None):
-        x = np.zeros((5, self.t_len))
+        x = np.zeros((3, self.t_len))
         x[0,:self.memory] = 1
         x[1,self.fix:self.stim] = self.stimulus[0]
         x[2,self.fix:self.stim] = self.stimulus[1]
         return x
 
     def get_y(self, args=None):
-        y = np.zeros((5, self.t_len))
+        y = np.zeros((3, self.t_len))
         y[0,:self.memory] = 1
         y[1,self.memory:] = self.stimulus[0]
         y[2,self.memory:] = self.stimulus[1]
@@ -206,12 +208,12 @@ class DelayCopy(Task):
         self.pattern = x
 
     def get_x(self, args=None):
-        x = np.zeros((5, self.t_len))
+        x = np.zeros((self.dim, self.t_len))
         x[:self.dim, :self.s_len] = self.pattern
         return x
 
     def get_y(self, args=None):
-        y = np.zeros((5, self.t_len))
+        y = np.zeros((self.dim, self.t_len))
         y[:self.dim, self.s_len:] = self.pattern
         return y
 
@@ -236,14 +238,14 @@ class FlipFlop(Task):
         self.keys = keys
 
     def get_x(self, args=None):
-        x = np.zeros((5, self.t_len))
+        x = np.zeros((self.dim, self.t_len))
         for i in range(self.dim):
             for idx in self.keys[i]:
                 x[i, abs(idx):abs(idx)+self.p_len] = np.sign(idx)
         return x
 
     def get_y(self, args=None):
-        y = np.zeros((5, self.t_len))
+        y = np.zeros((self.dim, self.t_len))
         for i in range(self.dim):
             for j in range(len(self.keys[i])):
                 # the desired key we care about
@@ -273,7 +275,7 @@ class DurationDisc(Task):
         self.select_t = args.select_t
 
     def get_x(self, args=None):
-        x = np.zeros((5, self.t_len))
+        x = np.zeros((4, self.t_len))
         s1, s1l = self.s1
         s2, s2l = self.s2
         x[0, s1:s1+s1l] = 1
@@ -285,7 +287,7 @@ class DurationDisc(Task):
         return x
 
     def get_y(self, args=None):
-        y = np.zeros((5, self.t_len))
+        y = np.zeros((2, self.t_len))
         is_opposite = (self.s1[1] < self.s2[1]) ^ (self.cue_id == 1)
         if is_opposite:
             y[0, self.select_t:] = 1
@@ -465,6 +467,7 @@ if __name__ == '__main__':
 
             if t_type in [RSG, CSG]:
                 trial_x = np.sum(trial_x, axis=0)
+                trial_y = trial_y[0]
                 ml, sl, bl = ax.stem(xr, trial_x, use_line_collection=True, linefmt='coral', label='ready/set')
                 ml.set_markerfacecolor('coral')
                 ml.set_markeredgecolor('coral')
@@ -474,7 +477,7 @@ if __name__ == '__main__':
                     ml.set_markeredgecolor('dodgerblue')
                 else:
                     ax.plot(xr, trial_y, color='dodgerblue', label='go', lw=2)
-                    if t_type.startswith('rsg'):
+                    if t_type is RSG:
                         ax.set_title(str(trial.rsg) + ' -> ' + str(trial.t_p))
 
             elif t_type is DelayCopy:
