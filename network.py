@@ -366,3 +366,50 @@ class M2Reservoir(nn.Module):
         if burn_in:
             self.burn_in(self.args.res_burn_steps)
             
+
+class M2ContextNet(nn.Module):
+    def __init__(self, args=DEFAULT_ARGS):
+        super().__init__()
+        args = fill_args(args, DEFAULT_ARGS, to_bunch=True)
+        self.args = args
+       
+        if not hasattr(self.args, 'network_seed'):
+            self.args.network_seed = random.randrange(1e6)
+
+        self.M_us = []
+        self.M_ros = []
+        self._init_vars()
+        if self.args.model_path is not None:
+            self.load_state_dict(torch.load(self.args.model_path))
+
+        self.out_act = get_activation(self.args.out_act)
+        self.m1_act = get_activation(self.args.m1_act)
+        self.m2_act = get_activation(self.args.m2_act)
+        self.reset()
+
+    def _init_vars(self):
+        with TorchSeed(self.args.network_seed):
+            D1 = self.args.D1 if self.args.D1 != 0 else self.args.N
+            D2 = self.args.D2 if self.args.D2 != 0 else self.args.N
+            for t in range(T):
+                M_u = nn.Linear(self.args.L + self.args.T, D1, bias=self.args.bias)
+            self.M_ro = nn.Linear(D2, self.args.Z, bias=self.args.bias)
+        self.reservoir = M2Reservoir(self.args)
+
+    def forward(self, o, extras=False):
+        # pass through the forward part
+        u = self.m1_act(self.M_u(o.reshape(-1, self.args.L + self.args.T)))
+        v, etc = self.reservoir(u, extras=True)
+        z = self.M_ro(self.m2_act(v))
+        z = self.out_act(z)
+
+        if not extras:
+            return z
+        elif self.args.use_reservoir:
+            return z, {'u': u, 'x': etc['x'], 'v': v}
+        else:
+            return z, {'u': u, 'v': v}
+
+    def reset(self, res_state=None, device=None):
+        if self.args.use_reservoir:
+            self.reservoir.reset(res_state=res_state, device=device)

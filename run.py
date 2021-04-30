@@ -47,6 +47,7 @@ def parse_args():
     parser.add_argument('--net', type=str, default='M2', choices=['basic', 'M2'])
 
     parser.add_argument('--train_parts', type=str, nargs='+', default=['M_u', 'M_ro'])
+    parser.add_argument('--share_parts', type=str, nargs='+', default=['M_ro'])
 
     parser.add_argument('-c', '--config', type=str, default=None, help='use args from config file')
     

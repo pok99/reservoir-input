@@ -129,7 +129,7 @@ def get_criteria(args):
             for j in range(len(t)):
                 length = i[j].t_len
                 if t_ix + t.shape[-1] <= length:
-                    loss += fn(t, o) / length
+                    loss += fn(t[j], o[j]) / length
                 elif t_ix < length:
                     t_adj = t[j,:,:length-t_ix]
                     o_adj = o[j,:,:length-t_ix]
