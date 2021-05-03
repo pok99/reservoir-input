@@ -29,8 +29,17 @@ class Trainer:
         self.args = args
         self.device = torch.device('cuda' if torch.cuda.is_available() and args.use_cuda else 'cpu')
 
+        trains, tests = create_loaders(self.args.dataset, self.args, split_test=True)
+        self.train_set, self.train_loader = trains
+        self.test_set, self.test_loader = tests
+        logging.info(f'Created data loaders using datasets:')
+        for ds in self.args.dataset:
+            logging.info(f'  {ds}')
+
         # self.net = BasicNetwork(self.args)
         self.net = M2Net(self.args)
+        for i, d in enumerate(self.train_set.names):
+            self.net.add_task(d, self.train_set.lzs[i][0], self.train_set.lzs[i][1])
         self.net.to(self.device)
         
         # print('resetting network')
@@ -61,13 +70,6 @@ class Trainer:
         self.criteria = get_criteria(self.args)
         self.optimizer = get_optimizer(self.args, self.train_params)
         self.scheduler = get_scheduler(self.args, self.optimizer)
-
-        trains, tests = create_loaders(self.args.dataset, self.args, split_test=True)
-        self.train_set, self.train_loader = trains
-        self.test_set, self.test_loader = tests
-        logging.info(f'Created data loaders using datasets:')
-        for ds in self.args.dataset:
-            logging.info(f'  {ds}')
         
         self.log_interval = self.args.log_interval
         if not self.args.no_log:
@@ -111,6 +113,8 @@ class Trainer:
 
     # runs an iteration where we want to match a certain trajectory
     def run_trial(self, x, y, info, training=True, extras=False):
+        lz = info[0].lz
+        name = info[0].name
         self.net.reset(self.args.res_x_init, device=self.device)
         trial_loss = 0.
         k_loss = 0.
@@ -122,8 +126,8 @@ class Trainer:
             # k to full n means normal BPTT
             k = x.shape[2]
         for j in range(x.shape[2]):
-            net_in = x[:,:,j].reshape(-1, self.args.L + self.args.T)
-            net_out, extras = self.net(net_in, extras=True)
+            net_in = x[:,:,j].reshape(-1, lz[0])
+            net_out, extras = self.net(name, net_in, extras=True)
             outs.append(net_out)
             # t-BPTT with parameter k
             if (j+1) % k == 0:
@@ -161,10 +165,13 @@ class Trainer:
         return trial_loss, etc
 
     def test(self):
+        n_trials = 0
         with torch.no_grad():
-            x, y, info = next(iter(self.test_loader))
-            x, y = x.to(self.device), y.to(self.device)
-            total_loss, etc = self.run_trial(x, y, info, training=False, extras=True)
+            for i in range(10):
+                x, y, info = next(iter(self.test_loader))
+                x, y = x.to(self.device), y.to(self.device)
+                loss, etc = self.run_trial(x, y, info, training=False, extras=True)
+                n_trials += len(x)
 
         etc = {
             'ins': x,

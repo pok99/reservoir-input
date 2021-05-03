@@ -3,13 +3,15 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, Sampler, SubsetRandomSampler
 
 import pdb
 
 import random
 
 from utils import load_rb
+
+from tasks import *
 
 def sigmoid(x):
     return 1/(1 + np.exp(-x))
@@ -31,85 +33,117 @@ def get_scheduler(args, op):
         return optim.lr_scheduler.MultiStepLR(op, milestones=[1,2,3], gamma=args.s_rate)
     return None
 
+class TaskSampler(Sampler):
+    def __init__(self, data_source, batch_size, drop_last=True, generator=None):
+        super().__init__(data_source)
+        assert type(data_source) is TrialDataset
+        max_idxs = data_source.max_idxs
+        self.bounds = [[max_idxs[i-1], max_idxs[i]] for i in range(len(max_idxs))]
+        self.bounds[0][0] = 0
+
+        self.drop_last = drop_last
+        self.batch_size = batch_size
+        self.generator = generator
+
+    def __iter__(self):
+        ranges = [b[0] + torch.randperm(b[1] - b[0], generator=self.generator) for b in self.bounds]
+        batches = []
+        for r in ranges:
+            if drop_last:
+                i_set = range(len(r) // self.batch_size)
+            else:
+                i_set = range(int(np.ceil(len(r) / self.batch_size)))
+            batches += [r[self.batch_size*i:self.batch_size*(i+1)] for i in i_set]
+        batches = [batches[i].tolist() for i in torch.randperm(len(batches), generator=self.generator)]
+        return iter(batches)
+
+    def __len__(self):
+        lens = [(b[1] - b[0] // self.batch_size) for b in self.bounds]
+        return sum(lens)
+
+
 # dataset that automatically creates trials composed of trial and context data
 class TrialDataset(Dataset):
     def __init__(self, datasets, args):
-        self.datasets = datasets
         self.args = args
-        # arrays of just the context cues
-        self.x_ctxs = []
-        # cumulative lengths of datasets
+        
+        self.names = []
+        self.datasets = []
+        self.t_types = []
+        self.lzs = []
         self.max_idxs = np.zeros(len(datasets), dtype=int)
-        for i, ds in enumerate(datasets):
-            x_ctx = np.zeros((args.T, ds[0].t_len))
-            # setting context cue for appropriate task
-            x_ctx[i] = 1
-            # this is for transient context cue
-            # x_ctx[i,10:20] = 1
-            self.x_ctxs.append(x_ctx)
+        for i, (dname, ds) in enumerate(datasets):
+            self.names.append(dname)
+            self.datasets.append(ds)
+            # cumulative lengths of datasets, for indexing
             self.max_idxs[i] = self.max_idxs[i-1] + len(ds)
+            # use ds[0] as exemplar to set t_type, L, Z
+            self.t_types.append(ds[0].t_type)
+            # change Ls and Zs as they may vary for dataset subtypes
+            L, Z = ds[0].L, ds[0].Z
+            if args is not None and args.separate_signal and type(ds[0]) is RSG:
+                L += 1
+            self.lzs.append((L, Z))
 
     def __len__(self):
         return self.max_idxs[-1]
 
     def __getitem__(self, idx):
         # index into the appropriate dataset to get the trial
-        ds_idx = np.argmax(self.max_idxs > idx)
+        ds_idx = self.get_dset_idx(idx)
         if ds_idx == 0:
             trial = self.datasets[0][idx]
         else:
             trial = self.datasets[ds_idx][idx - self.max_idxs[ds_idx-1]]
 
-        # combine context cue with actual trial x to get final x
         x = trial.get_x(self.args)
-        x_cts = self.x_ctxs[ds_idx]
-        x = np.concatenate((x, x_cts))
-        # don't need to do that with y
         y = trial.get_y(self.args)
-        trial.context = ds_idx
+        trial.name = self.names[ds_idx]
+        trial.lz = self.lzs[ds_idx]
         return x, y, trial
 
     def get_dset_idx(self, idx):
         return np.argmax(self.max_idxs > idx)
 
+
 # turns data samples into stuff that can be run through network
 def collater(samples):
     xs, ys, trials = list(zip(*samples))
-    # pad xs and ys to be the length of the max-length example
-    max_len = max([x.shape[-1] for x in xs])
-    xs_pad = [np.pad(x, ([0,0],[0,max_len-x.shape[-1]])) for x in xs]
-    ys_pad = [np.pad(y, ([0,0],[0,max_len-y.shape[-1]])) for y in ys]
-    xs = torch.as_tensor(np.stack(xs_pad), dtype=torch.float)
-    ys = torch.as_tensor(np.stack(ys_pad), dtype=torch.float)
+    xs = torch.as_tensor(np.stack(xs), dtype=torch.float)
+    ys = torch.as_tensor(np.stack(ys), dtype=torch.float)
     return xs, ys, trials
 
 # creates datasets and dataloaders
 def create_loaders(datasets, args, split_test=True, test_size=None, shuffle=True, order_fn=None):
     dsets_train = []
     dsets_test = []
-    for d in range(len(datasets)):
-        dset = load_rb(datasets[d])
+    for i, dpath in enumerate(datasets):
+        dset = load_rb(dpath)
+        # trim and set name of each dataset
+        dname = str(i) + '_' + dpath.split('/')[-1].split('.')[0]
         if not shuffle and order_fn is not None:
             dset = sorted(dset, key=order_fn)
         if split_test:
             cutoff = round(.9 * len(dset))
-            dsets_train.append(dset[:cutoff])
-            dsets_test.append(dset[cutoff:])
+            dsets_train.append([dname, dset[:cutoff]])
+            dsets_test.append([dname, dset[cutoff:]])
         else:
-            dsets_test.append(dset)
+            dsets_test.append([dname, dset[cutoff:]])
 
+    # test loader used regardless of setting
     test_set = TrialDataset(dsets_test, args)
     if test_size is None:
-        test_size = 128
+        test_size = 10
+    test_size = min(test_size, len(test_set))
+    test_sampler = TaskSampler(test_set, test_size, drop_last=False)
+    test_loader = DataLoader(test_set, batch_sampler=test_sampler, collate_fn=collater)
+
     if split_test:
         train_set = TrialDataset(dsets_train, args)
-        train_loader = DataLoader(train_set, batch_size=args.batch_size, collate_fn=collater, shuffle=shuffle, drop_last=True)
-        test_size = min(test_size, len(test_set))
-        test_loader = DataLoader(test_set, batch_size=test_size, collate_fn=collater, shuffle=shuffle)
+        train_sampler = TaskSampler(train_set, args.batch_size, drop_last=True)
+        train_loader = DataLoader(train_set, batch_sampler=train_sampler, collate_fn=collater)
         return (train_set, train_loader), (test_set, test_loader)
     else:
-        test_size = min(test_size, len(test_set))
-        test_loader = DataLoader(test_set, batch_size=test_size, collate_fn=collater, shuffle=shuffle)
         return (test_set, test_loader)
 
 def get_criteria(args):

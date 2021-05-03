@@ -379,8 +379,8 @@ class M2Net(nn.Module):
         if not hasattr(self.args, 'network_seed'):
             self.args.network_seed = random.randrange(1e6)
 
-        self.M_us = {}
-        self.M_ros = {}
+        self.M_us = nn.ModuleDict()
+        self.M_ros = nn.ModuleDict()
         self.LZs = {}
         self._init_vars()
         if self.args.model_path is not None:

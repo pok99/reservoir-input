@@ -48,7 +48,7 @@ def test_model(net, config, n_tests=0):
         for j in range(x.shape[2]):
             # run the step
             net_in = x[:,:,j].reshape(-1, net.args.L + net.args.T)
-            net_out = net(net_in)
+            net_out = net(name, net_in)
             outs.append(net_out)
 
         # pdb.set_trace()

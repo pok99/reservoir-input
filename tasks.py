@@ -33,7 +33,9 @@ class Task:
         self.dset_id = dset_id
         self.n = n
 
-        self.context = None
+        self.name = None
+        self.L = 0
+        self.Z = 0
 
     def get_x(self):
         pass
@@ -57,6 +59,9 @@ class RSG(Task):
         self.p_len = args.p_len
         self.rsg = (ready_time, set_time, go_time)
         self.t_p = t_p
+
+        self.L = 1
+        self.Z = 1
 
     def get_x(self, args=None):
         rt, st, gt = self.rsg
@@ -113,6 +118,9 @@ class CSG(Task):
         self.csg = (cue_time, set_time, go_time)
         self.t_p = t_p
 
+        self.L = 1
+        self.Z = 1
+
     def get_x(self, args=None):
         x = np.zeros((1, self.t_len))
         ct, st, gt = self.csg
@@ -139,6 +147,9 @@ class DelayProAnti(Task):
         self.stimulus = stimulus
         self.fix = args.fix_t
         self.stim = self.fix + args.stim_t
+
+        self.L = 3
+        self.Z = 3
 
     def get_x(self, args=None):
         x = np.zeros((3, self.t_len))
@@ -169,6 +180,9 @@ class MemoryProAnti(Task):
         self.fix = args.fix_t
         self.stim = self.fix + args.stim_t
         self.memory = self.stim + args.memory_t
+
+        self.L = 3
+        self.Z = 3
 
     def get_x(self, args=None):
         x = np.zeros((3, self.t_len))
@@ -207,6 +221,9 @@ class DelayCopy(Task):
         self.dim = args.dim
         self.pattern = x
 
+        self.L = args.dim
+        self.Z = args.dim
+
     def get_x(self, args=None):
         x = np.zeros((self.dim, self.t_len))
         x[:self.dim, :self.s_len] = self.pattern
@@ -236,6 +253,9 @@ class FlipFlop(Task):
         self.p_len = args.p_len
         self.dim = args.dim
         self.keys = keys
+
+        self.L = args.dim
+        self.Z = args.dim
 
     def get_x(self, args=None):
         x = np.zeros((self.dim, self.t_len))
@@ -273,6 +293,9 @@ class DurationDisc(Task):
         self.cue_id = np.random.choice([1, -1])
         self.cue_t = args.cue_t
         self.select_t = args.select_t
+
+        self.L = 4
+        self.Z = 2
 
     def get_x(self, args=None):
         x = np.zeros((4, self.t_len))
