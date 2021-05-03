@@ -11,7 +11,7 @@ import sys
 from network import BasicNetwork, M2Net
 from utils import Bunch, load_rb, get_config
 
-from helpers import get_criteria, create_loaders
+from helpers import get_criteria, create_loaders, get_test_samples
 
 
 def load_model_path(path, config=None):
@@ -29,46 +29,43 @@ def load_model_path(path, config=None):
 
 # given a model and a dataset, see how well the model does on it
 # works with plot_trained.py
-def test_model(net, config, n_tests=0):
-    test_set, test_loader = create_loaders(config.dataset, config, split_test=False, test_size=n_tests)
-    x, y, info = next(iter(test_loader))
-    dset_idx = [t.n for t in info]
-
-    # pdb.set_trace()
+def test_model(net, config, n_tests=128):
+    test_set, test_loader = create_loaders(config.dataset, config, split_test=False)
+    samples = get_test_samples(test_loader, n_tests=n_tests)
 
     criteria = get_criteria(config)
 
+    datas = []
+    t_losses = []
     with torch.no_grad():
-        net.reset()
+        for t, s in samples.items():
+            net.reset()
+            x, y, trials = s
+            lz = trials[0].lz
+            contexts = [t.context for t in trials]
+            idxs = [t.idx for t in trials]
 
-        # saving each individual loss per sample, per timestep
-        losses = np.zeros(len(x))
-        outs = []
+            # saving each individual loss per sample, per timestep
+            losses = np.zeros(len(x))
+            outs = []
 
-        for j in range(x.shape[2]):
-            # run the step
-            net_in = x[:,:,j].reshape(-1, net.args.L + net.args.T)
-            net_out = net(name, net_in)
-            outs.append(net_out)
+            for j in range(x.shape[2]):
+                # run the step
+                net_in = x[:,:,j].reshape(-1, lz[0])
+                net_out = net(t, net_in)
+                outs.append(net_out)
 
-        # pdb.set_trace()
-        net_outs = torch.stack(outs, dim=2)
-        net_targets = y
-        # pdb.set_trace()
-        for c in criteria:
-            for k in range(len(x)):
-                losses[k] += c(net_outs[k], net_targets[k], i=info[k], t_ix=0, single=True).item()
+            outs = torch.stack(outs, dim=2)
+            targets = y
+            # pdb.set_trace()
+            for c in criteria:
+                for k in range(len(x)):
+                    losses[k] += c(outs[k], targets[k], i=trials[k], t_ix=0, single=True).item()
 
-    ins = x
-    goals = y
 
-    # if 'bce' in config.losses or 'bce-w' in config.losses:
-    #     outs = torch.sigmoid(net_outs)
-    # else:
-    outs = net_outs
-
-    data = list(zip(dset_idx, ins, goals, outs, losses, info))
-    final_loss = np.mean(losses)
-    return data, final_loss
+            data = list(zip(contexts, idxs, trials, x, y, outs, losses))
+            datas += data
+            t_losses.append((t, np.mean(losses)))
+    return datas, t_losses
 
 

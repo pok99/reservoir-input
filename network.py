@@ -382,9 +382,24 @@ class M2Net(nn.Module):
         self.M_us = nn.ModuleDict()
         self.M_ros = nn.ModuleDict()
         self.LZs = {}
-        self._init_vars()
-        if self.args.model_path is not None:
-            self.load_state_dict(torch.load(self.args.model_path))
+
+            # missing, unexpected = self.load_state_dict(torch.load(self.args.model_path), strict=False)
+            # assert len(missing) == 0
+            # # get number of 
+            # names = np.unique([u.split('.')[1] for u in unexpected])
+            # M_us = list(filter(lambda u: u.startswith('M_us'), unexpected))
+            # M_ros = list(filter(lambda u: u.startswith('M_ros'), unexpected))
+            # Ls = []
+            # for i in range(len(M_us)/2):
+            #     name = next(filter(lambda n: n.startswith(str(i) + '_'), names))
+            #     u_weight, u_bias = sorted(filter(lambda u: u.startswith('M_us.' + str(i)), M_us), reverse=True)
+            #     ro_weight, ro_bias = sorted(filter(lambda u: u.startswith('M_ros.' + str(i)), M_ros), reverse=True)
+            #     L = unexpected[u_weight].shape[1]
+            #     Z = unexpected[ro_weight].shape[0]
+            #     self.add_task(name, L, Z)
+            #     self.M_us[name].weight = unexpected[u_weight]
+            #     self.M_ros[name].bias = unexpected[ro_weight]
+
 
         # use or don't use input/output low-D representations
         self.D1 = self.args.D1 if self.args.D1 != 0 else self.args.N
@@ -393,6 +408,24 @@ class M2Net(nn.Module):
         self.out_act = get_activation(self.args.out_act)
         self.m1_act = get_activation(self.args.m1_act)
         self.m2_act = get_activation(self.args.m2_act)
+        
+        self._init_vars()
+        if self.args.model_path is not None:
+            state_dict = torch.load(self.args.model_path)
+            names = np.unique([u.split('.')[1] for u in state_dict])
+            M_us = list(filter(lambda u: u.startswith('M_us'), state_dict))
+            M_ros = list(filter(lambda u: u.startswith('M_ros'), state_dict))
+            Ls = []
+            for i in range(len(M_us)//2):
+                name = next(filter(lambda n: n.startswith(str(i) + '_'), names))
+                u_weight, u_bias = sorted(filter(lambda u: u.startswith('M_us.' + str(i)), M_us), reverse=True)
+                ro_weight, ro_bias = sorted(filter(lambda u: u.startswith('M_ros.' + str(i)), M_ros), reverse=True)
+                L = state_dict[u_weight].shape[1]
+                Z = state_dict[ro_weight].shape[0]
+                self.add_task(name, L, Z)
+
+            self.load_state_dict(state_dict)
+
         self.reset()
 
     def _init_vars(self):

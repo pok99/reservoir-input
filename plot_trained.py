@@ -47,13 +47,15 @@ if args.test_all:
     print('avg summed loss (all):', loss)
 
 if not args.no_plot:
-    data, loss = test_model(net, config, n_tests=12)
-    print('avg summed loss (plotted):', loss)
+    data, t_losses = test_model(net, config, n_tests=12)
+    print('avg losses:')
+    for t, j in t_losses:
+        print(t + ': ' + str(j))
     run_id = '/'.join(args.model.split('/')[-3:-1])
 
-    fig, ax = plt.subplots(3,4,sharex=True, sharey=True, figsize=(12,7))
+    fig, ax = plt.subplots(3,4,sharex=False, sharey=False, figsize=(12,8))
     for i, ax in enumerate(fig.axes):
-        ix, x, y, z, loss, info = data[i]
+        context, ix, trial, x, y, z, loss = data[i]
         xr = np.arange(x.shape[-1])
 
         ax.axvline(x=0, color='dimgray', alpha = 1)
@@ -64,7 +66,7 @@ if not args.no_plot:
         ax.spines['left'].set_visible(False)
         ax.spines['bottom'].set_visible(False)
         
-        if type(info) in [DelayProAnti, MemoryProAnti]:
+        if type(trial) in [DelayProAnti, MemoryProAnti]:
             ax.plot(xr, x[0], color='grey', lw=1, ls='--', alpha=.4)
             ax.plot(xr, x[1], color='salmon', lw=1, ls='--', alpha=.4)
             ax.plot(xr, x[2], color='dodgerblue', lw=1, ls='--', alpha=.4)
@@ -75,23 +77,25 @@ if not args.no_plot:
             ax.plot(xr, z[1], color='salmon', lw=2)
             ax.plot(xr, z[2], color='dodgerblue', lw=2)
 
-        elif type(info) in [RSG, CSG]:
+        elif type(trial) in [RSG, CSG]:
             ax.plot(xr, y[0], color='coral', alpha=1, lw=1, label='target')
             ax.plot(xr, z[0], color='cornflowerblue', alpha=1, lw=1.5, label='response')
         elif 'bce' in config.loss:
             ax.scatter(xr, y, color='coral', alpha=0.5, s=3, label='target')
             ax.plot(xr, z, color='cornflowerblue', alpha=1, lw=1.5, label='response')
 
-        ax.tick_params(axis='both', color='white')
-        ax.set_title(f'trial {ix}, loss {np.round(float(loss), 2)}', size='small')
+        ax.tick_params(axis='both', color='white', labelsize=8)
+        ax.set_title(f'ctx {context}, trial {ix}, loss {np.round(float(loss), 2)}', size=8)
 
 
-    fig.text(0.5, 0.04, 'timestep', ha='center', va='center')
-    fig.text(0.06, 0.5, 'value', ha='center', va='center', rotation='vertical')
+    fig.text(0.5, 0.04, 'timestep', ha='center', va='center', size=12)
+    fig.text(0.03, 0.5, 'value', ha='center', va='center', rotation='vertical', size=14)
 
     handles, labels = ax.get_legend_handles_labels()
-    fig.suptitle(f'Final performance: {run_id}')
-    fig.legend(handles, labels, loc='center right')
+    fig.suptitle(f'Final performance: {run_id}', size=14)
+    fig.legend(handles, labels, loc='lower right')
+
+    plt.tight_layout(rect=(.04, .06, 1, 0.95))
 
     plt.show()
 

@@ -8,6 +8,7 @@ from torch.utils.data import Dataset, DataLoader, Sampler, SubsetRandomSampler
 import pdb
 
 import random
+from collections import OrderedDict
 
 from utils import load_rb
 
@@ -90,19 +91,21 @@ class TrialDataset(Dataset):
 
     def __getitem__(self, idx):
         # index into the appropriate dataset to get the trial
-        ds_idx = self.get_dset_idx(idx)
-        if ds_idx == 0:
-            trial = self.datasets[0][idx]
-        else:
-            trial = self.datasets[ds_idx][idx - self.max_idxs[ds_idx-1]]
+        context = self.get_context(idx)
+        if context != 0:
+            idx = idx - self.max_idxs[context-1]
 
+        trial = self.datasets[context][idx]
         x = trial.get_x(self.args)
         y = trial.get_y(self.args)
-        trial.name = self.names[ds_idx]
-        trial.lz = self.lzs[ds_idx]
+
+        trial.name = self.names[context]
+        trial.lz = self.lzs[context]
+        trial.context = context
+        trial.idx = idx
         return x, y, trial
 
-    def get_dset_idx(self, idx):
+    def get_context(self, idx):
         return np.argmax(self.max_idxs > idx)
 
 
@@ -125,10 +128,11 @@ def get_test_samples(loader, n_tests):
             samples[t_type] = [sample]
     for t, s in samples.items():
         samples[t] = collater(s)
-    return samples
+    ordered_samples = OrderedDict((k, samples[k]) for k in sorted(samples.keys()))
+    return ordered_samples
 
 # creates datasets and dataloaders
-def create_loaders(datasets, args, split_test=True, test_size=None, shuffle=True, order_fn=None):
+def create_loaders(datasets, args, split_test=True, shuffle=True, order_fn=None):
     dsets_train = []
     dsets_test = []
     for i, dpath in enumerate(datasets):
@@ -142,7 +146,7 @@ def create_loaders(datasets, args, split_test=True, test_size=None, shuffle=True
             dsets_train.append([dname, dset[:cutoff]])
             dsets_test.append([dname, dset[cutoff:]])
         else:
-            dsets_test.append([dname, dset[cutoff:]])
+            dsets_test.append([dname, dset])
 
     # test loader used regardless of setting
     test_set = TrialDataset(dsets_test, args)
