@@ -22,7 +22,7 @@ import pandas as pd
 from network import M2Net
 
 from utils import log_this, load_rb, get_config, fill_args, update_args
-from helpers import get_optimizer, get_scheduler, get_criteria, create_loaders
+from helpers import get_optimizer, get_scheduler, get_criteria, create_loaders, get_test_samples
 
 class Trainer:
     def __init__(self, args):
@@ -164,22 +164,30 @@ class Trainer:
         }
         return trial_loss, etc
 
-    def test(self):
+    def test(self, n_tests=50):
         n_trials = 0
+        total_loss = 0
+        samples = {}
+        xs = []
+        ys = []
         with torch.no_grad():
-            for i in range(10):
-                x, y, info = next(iter(self.test_loader))
+            samples = get_test_samples(self.test_loader, n_tests)
+            for t, s in samples.items():
+                x, y, trials = s
+                xs.append(x)
+                ys.append(y)
                 x, y = x.to(self.device), y.to(self.device)
-                loss, etc = self.run_trial(x, y, info, training=False, extras=True)
+                loss, etc = self.run_trial(x, y, trials, training=False, extras=True)
                 n_trials += len(x)
+                total_loss += loss
 
         etc = {
-            'ins': x,
-            'goals': y,
+            'ins': xs,
+            'goals': ys,
             'outs': etc['outs'].detach()
         }
 
-        return total_loss / len(x), etc
+        return total_loss / n_trials, etc
 
     def train(self, ix_callback=None):
         ix = 0

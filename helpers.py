@@ -49,7 +49,7 @@ class TaskSampler(Sampler):
         ranges = [b[0] + torch.randperm(b[1] - b[0], generator=self.generator) for b in self.bounds]
         batches = []
         for r in ranges:
-            if drop_last:
+            if self.drop_last:
                 i_set = range(len(r) // self.batch_size)
             else:
                 i_set = range(int(np.ceil(len(r) / self.batch_size)))
@@ -113,6 +113,20 @@ def collater(samples):
     ys = torch.as_tensor(np.stack(ys), dtype=torch.float)
     return xs, ys, trials
 
+# for test loaders that produce 1 sample at a time, combine them based on name of dset
+def get_test_samples(loader, n_tests):
+    samples = {}
+    for i in range(n_tests):
+        sample = next(iter(loader))[0]
+        t_type = sample[2].name
+        if t_type in samples:
+            samples[t_type].append(sample)
+        else:
+            samples[t_type] = [sample]
+    for t, s in samples.items():
+        samples[t] = collater(s)
+    return samples
+
 # creates datasets and dataloaders
 def create_loaders(datasets, args, split_test=True, test_size=None, shuffle=True, order_fn=None):
     dsets_train = []
@@ -132,11 +146,9 @@ def create_loaders(datasets, args, split_test=True, test_size=None, shuffle=True
 
     # test loader used regardless of setting
     test_set = TrialDataset(dsets_test, args)
-    if test_size is None:
-        test_size = 10
-    test_size = min(test_size, len(test_set))
-    test_sampler = TaskSampler(test_set, test_size, drop_last=False)
-    test_loader = DataLoader(test_set, batch_sampler=test_sampler, collate_fn=collater)
+    # sample 1 at a time, combine and collate them later on
+    test_sampler = TaskSampler(test_set, 1, drop_last=False)
+    test_loader = DataLoader(test_set, batch_sampler=test_sampler, collate_fn=lambda x:x)
 
     if split_test:
         train_set = TrialDataset(dsets_train, args)
