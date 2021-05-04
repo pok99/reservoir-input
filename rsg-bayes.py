@@ -31,7 +31,7 @@ def main(args):
     #     dset = load_rb(d)
     #     dsets.append(dset)
 
-    data, loss = test_model(net, config, n_tests=500)
+    data, loss = test_model(net, config, n_tests=100)
     
     # 2 contexts
     ys_1 = []
@@ -39,16 +39,17 @@ def main(args):
 
     y_ready_set = []
     for d in data:
-        # pdb.set_trace()
-        y_ready = np.argmax(d[1][0] > 0)
-        y_set = np.argmax(d[2] > 0)
-        y_target = np.argmax(d[2] >= 1)
-        y_prod = np.argmax(d[3] >= 1)
-        if d[5].context == 0:
-            ys_1.append((y_target - y_set, y_prod - y_set))
+        context, idx, trial, x, y, out, loss = d
+        y_ready, y_set, y_go = trial.rsg
+        y_prod = np.argmax(out >= 1)
+        t_y = y_go - y_set
+        t_p = y_prod - y_set
+        t_ym = y_set - y_ready
+        if context == 0:
+            ys_1.append((t_y, t_p))
         else:
-            ys_2.append((y_target - y_set, y_prod - y_set))
-        y_ready_set.append((y_set - y_ready, y_target - y_set))
+            ys_2.append((t_y, t_p))
+        y_ready_set.append((t_y, t_ym))
 
 
     ys_1 = np.array(ys_1)
@@ -64,8 +65,11 @@ def main(args):
     if len(ys_2) > 0:
         plt.scatter(ys_2[0], ys_2[1], color='dodgerblue')
 
-    plt.ylabel('produced t_p')
+    plt.scatter(y_ready_set[0], y_ready_set[1], color='black')
+
     plt.xlabel('desired t_p')
+    plt.ylabel('produced t_p')
+    
 
     plt.show()
 

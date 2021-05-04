@@ -155,6 +155,9 @@ class Trainer:
 
         if ix_callback is not None:
             ix_callback(trial_loss, etc)
+        # print(self.net.M_ros['0_rsg-100-150'].bias.grad)
+        # print(self.net.M_ros['1_rsg-150-200'].bias.grad)
+        # pdb.set_trace()
         self.optimizer.step()
 
         etc = {

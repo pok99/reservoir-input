@@ -38,11 +38,11 @@ network_params = [
 
 def parse_args():
     parser = argparse.ArgumentParser(description='')
-    parser.add_argument('-L', type=int, default=5, help='latent input dimension')
+    # parser.add_argument('-L', type=int, default=5, help='latent input dimension')
     parser.add_argument('--D1', type=int, default=50, help='u dimension')
-    parser.add_argument('--D2', type=int, default=200, help='v dimension')
-    parser.add_argument('-N', type=int, default=200, help='number of neurons in reservoir')
-    parser.add_argument('-Z', type=int, default=5, help='output dimension')
+    parser.add_argument('--D2', type=int, default=50, help='v dimension')
+    parser.add_argument('-N', type=int, default=300, help='number of neurons in reservoir')
+    # parser.add_argument('-Z', type=int, default=5, help='output dimension')
 
     parser.add_argument('--net', type=str, default='M2', choices=['basic', 'M2'])
 
@@ -82,7 +82,7 @@ def parse_args():
     parser.add_argument('--lr', type=float, default=1e-4, help='learning rate. adam only')
     parser.add_argument('--n_epochs', type=int, default=10, help='number of epochs to train for. adam only')
     parser.add_argument('--conv_type', type=str, choices=['patience', 'grad'], default='patience', help='how to determine convergence. adam only')
-    parser.add_argument('--patience', type=int, default=2000, help='stop training if loss doesn\'t decrease. adam only')
+    parser.add_argument('--patience', type=int, default=4000, help='stop training if loss doesn\'t decrease. adam only')
     parser.add_argument('--l2_reg', type=float, default=0, help='amount of l2 regularization')
     parser.add_argument('--s_rate', default=None, type=float, help='scheduler rate. dont use for no scheduler')
     parser.add_argument('--loss', type=str, nargs='+', default=['mse'])
@@ -147,7 +147,7 @@ def adjust_args(args):
     if args.model_path is not None:
         config = get_config(args.model_path)
         args = fill_args(args, config, overwrite_none=True)
-        enforce_same = ['N', 'D', 'L', 'Z', 'T', 'net', 'bias', 'use_reservoir']
+        enforce_same = ['N', 'D1', 'D2', 'net', 'bias', 'use_reservoir']
         for v in enforce_same:
             if v in config and args.__dict__[v] != config[v]:
                 print(f'Warning: based on config, changed {v} from {args.__dict__[v]} -> {config[v]}')
