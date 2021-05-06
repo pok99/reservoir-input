@@ -138,7 +138,7 @@ def create_loaders(datasets, args, split_test=True, shuffle=True, order_fn=None)
     for i, dpath in enumerate(datasets):
         dset = load_rb(dpath)
         # trim and set name of each dataset
-        dname = str(i) + '_' + dpath.split('/')[-1].split('.')[0]
+        dname = str(i) + '_' + ':'.join(dpath.split('/')[-1].split('.')[:-1])
         if not shuffle and order_fn is not None:
             dset = sorted(dset, key=order_fn)
         if split_test:

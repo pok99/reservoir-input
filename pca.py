@@ -1,112 +1,102 @@
 import numpy as np
 import torch
-from torch.utils.data import Dataset, DataLoader
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.cm as cm
 import matplotlib.colors as colors
 
-import os
+import argparse
 import sys
-import json
+import os
 import pdb
 
-import argparse
+from testers import get_states, load_model_path
+from helpers import get_test_samples, create_loaders
+from utils import get_config
 
+from tasks import *
 
-from testers import load_model_path
-from utils import get_config, load_rb
-from helpers import TrialDataset, collater, create_loaders
+cols = ['cornflowerblue']
 
-def pca(args):
+def main(args):
     config = get_config(args.model, to_bunch=True)
     net = load_model_path(args.model, config)
 
     if len(args.dataset) == 0:
         args.dataset = config.dataset
 
-    setting = 'estimation'
-    test_size = 1000
+    n_reps = 10
+    _, loader = create_loaders(args.dataset, config, split_test=False)
+    samples = get_test_samples(loader, n_tests=n_reps)
+    A = get_states(net, samples)
 
-    dset, loader = create_loaders(args.dataset, config, split_test=False, test_size=test_size)
-    x, y, info = next(iter(loader))
+    A_proj = pca(A, 3)
 
-    outs = []
-    with torch.no_grad():
-        net.reset()
-        for j in range(x.shape[2]):
-            net_in = x[:,:,j].reshape(-1, net.args.L + net.args.T)
-            net_out, extras = net(net_in, extras=True)
-            outs.append(extras['x'])
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.grid(False)
+    plt.axis('off')
 
-    A = torch.stack(outs, dim=1)
-    A_cut = []
-    # only choosing the relevant timestamps within which to do pca
-    for ix in range(x.shape[0]):
-        rsg = info[ix]['rsg']
-        if setting == 'estimation':
-            A_cut.append(A[ix,rsg[0]:rsg[1]])
-        else:
-            A_cut.append(A[ix,rsg[1]:rsg[2]])
-    A_cut = torch.cat(A_cut)
-    u, s, v = torch.pca_lowrank(A_cut)
+    colors = cm.autumn(np.linspace(0, 1, 6))
 
-    rank = 3
-    if rank == 3:
-        fig = plt.figure()
-        ax = fig.add_subplot(111, projection='3d')
-        ax.grid(False)
-        plt.axis('off')
+    for ix in range(A_proj.shape[0]):
+        t = A_proj[ix].T
+        # trial = samples['0_delaypro'][2][ix]
+        # trial = samples['0_memorypro'][2][ix]
+        trial = samples['0_flip-flop-2-0:01'][2][ix]
+        # trial = samples['0_flip-flop-1-0:04'][2][ix]
+        # trial = samples['0_durdisc'][2][ix]
 
-    # when using categories WITH CONTEXTS
-    context_interval_As = {}
-    context_counts = np.ones(10).astype(int)
-    for ix in range(x.shape[0]):
-        traj = A[ix]
-        rsg = info[ix]['rsg']
-        context = info[ix]['context']
-        interval = info[ix]['t_p']
-        if setting == 'estimation':
-            traj_cut = traj[rsg[0]:rsg[1]]
-        else:
-            traj_cut = traj[rsg[1]:rsg[2]]
-        traj_proj = traj_cut @ v[:, :rank]
-        group = (context, interval)
-        if group in context_interval_As:
-            context_interval_As[group].append(traj_proj)
-        else:
-            context_counts[context] += 1
-            context_interval_As[group] = [traj_proj]
+        ax.plot(t[0], t[1], t[2], color=colors[0], lw=1)
 
-    context_colors = [
-        iter(cm.autumn(np.linspace(0, 1, context_counts[0]))),
-        iter(cm.winter(np.linspace(0, 1, context_counts[1])))
-    ]
+        # direction = (trial.s1[1] < trial.s2[1]) ^ (trial.cue_id == 1)
+        # ax.scatter(t[0][0], t[1][0], t[2][0], color='salmon', marker='o')
+        # if direction == 1:
+        #     ax.plot(t[0], t[1], t[2], color=colors[0], lw=1)
+        # else:
+        #     ax.plot(t[0], t[1], t[2], color=colors[2], lw=1)
 
-    sorted_keys = sorted(context_interval_As.keys(), key=lambda x: x[1])
-    for k in sorted_keys:
-        v = context_interval_As[k]
-        proj = sum(v) / len(v)
-        c = next(context_colors[k[0]])
 
-        t = proj.T
-        if rank == 2:
-            plt.plot(t[0], t[1], color=c, lw=1)
-            plt.scatter(t[0][0], t[1][0], s=20, color=c)
-            plt.annotate(k, (t[0][-1], t[1][-1]))
-        elif rank == 3:
-            ax.plot(t[0], t[1], t[2], color=c, lw=1)
-            if setting == 'estimation':
-                marker_a = '^'
-                marker_b = 'o'
-            else:
-                marker_a = 'o'
-                marker_b = 's'
-            ax.scatter(t[0][0], t[1][0], t[2][0], s=40, color=c, marker=marker_a)
-            ax.scatter(t[0][-1], t[1][-1], t[2][-1], s=30, color=c, marker=marker_b)
+        # stim = trial.stim
+        # fix = trial.fix
+        # mem = trial.memory
+
+        # ax.plot(t[0][:fix], t[1][:fix], t[2][:fix], color=colors[0], lw=1.5)
+        # ax.plot(t[0][fix:stim], t[1][fix:stim], t[2][fix:stim], color=colors[1], lw=1.5)
+        # ax.plot(t[0][stim:], t[1][stim:], t[2][stim:], color=colors[1], lw=1.5)
+        # # ax.plot(t[0][stim:mem], t[1][stim:mem], t[2][stim:mem], color=colors[2], lw=1.5)
+        # # ax.plot(t[0][mem:], t[1][mem:], t[2][mem:], color=colors[3], lw=1.5)
+        # ax.scatter(t[0][fix], t[1][fix], t[2][fix], color='salmon', marker='s')
+        # ax.scatter(t[0][stim], t[1][stim], t[2][stim], color='salmon', marker='^')
+        # ax.scatter(t[0][-1], t[1][-1], t[2][-1], s=10, color='salmon', marker='o')
 
     plt.show()
 
+# A should be [N, T, D] shaped where
+# N is the number of samples
+# T is timesteps
+# D is the dimensional space that needs to be reduced
+
+def pca(A, rank):
+    # mix up the samples and timesteps, but keep the dimensions
+    N, T, D = A.shape
+    A_cut = A.reshape(-1, D)
+    u, s, v = torch.pca_lowrank(A_cut)
+
+    # if rank == 3:
+    #     fig = plt.figure()
+    #     ax = fig.add_subplot(111, projection='3d')
+    #     ax.grid(False)
+    #     plt.axis('off')
+
+    projs = []
+    for ix in range(N):
+        traj = A[ix]
+        traj_proj = traj @ v[:, :rank]
+        projs.append(traj_proj)
+
+    projs = torch.stack(projs, dim=0)
+    return projs
 
 if __name__ == '__main__':
     ap = argparse.ArgumentParser()
@@ -114,4 +104,4 @@ if __name__ == '__main__':
     ap.add_argument('-d', '--dataset', type=str, nargs='+', default=[])
     args = ap.parse_args()
 
-    pca(args)
+    main(args)

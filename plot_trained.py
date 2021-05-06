@@ -84,6 +84,22 @@ if not args.no_plot:
             ax.scatter(xr, y, color='coral', alpha=0.5, s=3, label='target')
             ax.plot(xr, z, color='cornflowerblue', alpha=1, lw=1.5, label='response')
 
+        elif type(trial) is FlipFlop:
+            for j in range(trial.dim):
+                ax.plot(xr, x[j], color=cols[j], ls='--', lw=.5, alpha=.4)
+                ax.plot(xr, y[j], color=cols[j], lw=1.5, ls=':')
+                ax.plot(xr, z[j], color=cols[j], lw=2)
+
+        elif type(trial) is DurationDisc:
+            ax.plot(xr, x[0], color='grey', lw=.5, ls='--', alpha=.4)
+            ax.plot(xr, x[1], color='grey', lw=.5, ls='--', alpha=.4)
+            ax.plot(xr, x[2], color='salmon', lw=.5, ls='--', alpha=.7)
+            ax.plot(xr, x[3], color='dodgerblue', lw=.5, ls='--', alpha=.7)
+            ax.plot(xr, y[0], color='salmon', lw=1.5, ls=':')
+            ax.plot(xr, y[1], color='dodgerblue', lw=1.5, ls=':')
+            ax.plot(xr, z[0], color='salmon', lw=2)
+            ax.plot(xr, z[1], color='dodgerblue', lw=2)
+
         ax.tick_params(axis='both', color='white', labelsize=8)
         ax.set_title(f'ctx {context}, trial {ix}, loss {np.round(float(loss), 2)}', size=8)
 

@@ -69,3 +69,19 @@ def test_model(net, config, n_tests=128):
     return datas, t_losses
 
 
+def get_states(net, samples):
+
+    states = []
+    with torch.no_grad():
+        net.reset()
+        for t, s in samples.items():
+            x, y, trials = s
+            lz = trials[0].lz
+            for j in range(x.shape[2]):
+                net_in = x[:,:,j].reshape(-1, lz[0])
+                net_out, extras = net(t, net_in, extras=True)
+                states.append(extras['x'])
+            break
+
+    A = torch.stack(states, dim=1)
+    return A

@@ -95,7 +95,8 @@ def parse_args():
     parser.add_argument('--maxiter', type=int, default=10000, help='limit to # iterations. lbfgs-scipy only')
 
     # seeds
-    parser.add_argument('--seed', type=int, help='seed for most of network')
+    parser.add_argument('--seed', type=int, help='general purpose seed')
+    parser.add_argument('--network_seed', type=int, help='seed for network initialization')
     parser.add_argument('--res_seed', type=int, help='seed for reservoir')
     parser.add_argument('--res_x_seed', type=int, default=0, help='seed for reservoir init hidden states. -1 for zero init')
     parser.add_argument('--res_burn_steps', type=int, default=200, help='number of steps for reservoir to burn in')
@@ -135,6 +136,8 @@ def adjust_args(args):
         args.res_seed = random.randrange(1e6)
     if args.seed is None:
         args.seed = random.randrange(1e6)
+    if args.network_seed is None:
+        args.network_seed = random.randrange(1e6)
 
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)

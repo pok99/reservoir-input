@@ -15,7 +15,7 @@ def create_parameters(debug):
 
     lr = 1e-4
     n_epochs = 20
-    patience = 4000
+    patience = 5000
     batch_size = 2
 
     # usually have this off but if we wanna check models, set it on
@@ -29,10 +29,12 @@ def create_parameters(debug):
     train_parts = [['all'], ['M_u', 'M_ro']]
 
     datasets = [
-        ['datasets/rsg-100-150.pkl', 'datasets/rsg-150-200.pkl']
+        # ['datasets/rsg-100-150.pkl', 'datasets/rsg-150-200.pkl'],
+        []
     ]
     losses = [
-        ['mse-e']
+        # ['mse-e'],
+        ['mse']
     ]
 
     if debug:
@@ -54,7 +56,7 @@ def create_parameters(debug):
     seed_samples = [i + seed_offset for i in range(n_seeds)]
     rseed_samples = [i + rseed_offset for i in range(n_rseeds)]
 
-    for (d, nN, nD1, nD2, loss, rnoise, mnoise, tp, seed, rseed) in product(datasets, Ns, D1s, D2s, losses, r_noises, m_noises, train_parts, range(n_seeds), range(n_rseeds)):
+    for (d, nN, nD1, nD2, loss, rnoise, mnoise, tp, nseed, rseed) in product(datasets, Ns, D1s, D2s, losses, r_noises, m_noises, train_parts, range(n_seeds), range(n_rseeds)):
         if nD1 > nN or nD2 > nN:
             continue
         run_params = {}
@@ -77,7 +79,8 @@ def create_parameters(debug):
         run_params['res_noise'] = rnoise
         run_params['m_noise'] = mnoise
 
-        run_params['seed'] = seed_samples[seed]
+        run_params['seed'] = 0
+        run_params['network_seed'] = seed_samples[nseed]
         run_params['res_seed'] = rseed_samples[rseed]
         run_params['res_x_seed'] = 0
 

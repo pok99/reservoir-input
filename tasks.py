@@ -368,41 +368,48 @@ def get_task_args(args):
     tarr = args.task_args
     targs = Bunch()
     if args.t_type.startswith('rsg'):
+        targs.t_len = get_tval(tarr, 'l', 500, int)
         targs.p_len = get_tval(tarr, 'pl', 5, int)
         targs.max_ready = get_tval(tarr, 'max_ready', 80, int)
         if args.intervals is None:
             targs.min_t = get_tval(tarr, 'gt', targs.p_len * 4, int)
-            targs.max_t = get_tval(tarr, 'lt', args.t_len // 2 - targs.p_len * 4 - targs.max_ready, int)
+            targs.max_t = get_tval(tarr, 'lt', targs.t_len // 2 - targs.p_len * 4 - targs.max_ready, int)
 
     elif args.t_type.startswith('csg'):
+        targs.t_len = get_tval(tarr, 'l', 500, int)
         targs.p_len = get_tval(tarr, 'pl', 5, int)
         targs.max_cue = get_tval(tarr, 'max_cue', 80, int)
         targs.max_set = get_tval(tarr, 'max_set', 200, int)
         if args.intervals is None:
             targs.min_t = get_tval(tarr, 'gt', targs.p_len * 4, int)
-            targs.max_t = get_tval(tarr, 'lt', args.t_len // 2 - targs.p_len * 4, int)
+            targs.max_t = get_tval(tarr, 'lt', targs.t_len // 2 - targs.p_len * 4, int)
 
     elif args.t_type == 'delay-copy':
+        targs.t_len = get_tval(tarr, 'l', 500, int)
         targs.dim = get_tval(tarr, 'dim', 2, int)
         targs.n_freqs = get_tval(tarr, 'n_freqs', 20, int)
         targs.f_range = get_tval(tarr, 'f_range', [10, 40], float, n_vals=2)
         targs.amp = get_tval(tarr, 'amp', 1, float)
 
     elif args.t_type == 'flip-flop':
+        targs.t_len = get_tval(tarr, 'l', 400, int)
         targs.dim = get_tval(tarr, 'dim', 3, int)
         targs.p_len = get_tval(tarr, 'pl', 5, int)
         targs.geop = get_tval(tarr, 'p', .02, float)
 
     elif args.t_type == 'delay-pro' or args.t_type == 'delay-anti':
+        targs.t_len = get_tval(tarr, 'l', 200, int)
         targs.fix_t = get_tval(tarr, 'fix', 50, int)
         targs.stim_t = get_tval(tarr, 'stim', 100, int)
 
     elif args.t_type == 'memory-pro' or args.t_type == 'memory-anti':
+        targs.t_len = get_tval(tarr, 'l', 300, int)
         targs.fix_t = get_tval(tarr, 'fix', 50, int)
         targs.stim_t = get_tval(tarr, 'stim', 100, int)
         targs.memory_t = get_tval(tarr, 'memory', 50, int)
 
     elif args.t_type == 'dur-disc':
+        targs.t_len = get_tval(tarr, 'l', 500, int)
         targs.max_ready = get_tval(tarr, 'max_ready', 20, int)
         targs.min_d = get_tval(tarr, 'gt', 10, int)
         targs.max_d = get_tval(tarr, 'lt', 50, int)
@@ -445,7 +452,7 @@ if __name__ == '__main__':
 
     # general dataset arguments
     parser.add_argument('-t', '--t_type', default='rsg', help='type of trial to create')
-    parser.add_argument('-l', '--t_len', type=int, default=500)
+    # parser.add_argument('-l', '--t_len', type=int, default=500)
     parser.add_argument('-n', '--n_trials', type=int, default=2000)
 
     # rsg arguments

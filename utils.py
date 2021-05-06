@@ -35,6 +35,8 @@ def add_yaml_args(args, config_file):
             #     logging.warning(f'{c} is not set to begin with: {v}')
     return args
 
+# merge these two functions at some point
+
 # combine two args, overwriting with the second
 def update_args(args, new_args, to_bunch=True):
     dic = args if type(args) is dict else vars(args)
