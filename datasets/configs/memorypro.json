@@ -11,5 +11,7 @@
   "fix_t": 50,
   "stim_t": 100,
   "memory_t": 50,
-  "argv": "tasks.py create memorypro -t memory-pro"
+  "argv": "tasks.py create memorypro -t memory-pro",
+  "L": 3,
+  "Z": 3
 }

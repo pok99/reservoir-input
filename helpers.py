@@ -3,16 +3,14 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import Dataset, DataLoader, Sampler, SubsetRandomSampler
+from torch.utils.data import Dataset, DataLoader
 
 import pdb
 
 import random
 from collections import OrderedDict
 
-from utils import load_rb
-
-from tasks import *
+from utils import load_rb, get_config
 
 def sigmoid(x):
     return 1/(1 + np.exp(-x))
@@ -36,25 +34,29 @@ def get_scheduler(args, op):
 
 
 # dataset that automatically creates trials composed of trial and context data
+# input dataset should be in form [(dname, dset), ...]
 class TrialDataset(Dataset):
     def __init__(self, datasets, args):
         self.args = args
         
-        self.dnames = []
-        self.data = []
-        self.t_types = []
-        self.lzs = []
-        self.max_idxs = np.zeros(len(data), dtype=int)
-        for i, (dname, ds) in enumerate(data):
+        self.dnames = []    # names of dsets
+        self.data = []      # dsets themselves
+        self.t_types = []   # task type
+        self.lzs = []       # Ls and Zs for task trials
+        self.x_ctxs = []    # precomputed context inputs
+        self.max_idxs = np.zeros(len(datasets), dtype=int)
+        for i, (dname, ds) in enumerate(datasets):
             self.dnames.append(dname)
             self.data.append(ds)
+            # setting context cue for appropriate task
+            x_ctx = np.zeros((args.T, ds[0].t_len))
+            x_ctx[i] = 1
+            self.x_ctxs.append(x_ctx)
             # cumulative lengths of data, for indexing
             self.max_idxs[i] = self.max_idxs[i-1] + len(ds)
             # use ds[0] as exemplar to set t_type, L, Z
             self.t_types.append(ds[0].t_type)
-            # change Ls and Zs as they may vary for dataset subtypes
-            L, Z = ds[0].L, ds[0].Z
-            self.lzs.append((L, Z))
+            self.lzs.append((ds[0].L, ds[0].Z))
 
     def __len__(self):
         return self.max_idxs[-1]
@@ -62,11 +64,14 @@ class TrialDataset(Dataset):
     def __getitem__(self, idx):
         # index into the appropriate dataset to get the trial
         context = self.get_context(idx)
+        # idx variable now references position within dataset
         if context != 0:
             idx = idx - self.max_idxs[context-1]
 
         trial = self.data[context][idx]
         x = trial.get_x(self.args)
+        x_cts = self.x_ctxs[context]
+        x = np.concatenate((x, x_cts))
         y = trial.get_y(self.args)
 
         trial.context = context
@@ -113,6 +118,7 @@ def create_loaders(datasets, args, split_test=True, test_size=1):
         return (train_set, train_loader), (test_set, test_loader)
     else:
         return (test_set, test_loader)
+
 
 def get_criteria(args):
     criteria = []

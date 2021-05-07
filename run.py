@@ -165,7 +165,16 @@ def adjust_args(args):
         args.out_act = 'exp'
     else:
         args.out_act = 'none'
+
+    # number of task variables, latent variables, and output variables
     args.T = len(args.dataset)
+    L, Z = 0, 0
+    for dset in args.dataset:
+        config = get_config(dset, ctype='dset', to_bunch=True)
+        L = max(L, config.L)
+        Z = max(Z, config.Z)
+    args.L = L
+    args.Z = Z
 
     # initializing logging
     # do this last, because we will be logging previous parameters into the config file

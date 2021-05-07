@@ -3,7 +3,7 @@
   "name": "durdisc",
   "config": null,
   "t_type": "dur-disc",
-  "n_trials": 20,
+  "n_trials": 2000,
   "intervals": null,
   "motifs": null,
   "task_args": [],
@@ -14,5 +14,7 @@
   "sep_t": 150,
   "cue_t": 400,
   "select_t": 440,
-  "argv": "tasks.py create durdisc -t dur-disc -n 20"
+  "argv": "tasks.py create durdisc -t dur-disc",
+  "L": 4,
+  "Z": 2
 }

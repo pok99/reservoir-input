@@ -8,7 +8,7 @@ import random
 
 sys.path.append('../')
 
-from network import BasicNetwork, Reservoir
+from network import BasicNetwork, M2Reservoir
 from utils import Bunch
 
 
@@ -26,7 +26,7 @@ def single_std():
     all_dists = []
     for rep in range(n_unique_nets):
         b = Bunch(N=N, res_init_g=g, bias=False)
-        net = Reservoir(b)
+        net = M2Reservoir(b)
         init_x = np.random.normal(0, 1, (1, N))
         net.reset(res_state=init_x)
         xs = np.zeros((n_steps, N))

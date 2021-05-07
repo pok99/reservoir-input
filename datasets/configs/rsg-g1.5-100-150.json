@@ -20,5 +20,7 @@
   "max_ready": 80,
   "min_t": 100,
   "max_t": 150,
-  "argv": "tasks.py create rsg-g1.5-100-150 -t rsg -a lt 150 gt 100 gain 1.5"
+  "argv": "tasks.py create rsg-g1.5-100-150 -t rsg -a lt 150 gt 100 gain 1.5",
+  "L": 1,
+  "Z": 1
 }

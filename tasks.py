@@ -357,6 +357,8 @@ def create_dataset(args):
     trials = []
     for n in range(n_trials):
         trial = TaskObj(args, dset_id=args.name, n=n)
+        args.L = trial.L
+        args.Z = trial.Z
         trials.append(trial)
 
     return trials, args

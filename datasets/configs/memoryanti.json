@@ -11,5 +11,7 @@
   "fix_t": 50,
   "stim_t": 100,
   "memory_t": 50,
-  "argv": "tasks.py create memoryanti -t memory-anti"
+  "argv": "tasks.py create memoryanti -t memory-anti",
+  "L": 3,
+  "Z": 3
 }

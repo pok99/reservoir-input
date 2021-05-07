@@ -304,7 +304,7 @@ class M2Reservoir(nn.Module):
         self.x.detach_()
 
     # extras currently doesn't do anything. maybe add x val, etc.
-    def forward(self, u, extras=False):
+    def forward(self, u=None, extras=False):
         if self.dynamics_mode == 0:
             if u is None:
                 g = self.activation(self.J(self.x))

@@ -22,7 +22,7 @@ import pandas as pd
 from network import M2Net
 
 from utils import log_this, load_rb, get_config, fill_args, update_args
-from helpers import get_optimizer, get_scheduler, get_criteria, create_loaders, get_test_samples
+from helpers import get_optimizer, get_scheduler, get_criteria, create_loaders
 
 class Trainer:
     def __init__(self, args):
@@ -38,8 +38,6 @@ class Trainer:
 
         # self.net = BasicNetwork(self.args)
         self.net = M2Net(self.args)
-        for i, d in enumerate(self.train_set.names):
-            self.net.add_task(d, self.train_set.lzs[i][0], self.train_set.lzs[i][1])
         self.net.to(self.device)
         
         # print('resetting network')
@@ -112,9 +110,8 @@ class Trainer:
                 pickle.dump(self.vis_samples, f)
 
     # runs an iteration where we want to match a certain trajectory
-    def run_trial(self, x, y, info, training=True, extras=False):
-        lz = info[0].lz
-        name = info[0].name
+    def run_trial(self, x, y, trial, training=True, extras=False):
+        lz = trial[0].lz
         self.net.reset(self.args.res_x_init, device=self.device)
         trial_loss = 0.
         k_loss = 0.
@@ -126,8 +123,8 @@ class Trainer:
             # k to full n means normal BPTT
             k = x.shape[2]
         for j in range(x.shape[2]):
-            net_in = x[:,:,j].reshape(-1, lz[0])
-            net_out, extras = self.net(name, net_in, extras=True)
+            net_in = x[:,:,j].reshape(-1, x.shape[0])
+            net_out, etc = self.net(net_in, extras=True)
             outs.append(net_out)
             # t-BPTT with parameter k
             if (j+1) % k == 0:
@@ -135,7 +132,7 @@ class Trainer:
                 k_outs = torch.stack(outs[-k:], dim=2)
                 k_targets = y[:,:,j+1-k:j+1]
                 for c in self.criteria:
-                    k_loss += c(k_outs, k_targets, i=info, t_ix=j+1-k)
+                    k_loss += c(k_outs, k_targets, i=trial, t_ix=j+1-k)
                 trial_loss += k_loss.detach().item()
                 if training:
                     k_loss.backward()
@@ -149,9 +146,9 @@ class Trainer:
             return trial_loss, etc
         return trial_loss
 
-    def train_iteration(self, x, y, info, ix_callback=None):
+    def train_iteration(self, x, y, trial, ix_callback=None):
         self.optimizer.zero_grad()
-        trial_loss, etc = self.run_trial(x, y, info, extras=True)
+        trial_loss, etc = self.run_trial(x, y, trial, extras=True)
 
         if ix_callback is not None:
             ix_callback(trial_loss, etc)
@@ -168,29 +165,18 @@ class Trainer:
         return trial_loss, etc
 
     def test(self, n_tests=50):
-        n_trials = 0
-        total_loss = 0
-        samples = {}
-        xs = []
-        ys = []
         with torch.no_grad():
-            samples = get_test_samples(self.test_loader, n_tests)
-            for t, s in samples.items():
-                x, y, trials = s
-                xs.append(x)
-                ys.append(y)
-                x, y = x.to(self.device), y.to(self.device)
-                loss, etc = self.run_trial(x, y, trials, training=False, extras=True)
-                n_trials += len(x)
-                total_loss += loss
+            x, y, trials = next(iter(self.test_loader))
+            x, y = x.to(self.device), y.to(self.device)
+            loss, etc = self.run_trial(x, y, trials, training=False, extras=True)
 
         etc = {
-            'ins': xs,
-            'goals': ys,
+            'ins': x,
+            'goals': y,
             'outs': etc['outs'].detach()
         }
 
-        return total_loss / n_trials, etc
+        return loss / x.shape[0], etc
 
     def train(self, ix_callback=None):
         ix = 0

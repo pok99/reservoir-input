@@ -10,5 +10,7 @@
   "t_len": 300,
   "fix_t": 50,
   "stim_t": 150,
-  "argv": "tasks.py create delaypro -t delay-pro"
+  "argv": "tasks.py create delaypro -t delay-pro",
+  "L": 3,
+  "Z": 3
 }
