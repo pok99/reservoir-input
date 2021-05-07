@@ -3,7 +3,6 @@
   "name": "csg-100-200",
   "config": null,
   "t_type": "csg",
-  "t_len": 500,
   "n_trials": 2000,
   "intervals": null,
   "motifs": null,
@@ -13,9 +12,10 @@
     "gt",
     "100"
   ],
+  "t_len": 600,
   "p_len": 5,
-  "max_cue": 80,
-  "max_set": 200,
+  "max_cue": 100,
+  "max_set": 300,
   "min_t": 100,
   "max_t": 200,
   "argv": "tasks.py create csg-100-200 -t csg -a lt 200 gt 100"

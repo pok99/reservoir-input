@@ -26,14 +26,14 @@ mpl.rcParams['lines.linewidth'] = .5
 
 cols = ['coral', 'cornflowerblue', 'magenta', 'orchid']
 
-
+# dset_id is the name of the dataset (as saved)
+# n is the index of the trial in the dataset
 class Task:
     def __init__(self, t_len, dset_id=None, n=None):
         self.t_len = t_len
         self.dset_id = dset_id
         self.n = n
 
-        self.name = None
         self.L = 0
         self.Z = 0
 
@@ -47,17 +47,18 @@ class RSG(Task):
     def __init__(self, args, dset_id=None, n=None):
         super().__init__(args.t_len, dset_id, n)
         if args.intervals is None:
-            t_p = np.random.randint(args.min_t, args.max_t)
+            t_o = np.random.randint(args.min_t, args.max_t)
         else:
-            t_p = random.choice(args.intervals)
+            t_o = random.choice(args.intervals)
+        t_p = int(t_o * args.gain)
         ready_time = np.random.randint(args.p_len * 2, args.max_ready)
-        set_time = ready_time + t_p
+        set_time = ready_time + t_o
         go_time = set_time + t_p
-        assert go_time < args.t_len
 
         self.t_type = args.t_type
         self.p_len = args.p_len
         self.rsg = (ready_time, set_time, go_time)
+        self.t_o = t_o
         self.t_p = t_p
 
         self.L = 1
@@ -71,16 +72,12 @@ class RSG(Task):
         # set pulse
         x_set = np.zeros(self.t_len)
         x_set[st:st+self.p_len] = 1
-        # are ready/set different signals? different x sizes depending
-        if args is not None and args.separate_signal:
-            x = np.zeros((2, self.t_len))
-            x[1] = x_set
-        else:
-            x = np.zeros((1, self.t_len))
-            x[0] = x_set
+        # insert set pulse
+        x = np.zeros((1, self.t_len))
+        x[0] = x_set
         # perceptual shift
         if args is not None and args.m_noise != 0:
-            x_ready = shift_x(x_ready, args.m_noise, self.t_p)
+            x_ready = shift_x(x_ready, args.m_noise, self.t_o)
         x[0] += x_ready
         # noisy up/down corruption
         if args is not None and args.x_noise != 0:
@@ -283,14 +280,15 @@ class DurationDisc(Task):
     def __init__(self, args, dset_id=None, n=None):
         super().__init__(args.t_len, dset_id, n)
 
-        s1_t = np.random.randint(args.min_d, args.max_ready)
+        s1_t = np.random.randint(args.tau, args.sep_t - args.max_d - args.tau)
         s1_len, s2_len = np.random.randint(args.min_d, args.max_d, 2)
-        s2_t = s1_t + s1_len + np.random.randint(args.min_d, args.max_int)
+        s2_t = np.random.randint(args.sep_t + args.tau, args.cue_t - args.max_d - args.tau)
 
         self.t_type = args.t_type
         self.s1 = [s1_t, s1_len]
         self.s2 = [s2_t, s2_len]
         self.cue_id = np.random.choice([1, -1])
+        self.direction = (self.s1[1] < self.s2[1]) ^ (self.cue_id == 1)
         self.cue_t = args.cue_t
         self.select_t = args.select_t
 
@@ -311,8 +309,7 @@ class DurationDisc(Task):
 
     def get_y(self, args=None):
         y = np.zeros((2, self.t_len))
-        is_opposite = (self.s1[1] < self.s2[1]) ^ (self.cue_id == 1)
-        if is_opposite:
+        if self.direction:
             y[0, self.select_t:] = 1
         else:
             y[1, self.select_t:] = 1
@@ -336,6 +333,7 @@ def create_dataset(args):
     n_trials = args.n_trials
 
     if t_type.startswith('rsg'):
+        assert args.max_ready + args.max_t + int(args.max_t * args.gain) < args.t_len
         TaskObj = RSG
     elif t_type.startswith('csg'):
         TaskObj = CSG
@@ -350,36 +348,38 @@ def create_dataset(args):
         assert args.fix_t + args.stim_t + args.memory_t < args.t_len
         TaskObj = MemoryProAnti
     elif t_type == 'dur-disc':
-        assert args.max_ready + args.max_d * 2 + args.max_int < args.cue_t
-        assert args.cue_t < args.select_t
+        assert args.tau + args.max_d <= args.sep_t
+        assert args.sep_t + args.tau + args.max_d <= args.cue_t
         TaskObj = DurationDisc
     else:
         raise NotImplementedError
 
     trials = []
     for n in range(n_trials):
-        trial = TaskObj(args, args.name, n)
+        trial = TaskObj(args, dset_id=args.name, n=n)
         trials.append(trial)
 
     return trials, args
 
 # turn task_args argument into usable argument variables
+# lots of defaults are written down here
 def get_task_args(args):
     tarr = args.task_args
     targs = Bunch()
     if args.t_type.startswith('rsg'):
-        targs.t_len = get_tval(tarr, 'l', 500, int)
+        targs.t_len = get_tval(tarr, 'l', 600, int)
         targs.p_len = get_tval(tarr, 'pl', 5, int)
+        targs.gain = get_tval(tarr, 'gain', 1, float)
         targs.max_ready = get_tval(tarr, 'max_ready', 80, int)
         if args.intervals is None:
             targs.min_t = get_tval(tarr, 'gt', targs.p_len * 4, int)
             targs.max_t = get_tval(tarr, 'lt', targs.t_len // 2 - targs.p_len * 4 - targs.max_ready, int)
 
     elif args.t_type.startswith('csg'):
-        targs.t_len = get_tval(tarr, 'l', 500, int)
+        targs.t_len = get_tval(tarr, 'l', 600, int)
         targs.p_len = get_tval(tarr, 'pl', 5, int)
-        targs.max_cue = get_tval(tarr, 'max_cue', 80, int)
-        targs.max_set = get_tval(tarr, 'max_set', 200, int)
+        targs.max_cue = get_tval(tarr, 'max_cue', 100, int)
+        targs.max_set = get_tval(tarr, 'max_set', 300, int)
         if args.intervals is None:
             targs.min_t = get_tval(tarr, 'gt', targs.p_len * 4, int)
             targs.max_t = get_tval(tarr, 'lt', targs.t_len // 2 - targs.p_len * 4, int)
@@ -392,15 +392,15 @@ def get_task_args(args):
         targs.amp = get_tval(tarr, 'amp', 1, float)
 
     elif args.t_type == 'flip-flop':
-        targs.t_len = get_tval(tarr, 'l', 400, int)
+        targs.t_len = get_tval(tarr, 'l', 500, int)
         targs.dim = get_tval(tarr, 'dim', 3, int)
         targs.p_len = get_tval(tarr, 'pl', 5, int)
         targs.geop = get_tval(tarr, 'p', .02, float)
 
     elif args.t_type == 'delay-pro' or args.t_type == 'delay-anti':
-        targs.t_len = get_tval(tarr, 'l', 200, int)
+        targs.t_len = get_tval(tarr, 'l', 300, int)
         targs.fix_t = get_tval(tarr, 'fix', 50, int)
-        targs.stim_t = get_tval(tarr, 'stim', 100, int)
+        targs.stim_t = get_tval(tarr, 'stim', 150, int)
 
     elif args.t_type == 'memory-pro' or args.t_type == 'memory-anti':
         targs.t_len = get_tval(tarr, 'l', 300, int)
@@ -409,13 +409,13 @@ def get_task_args(args):
         targs.memory_t = get_tval(tarr, 'memory', 50, int)
 
     elif args.t_type == 'dur-disc':
-        targs.t_len = get_tval(tarr, 'l', 500, int)
-        targs.max_ready = get_tval(tarr, 'max_ready', 20, int)
+        targs.t_len = get_tval(tarr, 'l', 600, int)
+        targs.tau = get_tval(tarr, 'tau', 10, int)
         targs.min_d = get_tval(tarr, 'gt', 10, int)
-        targs.max_d = get_tval(tarr, 'lt', 50, int)
-        targs.max_int = get_tval(tarr, 'max_int', 50, int)
-        targs.cue_t = get_tval(tarr, 'cue_t', 200, int)
-        targs.select_t = get_tval(tarr, 'select_t', 240, int)
+        targs.max_d = get_tval(tarr, 'lt', 80, int)
+        targs.sep_t = get_tval(tarr, 'sep_t', 150, int)
+        targs.cue_t = get_tval(tarr, 'cue_t', 400, int)
+        targs.select_t = get_tval(tarr, 'select_t', 440, int)
 
     return targs
 
@@ -508,7 +508,7 @@ if __name__ == '__main__':
                 else:
                     ax.plot(xr, trial_y, color='dodgerblue', label='go', lw=2)
                     if t_type is RSG:
-                        ax.set_title(str(trial.rsg) + ' -> ' + str(trial.t_p))
+                        ax.set_title(f'{trial.rsg}: [{trial.t_o}, {trial.t_p}] ', fontsize=9)
 
             elif t_type is DelayCopy:
                 for j in range(trial.dim):

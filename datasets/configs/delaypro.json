@@ -2,13 +2,13 @@
   "mode": "create",
   "name": "delaypro",
   "config": null,
-  "t_type": "delay-anti",
-  "t_len": 200,
+  "t_type": "delay-pro",
   "n_trials": 2000,
   "intervals": null,
   "motifs": null,
   "task_args": [],
+  "t_len": 300,
   "fix_t": 50,
-  "stim_t": 100,
-  "argv": "tasks.py create delaypro -t delay-anti -l 200"
+  "stim_t": 150,
+  "argv": "tasks.py create delaypro -t delay-pro"
 }
