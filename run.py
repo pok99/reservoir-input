@@ -54,9 +54,8 @@ def parse_args():
     # make sure model_config path is specified if you use any paths! it ensures correct dimensions, bias, etc.
     parser.add_argument('--model_config_path', type=str, default=None, help='config path corresponding to model load path')
     parser.add_argument('--model_path', type=str, default=None, help='start training from certain model. superseded by below')
-    # parser.add_argument('--Wro_path', type=str, default=None, help='start training from certain Wro')
-    # parser.add_argument('--Wf_path', type=str, default=None, help='start training from certain Wf')
-    # parser.add_argument('--J_path', type=str, default=None, help='saved reservoir. should be saved with seed tho')
+    parser.add_argument('--M_path', type=str, default=None, help='start training from certain in/out representations')
+    parser.add_argument('--res_path', type=str, default=None, help='start training from certain reservoir representation')
     
     # network manipulation
     # parser.add_argument('--res_init_type', type=str, default='gaussian', help='')

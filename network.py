@@ -205,49 +205,52 @@ class BasicNetwork(nn.Module):
         if self.args.use_reservoir:
             self.reservoir.reset(res_state=res_state, device=device)
 
-# class M2Net(nn.Module):
-#     def __init__(self, args=DEFAULT_ARGS):
-#         super().__init__()
-#         args = fill_args(args, DEFAULT_ARGS, to_bunch=True)
-#         self.args = args
+class M2Net(nn.Module):
+    def __init__(self, args=DEFAULT_ARGS):
+        super().__init__()
+        args = fill_args(args, DEFAULT_ARGS, to_bunch=True)
+        self.args = args
        
-#         if not hasattr(self.args, 'network_seed'):
-#             self.args.network_seed = random.randrange(1e6)
+        if not hasattr(self.args, 'network_seed'):
+            self.args.network_seed = random.randrange(1e6)
 
-#         self._init_vars()
-#         if self.args.model_path is not None:
-#             self.load_state_dict(torch.load(self.args.model_path))
+        self.out_act = get_activation(self.args.out_act)
+        self.m1_act = get_activation(self.args.m1_act)
+        self.m2_act = get_activation(self.args.m2_act)
 
-#         self.out_act = get_activation(self.args.out_act)
-#         self.m1_act = get_activation(self.args.m1_act)
-#         self.m2_act = get_activation(self.args.m2_act)
-#         self.reset()
+        self._init_vars()
+        self.reset()
 
-#     def _init_vars(self):
-#         with TorchSeed(self.args.network_seed):
-#             D1 = self.args.D1 if self.args.D1 != 0 else self.args.N
-#             D2 = self.args.D2 if self.args.D2 != 0 else self.args.N
-#             self.M_u = nn.Linear(self.args.L + self.args.T, D1, bias=self.args.bias)
-#             self.M_ro = nn.Linear(D2, self.args.Z, bias=self.args.bias)
-#         self.reservoir = M2Reservoir(self.args)
+    def _init_vars(self):
+        with TorchSeed(self.args.network_seed):
+            D1 = self.args.D1 if self.args.D1 != 0 else self.args.N
+            D2 = self.args.D2 if self.args.D2 != 0 else self.args.N
+            self.M_u = nn.Linear(self.args.L + self.args.T, D1, bias=self.args.bias)
+            self.M_ro = nn.Linear(D2, self.args.Z, bias=self.args.bias)
+        self.reservoir = M2Reservoir(self.args)
+        if self.args.M_path is not None:
+            M_params = torch.load(self.args.M_path)
+            # TODO load M_params
+        if self.args.model_path is not None:
+            self.load_state_dict(torch.load(self.args.model_path))
 
-#     def forward(self, o, extras=False):
-#         # pass through the forward part
-#         u = self.m1_act(self.M_u(o.reshape(-1, self.args.L + self.args.T)))
-#         v, etc = self.reservoir(u, extras=True)
-#         z = self.M_ro(self.m2_act(v))
-#         z = self.out_act(z)
+    def forward(self, o, extras=False):
+        # pass through the forward part
+        u = self.m1_act(self.M_u(o.reshape(-1, self.args.L + self.args.T)))
+        v, etc = self.reservoir(u, extras=True)
+        z = self.M_ro(self.m2_act(v))
+        z = self.out_act(z)
 
-#         if not extras:
-#             return z
-#         elif self.args.use_reservoir:
-#             return z, {'u': u, 'x': etc['x'], 'v': v}
-#         else:
-#             return z, {'u': u, 'v': v}
+        if not extras:
+            return z
+        elif self.args.use_reservoir:
+            return z, {'u': u, 'x': etc['x'], 'v': v}
+        else:
+            return z, {'u': u, 'v': v}
 
-#     def reset(self, res_state=None, device=None):
-#         if self.args.use_reservoir:
-#             self.reservoir.reset(res_state=res_state, device=device)
+    def reset(self, res_state=None, device=None):
+        if self.args.use_reservoir:
+            self.reservoir.reset(res_state=res_state, device=device)
 
 class M2Reservoir(nn.Module):
     def __init__(self, args=DEFAULT_ARGS):
@@ -368,77 +371,3 @@ class M2Reservoir(nn.Module):
 
         if burn_in:
             self.burn_in(self.args.res_burn_steps)
-            
-
-class M2Net(nn.Module):
-    def __init__(self, args=DEFAULT_ARGS):
-        super().__init__()
-        args = fill_args(args, DEFAULT_ARGS, to_bunch=True)
-        self.args = args
-       
-        if not hasattr(self.args, 'network_seed'):
-            self.args.network_seed = random.randrange(1e6)
-
-        self.M_us = nn.ModuleDict()
-        self.M_ros = nn.ModuleDict()
-        self.LZs = {}
-
-        # use or don't use input/output low-D representations
-        self.D1 = self.args.D1 if self.args.D1 != 0 else self.args.N
-        self.D2 = self.args.D2 if self.args.D2 != 0 else self.args.N
-
-        self.out_act = get_activation(self.args.out_act)
-        self.m1_act = get_activation(self.args.m1_act)
-        self.m2_act = get_activation(self.args.m2_act)
-
-        self._init_vars()
-        self.reset()
-
-    def _init_vars(self):
-        self.reservoir = M2Reservoir(self.args)
-        if self.args.model_path is not None:
-            state_dict = torch.load(self.args.model_path)
-            names = np.unique([u.split('.')[1] for u in state_dict])
-            M_us = list(filter(lambda u: u.startswith('M_us'), state_dict))
-            M_ros = list(filter(lambda u: u.startswith('M_ros'), state_dict))
-            for i in range(len(M_us)//2):
-                name = next(filter(lambda n: n.startswith(str(i) + '_'), names))
-                u_weight, u_bias = sorted(filter(lambda u: u.startswith('M_us.' + str(i)), M_us), reverse=True)
-                ro_weight, ro_bias = sorted(filter(lambda u: u.startswith('M_ros.' + str(i)), M_ros), reverse=True)
-                L = state_dict[u_weight].shape[1]
-                Z = state_dict[ro_weight].shape[0]
-                self.add_task(name, L, Z)
-
-            self.load_state_dict(state_dict)
-
-    def add_task(self, t_name, L, Z):
-        # use a different seed for each task
-        with TorchSeed(self.args.network_seed + hash(t_name)):
-            M_u = nn.Linear(L, self.D1, bias=self.args.bias)
-            M_ro = nn.Linear(self.D2, Z, bias=self.args.bias)
-            self.M_us[t_name] = M_u
-            self.M_ros[t_name] = M_ro
-            self.LZs[t_name] = (L, Z)
-
-    def forward(self, t_name, o, extras=False):
-        # fetch task variables
-        M_u = self.M_us[t_name]
-        M_ro = self.M_ros[t_name]
-        L, Z = self.LZs[t_name]
-
-        # pass through the forward part
-        u = self.m1_act(M_u(o.reshape(-1, L)))
-        v, etc = self.reservoir(u, extras=True)
-        z = M_ro(self.m2_act(v))
-        z = self.out_act(z)
-
-        if not extras:
-            return z
-        elif self.args.use_reservoir:
-            return z, {'u': u, 'x': etc['x'], 'v': v}
-        else:
-            return z, {'u': u, 'v': v}
-
-    def reset(self, res_state=None, device=None):
-        if self.args.use_reservoir:
-            self.reservoir.reset(res_state=res_state, device=device)
