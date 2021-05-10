@@ -173,7 +173,7 @@ def lrange(l, p=0.1):
 def get_config(path, ctype='model', to_bunch=False):
     head, tail = os.path.split(path)
     if ctype == 'dset':
-        fname = tail.split('.')[0] + '.json'
+        fname = '.'.join(tail.split('.')[:-1]) + '.json'
         c_folder = os.path.join(head, 'configs')
         if os.path.isfile(os.path.join(c_folder, fname)):
             c_path = os.path.join(head, 'configs', fname)

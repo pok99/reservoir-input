@@ -49,7 +49,7 @@ if args.test_all:
 if not args.no_plot:
     data, t_losses = test_model(net, config, n_tests=12)
     print('avg losses:')
-    for t, j in t_losses:
+    for t, j in t_losses.items():
         print(t + ': ' + str(j))
     run_id = '/'.join(args.model.split('/')[-3:-1])
 

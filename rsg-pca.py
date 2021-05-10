@@ -13,10 +13,11 @@ import pdb
 
 import argparse
 
-
-from testers import load_model_path
+from testers import load_model_path, get_states
 from utils import get_config, load_rb
 from helpers import TrialDataset, collater, create_loaders
+
+from tasks import *
 
 def pca(args):
     config = get_config(args.model, to_bunch=True)
@@ -26,10 +27,37 @@ def pca(args):
         args.dataset = config.dataset
 
     setting = 'estimation'
-    test_size = 1000
 
-    dset, loader = create_loaders(args.dataset, config, split_test=False, test_size=test_size)
-    x, y, info = next(iter(loader))
+    n_reps = 10
+    _, loader = create_loaders(args.dataset, config, split_test=False, test_size=n_reps)
+    x, y, trials = next(iter(loader))
+    A = get_states(net, x)
+
+    pdb.set_trace()
+
+    if setting == 'estimation':
+        for state in A:
+            pass
+
+    A_proj = pca(A, 3)
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.grid(False)
+    plt.axis('off')
+
+    colors = cm.autumn(np.linspace(0, 1, 6))
+
+    for ix in range(A_proj.shape[0]):
+        t = A_proj[ix].T
+        # trial = samples['0_delaypro'][2][ix]
+        # trial = samples['0_memorypro'][2][ix]
+        # trial = samples['0_flip-flop-2-0:01'][2][ix]
+        # trial = samples['0_flip-flop-1-0:04'][2][ix]
+        # trial = samples['0_durdisc'][2][ix]
+
+        ax.plot(t[0], t[1], t[2], color=colors[0], lw=1)
+
 
     outs = []
     with torch.no_grad():

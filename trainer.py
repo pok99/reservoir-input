@@ -29,7 +29,7 @@ class Trainer:
         self.args = args
         self.device = torch.device('cuda' if torch.cuda.is_available() and args.use_cuda else 'cpu')
 
-        trains, tests = create_loaders(self.args.dataset, self.args, split_test=True)
+        trains, tests = create_loaders(self.args.dataset, self.args, split_test=True, test_size=50)
         self.train_set, self.train_loader = trains
         self.test_set, self.test_loader = tests
         logging.info(f'Created data loaders using datasets:')
@@ -111,7 +111,6 @@ class Trainer:
 
     # runs an iteration where we want to match a certain trajectory
     def run_trial(self, x, y, trial, training=True, extras=False):
-        lz = trial[0].lz
         self.net.reset(self.args.res_x_init, device=self.device)
         trial_loss = 0.
         k_loss = 0.
@@ -123,7 +122,7 @@ class Trainer:
             # k to full n means normal BPTT
             k = x.shape[2]
         for j in range(x.shape[2]):
-            net_in = x[:,:,j].reshape(-1, x.shape[0])
+            net_in = x[:,:,j]
             net_out, etc = self.net(net_in, extras=True)
             outs.append(net_out)
             # t-BPTT with parameter k
@@ -152,9 +151,6 @@ class Trainer:
 
         if ix_callback is not None:
             ix_callback(trial_loss, etc)
-        # print(self.net.M_ros['0_rsg-100-150'].bias.grad)
-        # print(self.net.M_ros['1_rsg-150-200'].bias.grad)
-        # pdb.set_trace()
         self.optimizer.step()
 
         etc = {
@@ -164,7 +160,7 @@ class Trainer:
         }
         return trial_loss, etc
 
-    def test(self, n_tests=50):
+    def test(self):
         with torch.no_grad():
             x, y, trials = next(iter(self.test_loader))
             x, y = x.to(self.device), y.to(self.device)

@@ -187,7 +187,7 @@ class BasicNetwork(nn.Module):
 
     def forward(self, o, extras=False):
         # pass through the forward part
-        u = self.W_f(o.reshape(-1, self.args.L + self.args.T))
+        u = self.W_f(o)
         if self.args.use_reservoir:
             z, etc = self.reservoir(u, extras=True)
         else:
@@ -234,9 +234,14 @@ class M2Net(nn.Module):
         if self.args.model_path is not None:
             self.load_state_dict(torch.load(self.args.model_path))
 
+    def add_task(self):
+        M = self.M_u.weight.data
+        self.M_u.weight.data = torch.cat((M, torch.zeros((M.shape[0],1))), dim=1)
+
     def forward(self, o, extras=False):
         # pass through the forward part
-        u = self.m1_act(self.M_u(o.reshape(-1, self.args.L + self.args.T)))
+        # o should have shape [batch size, self.args.T + self.args.L]
+        u = self.m1_act(self.M_u(o))
         v, etc = self.reservoir(u, extras=True)
         z = self.M_ro(self.m2_act(v))
         z = self.out_act(z)

@@ -42,9 +42,9 @@ def main(args):
         context, idx, trial, x, y, out, loss = d
         y_ready, y_set, y_go = trial.rsg
         y_prod = np.argmax(out >= 1)
-        t_y = y_go - y_set
+        t_y = y_set - y_ready
         t_p = y_prod - y_set
-        t_ym = y_set - y_ready
+        t_ym = y_go - y_set
         if context == 0:
             ys_1.append((t_y, t_p))
         else:

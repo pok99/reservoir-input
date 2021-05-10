@@ -11,7 +11,7 @@ import os
 import pdb
 
 from testers import get_states, load_model_path
-from helpers import get_test_samples, create_loaders
+from helpers import create_loaders
 from utils import get_config
 
 from tasks import *
@@ -26,9 +26,9 @@ def main(args):
         args.dataset = config.dataset
 
     n_reps = 10
-    _, loader = create_loaders(args.dataset, config, split_test=False)
-    samples = get_test_samples(loader, n_tests=n_reps)
-    A = get_states(net, samples)
+    _, loader = create_loaders(args.dataset, config, split_test=False, test_size=n_reps)
+    x, y, trials = next(iter(loader))
+    A = get_states(net, x)
 
     A_proj = pca(A, 3)
 
@@ -43,7 +43,7 @@ def main(args):
         t = A_proj[ix].T
         # trial = samples['0_delaypro'][2][ix]
         # trial = samples['0_memorypro'][2][ix]
-        trial = samples['0_flip-flop-2-0:01'][2][ix]
+        # trial = samples['0_flip-flop-2-0:01'][2][ix]
         # trial = samples['0_flip-flop-1-0:04'][2][ix]
         # trial = samples['0_durdisc'][2][ix]
 
@@ -77,11 +77,11 @@ def main(args):
 # T is timesteps
 # D is the dimensional space that needs to be reduced
 
-def pca(A, rank):
+def pca(As, rank):
     # mix up the samples and timesteps, but keep the dimensions
-    N, T, D = A.shape
-    A_cut = A.reshape(-1, D)
-    u, s, v = torch.pca_lowrank(A_cut)
+    N = len(As)
+    A_cut = torch.cat(As)
+    u, s, v = torch.pca_lowrank(A)
 
     # if rank == 3:
     #     fig = plt.figure()

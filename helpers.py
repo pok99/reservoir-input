@@ -45,6 +45,7 @@ class TrialDataset(Dataset):
         self.lzs = []       # Ls and Zs for task trials
         self.x_ctxs = []    # precomputed context inputs
         self.max_idxs = np.zeros(len(datasets), dtype=int)
+        self.t_lens = []
         for i, (dname, ds) in enumerate(datasets):
             self.dnames.append(dname)
             self.data.append(ds)
@@ -52,6 +53,7 @@ class TrialDataset(Dataset):
             x_ctx = np.zeros((args.T, ds[0].t_len))
             x_ctx[i] = 1
             self.x_ctxs.append(x_ctx)
+            self.t_lens.append(ds[0].t_len)
             # cumulative lengths of data, for indexing
             self.max_idxs[i] = self.max_idxs[i-1] + len(ds)
             # use ds[0] as exemplar to set t_type, L, Z
@@ -170,8 +172,8 @@ def get_criteria(args):
                 t_g = i[j].rsg[2] - t_ix
                 t_p = i[j].t_p
                 # exponential loss centred at go time
-                # dropping to 0.5 at set time
-                lam = -np.log(2) / t_p
+                # dropping to 0.25 at set time
+                lam = -np.log(4) / t_p
                 # left half, only use if go time is to the right
                 if t_g > 0:
                     xr[:t_g] = torch.exp(-lam * (xr[:t_g] - t_g))
