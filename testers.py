@@ -70,7 +70,8 @@ def test_model(net, config, n_tests=128):
 
     return data, t_losses
 
-
+# returns hidden states as [N, T, H]
+# note: this returns hidden states as the last dimension, not timesteps!
 def get_states(net, x):
     states = []
     with torch.no_grad():

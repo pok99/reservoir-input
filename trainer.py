@@ -140,6 +140,8 @@ class Trainer:
 
         net_outs = torch.stack(outs, dim=2)
 
+        trial_loss /= self.args.batch_size
+
         if extras:
             etc = {'outs': net_outs,}
             return trial_loss, etc

@@ -72,30 +72,28 @@ def main(args):
 
     plt.show()
 
-# A should be [N, T, D] shaped where
-# N is the number of samples
+# As should be either [T, D] or [[T, D], ...] shaped where
+# outer (optional) listing
 # T is timesteps
 # D is the dimensional space that needs to be reduced
 
-def pca(As, rank):
-    # mix up the samples and timesteps, but keep the dimensions
-    N = len(As)
-    A_cut = torch.cat(As)
-    u, s, v = torch.pca_lowrank(A)
+def pca2(As, rank):
+    # can deal with either list of inputs or a single A vector
+    if type(As) is not list:
+        As = [As]
 
-    # if rank == 3:
-    #     fig = plt.figure()
-    #     ax = fig.add_subplot(111, projection='3d')
-    #     ax.grid(False)
-    #     plt.axis('off')
+    N = len(As)
+    # mix up the samples and timesteps, but keep the dimensions
+    A = torch.cat(As)
+
+    u, s, v = torch.pca_lowrank(A)
 
     projs = []
     for ix in range(N):
-        traj = A[ix]
+        traj = As[ix]
         traj_proj = traj @ v[:, :rank]
         projs.append(traj_proj)
 
-    projs = torch.stack(projs, dim=0)
     return projs
 
 if __name__ == '__main__':
