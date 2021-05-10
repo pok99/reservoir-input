@@ -376,6 +376,9 @@ def get_task_args(args):
         if args.intervals is None:
             targs.min_t = get_tval(tarr, 'gt', targs.p_len * 4, int)
             targs.max_t = get_tval(tarr, 'lt', targs.t_len // 2 - targs.p_len * 4 - targs.max_ready, int)
+        else:
+            targs.max_t = max(args.intervals)
+            targs.min_t = min(args.intervals)
 
     elif args.t_type.startswith('csg'):
         targs.t_len = get_tval(tarr, 'l', 600, int)

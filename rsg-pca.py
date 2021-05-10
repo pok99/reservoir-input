@@ -21,7 +21,7 @@ from tasks import *
 
 from pca import pca2
 
-colorspaces = [cm.autumn, cm.cool]
+cspaces = [cm.autumn, cm.cool]
 
 def pca(args):
     config = get_config(args.model, to_bunch=True)
@@ -59,7 +59,7 @@ def pca(args):
             interval_groups[context][interval] = [A_proj[idx]]
 
     context_colors = [
-        iter(colorspaces[i](np.linspace(0, 1, len(interval_groups[i])))) for i in range(n_contexts)
+        iter(cspaces[i](np.linspace(0, 1, len(interval_groups[i])))) for i in range(n_contexts)
     ]
 
     fig = plt.figure()
@@ -76,16 +76,16 @@ def pca(args):
             c = next(context_colors[context])
 
             t = proj.T
-            elif rank == 3:
-                ax.plot(t[0], t[1], t[2], color=c, lw=1)
-                if setting == 'estimation':
-                    marker_a = '^'
-                    marker_b = 'o'
-                else:
-                    marker_a = 'o'
-                    marker_b = 's'
-                ax.scatter(t[0][0], t[1][0], t[2][0], s=40, color=c, marker=marker_a)
-                ax.scatter(t[0][-1], t[1][-1], t[2][-1], s=30, color=c, marker=marker_b)
+
+            ax.plot(t[0], t[1], t[2], color=c, lw=1)
+            if setting == 'estimation':
+                marker_a = '^'
+                marker_b = 'o'
+            else:
+                marker_a = 'o'
+                marker_b = 's'
+            ax.scatter(t[0][0], t[1][0], t[2][0], s=40, color=c, marker=marker_a)
+            ax.scatter(t[0][-1], t[1][-1], t[2][-1], s=30, color=c, marker=marker_b)
 
     plt.show()
 
