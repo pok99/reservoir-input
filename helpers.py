@@ -3,7 +3,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, Subset
 
 import pdb
 
@@ -111,15 +111,38 @@ def create_loaders(datasets, args, split_test=True, test_size=1):
         else:
             dsets_test.append([dname, dset])
 
-    # test loader used regardless of setting
+    # creating datasets
     test_set = TrialDataset(dsets_test, args)
-    test_loader = DataLoader(test_set, batch_size=test_size, shuffle=True, collate_fn=collater, drop_last=False)
     if split_test:
         train_set = TrialDataset(dsets_train, args)
-        train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True, collate_fn=collater, drop_last=True)
-        return (train_set, train_loader), (test_set, test_loader)
+
+    if args.sequential:
+        # helper function for sequential loaders
+        def create_subset_loaders(dset, batch_size, drop_last):
+            loaders = []
+            max_idxs = dset.max_idxs
+            for i in range(len(datasets)):
+                if i == 0:
+                    subset = Subset(dset, range(max_idxs[0]))
+                else:
+                    subset = Subset(dset, range(max_idxs[i-1], max_idxs[i]))
+                loader = DataLoader(subset, batch_size=batch_size, shuffle=True, collate_fn=collater, drop_last=drop_last)
+                loaders.append(loader)
+            return loaders
+        # create the loaders themselves
+        test_loaders = create_subset_loaders(test_set, test_size, False)
+        if split_test:
+            train_loaders = create_subset_loaders(train_set, args.batch_size, True)
+            return (train_set, train_loaders), (test_set, test_loaders)
+        return (test_set, test_loaders)
     else:
+        # otherwise it's quite simple, create a single dataset and loader
+        test_loader = DataLoader(test_set, batch_size=test_size, shuffle=True, collate_fn=collater, drop_last=False)
+        if split_test:
+            train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True, collate_fn=collater, drop_last=True)
+            return (train_set, train_loader), (test_set, test_loader)
         return (test_set, test_loader)
+        
 
 
 def get_criteria(args):

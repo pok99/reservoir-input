@@ -29,14 +29,17 @@ class Trainer:
         self.args = args
         self.device = torch.device('cuda' if torch.cuda.is_available() and args.use_cuda else 'cpu')
 
-        if not self.args.sequential:
-            trains, tests = create_loaders(self.args.dataset, self.args, split_test=True, test_size=50)
-        else:
-            for d in self.args.dataset:
-                pass
+        trains, tests = create_loaders(self.args.dataset, self.args, split_test=True, test_size=50)
 
-        self.train_set, self.train_loader = trains
-        self.test_set, self.test_loader = tests
+        if self.args.sequential:
+            self.train_set, self.train_loaders = trains
+            self.test_set, self.test_loaders = tests
+            self.train_idx = 0
+            self.train_loader = self.train_loaders[self.args.train_order[self.train_idx]]
+            self.test_loader = self.test_loaders[self.args.train_order[self.train_idx]]
+        else:
+            self.train_set, self.train_loader = trains
+            self.test_set, self.test_loader = tests
         logging.info(f'Created data loaders using datasets:')
         for ds in self.args.dataset:
             logging.info(f'  {ds}')
@@ -156,6 +159,8 @@ class Trainer:
         self.optimizer.zero_grad()
         trial_loss, etc = self.run_trial(x, y, trial, extras=True)
 
+        print(sum([t.context for t in trial]))
+
         if ix_callback is not None:
             ix_callback(trial_loss, etc)
         self.optimizer.step()
@@ -218,6 +223,13 @@ class Trainer:
                     if not self.args.no_log:
                         self.log_checkpoint(ix, etc['ins'].cpu().numpy(), etc['goals'].cpu().numpy(), z, train_loss, test_loss)
                     running_loss = 0.0
+
+                    if self.args.sequential and test_loss < 50:
+                        logging.info(f'Successfully trained task {self.train_idx}. Moving on to task {self.train_idx + 1}')
+                        self.train_idx += 1
+                        self.train_loader = self.train_loaders[self.args.train_order[self.train_idx]]
+                        self.test_loader = self.test_loaders[self.args.train_order[self.train_idx]]
+                        break
 
                     # convergence based on no avg loss decrease after patience samples
                     if test_loss < running_min_error:
