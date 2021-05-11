@@ -44,6 +44,9 @@ class Trainer:
         for ds in self.args.dataset:
             logging.info(f'  {ds}')
 
+        if self.args.sequential:
+            logging.info(f'Sequential training. Starting with task {self.train_idx}')
+
         # self.net = BasicNetwork(self.args)
         self.net = M2Net(self.args)
         self.net.to(self.device)
@@ -159,8 +162,6 @@ class Trainer:
         self.optimizer.zero_grad()
         trial_loss, etc = self.run_trial(x, y, trial, extras=True)
 
-        print(sum([t.context for t in trial]))
-
         if ix_callback is not None:
             ix_callback(trial_loss, etc)
         self.optimizer.step()
@@ -224,11 +225,22 @@ class Trainer:
                         self.log_checkpoint(ix, etc['ins'].cpu().numpy(), etc['goals'].cpu().numpy(), z, train_loss, test_loss)
                     running_loss = 0.0
 
-                    if self.args.sequential and test_loss < 50:
-                        logging.info(f'Successfully trained task {self.train_idx}. Moving on to task {self.train_idx + 1}')
+                    if self.args.sequential and test_loss < self.args.seq_threshold:
+                        logging.info(f'Successfully trained task {self.train_idx}...')
                         self.train_idx += 1
+                        for i in range(self.train_idx):
+                            self.test_loader = self.test_loaders[self.args.train_order[i]]
+                            test_loss, _ = self.test()
+                            logging.info(f'Loss on task {i}: {test_loss:.3f}')
+                        if self.train_idx == len(self.args.train_order):
+                            ending = True
+                            logging.info(f'...done training all tasks! ending')
+                            break
+                        logging.info(f'...moving on to task {self.train_idx}.')
                         self.train_loader = self.train_loaders[self.args.train_order[self.train_idx]]
                         self.test_loader = self.test_loaders[self.args.train_order[self.train_idx]]
+                        running_min_error = float('inf')
+                        running_no_min = 0
                         break
 
                     # convergence based on no avg loss decrease after patience samples

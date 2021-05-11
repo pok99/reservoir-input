@@ -237,6 +237,7 @@ class M2Net(nn.Module):
     def add_task(self):
         M = self.M_u.weight.data
         self.M_u.weight.data = torch.cat((M, torch.zeros((M.shape[0],1))), dim=1)
+        self.args.T += 1
 
     def forward(self, o, extras=False):
         # pass through the forward part

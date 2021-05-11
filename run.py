@@ -69,8 +69,9 @@ def parse_args():
 
     parser.add_argument('-d', '--dataset', type=str, nargs='+', help='dataset(s) to use. >1 means different contexts')
     # parser.add_argument('-a', '--add_tasks', type=str, nargs='+', help='add tasks to previously trained reservoir')
-    parser.add_argument('-o', '--train_order', type=int, nargs='+', default=[], help='ids of tasks to train on, in order if sequential flag is enabled. empty for all')
     parser.add_argument('-s', '--sequential', action='store_true', help='sequential training')
+    parser.add_argument('-o', '--train_order', type=int, nargs='+', default=[], help='ids of tasks to train on, in order if sequential flag is enabled. empty for all')
+    parser.add_argument('--seq_threshold', type=float, default=2, help='threshold for having solved a task before moving on to next one')
     # high-level arguments that control dataset manipulations
     parser.add_argument('--same_test', action='store_true', help='use entire dataset for both training and testing')
     
@@ -162,7 +163,7 @@ def adjust_args(args):
 
     # shortcut for training in designated order
     if args.sequential and len(args.train_order) == 0:
-        args.train_order = range(len(args.dataset))
+        args.train_order = list(range(len(args.dataset)))
 
     # TODO
     args.bias = not args.no_bias
