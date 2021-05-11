@@ -47,7 +47,6 @@ def parse_args():
     parser.add_argument('--net', type=str, default='M2', choices=['basic', 'M2'])
 
     parser.add_argument('--train_parts', type=str, nargs='+', default=['M_u', 'M_ro'])
-    parser.add_argument('--share_parts', type=str, nargs='+', default=['M_ro'])
 
     parser.add_argument('-c', '--config', type=str, default=None, help='use args from config file')
     
@@ -70,7 +69,7 @@ def parse_args():
 
     parser.add_argument('-d', '--dataset', type=str, nargs='+', help='dataset(s) to use. >1 means different contexts')
     parser.add_argument('-a', '--add_tasks', type=str, nargs='+', help='add tasks to previously trained reservoir')
-    parser.add_argument('--train_tasks', type=int, nargs='+', default=[], help='ids of tasks to train on, in order if sequential flag is enabled. empty for all')
+    parser.add_argument('-o', '--train_order', type=int, nargs='+', default=[], help='ids of tasks to train on, in order if sequential flag is enabled. empty for all')
     parser.add_argument('-s', '--sequential', action='store_true', help='sequential training')
     # high-level arguments that control dataset manipulations
     parser.add_argument('--same_test', action='store_true', help='use entire dataset for both training and testing')

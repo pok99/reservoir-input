@@ -181,7 +181,7 @@ def get_config(path, ctype='model', to_bunch=False):
             raise NotImplementedError
 
     elif ctype == 'model':
-        if tail == 'model_best.pth':
+        if tail == 'model_best.pth' or 'test' in tail:
             for i in os.listdir(head):
                 if i.startswith('config'):
                     c_path = os.path.join(head, i)

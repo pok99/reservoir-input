@@ -29,7 +29,12 @@ class Trainer:
         self.args = args
         self.device = torch.device('cuda' if torch.cuda.is_available() and args.use_cuda else 'cpu')
 
-        trains, tests = create_loaders(self.args.dataset, self.args, split_test=True, test_size=50)
+        if not self.args.sequential:
+            trains, tests = create_loaders(self.args.dataset, self.args, split_test=True, test_size=50)
+        else:
+            for d in self.args.dataset:
+                pass
+
         self.train_set, self.train_loader = trains
         self.test_set, self.test_loader = tests
         logging.info(f'Created data loaders using datasets:')
@@ -140,7 +145,7 @@ class Trainer:
 
         net_outs = torch.stack(outs, dim=2)
 
-        trial_loss /= self.args.batch_size
+        trial_loss /= x.shape[0]
 
         if extras:
             etc = {'outs': net_outs,}
@@ -174,7 +179,7 @@ class Trainer:
             'outs': etc['outs'].detach()
         }
 
-        return loss / x.shape[0], etc
+        return loss, etc
 
     def train(self, ix_callback=None):
         ix = 0

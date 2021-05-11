@@ -36,47 +36,6 @@ def main(args):
     elif t_type in [DelayProAnti, MemoryProAnti]:
         pca_dmpa(args, A, trials, n_reps)
 
-    # A_proj = pca(A, 3)
-
-    # fig = plt.figure()
-    # ax = fig.add_subplot(111, projection='3d')
-    # ax.grid(False)
-    # plt.axis('off')
-
-    # colors = cm.autumn(np.linspace(0, 1, 6))
-
-    # for ix in range(A_proj.shape[0]):
-    #     t = A_proj[ix].T
-    #     # trial = samples['0_delaypro'][2][ix]
-    #     # trial = samples['0_memorypro'][2][ix]
-    #     # trial = samples['0_flip-flop-2-0:01'][2][ix]
-    #     # trial = samples['0_flip-flop-1-0:04'][2][ix]
-    #     # trial = samples['0_durdisc'][2][ix]
-
-    #     ax.plot(t[0], t[1], t[2], color=colors[0], lw=1)
-
-    #     # direction = (trial.s1[1] < trial.s2[1]) ^ (trial.cue_id == 1)
-    #     # ax.scatter(t[0][0], t[1][0], t[2][0], color='salmon', marker='o')
-    #     # if direction == 1:
-    #     #     ax.plot(t[0], t[1], t[2], color=colors[0], lw=1)
-    #     # else:
-    #     #     ax.plot(t[0], t[1], t[2], color=colors[2], lw=1)
-
-
-    #     # stim = trial.stim
-    #     # fix = trial.fix
-    #     # mem = trial.memory
-
-    #     # ax.plot(t[0][:fix], t[1][:fix], t[2][:fix], color=colors[0], lw=1.5)
-    #     # ax.plot(t[0][fix:stim], t[1][fix:stim], t[2][fix:stim], color=colors[1], lw=1.5)
-    #     # ax.plot(t[0][stim:], t[1][stim:], t[2][stim:], color=colors[1], lw=1.5)
-    #     # # ax.plot(t[0][stim:mem], t[1][stim:mem], t[2][stim:mem], color=colors[2], lw=1.5)
-    #     # # ax.plot(t[0][mem:], t[1][mem:], t[2][mem:], color=colors[3], lw=1.5)
-    #     # ax.scatter(t[0][fix], t[1][fix], t[2][fix], color='salmon', marker='s')
-    #     # ax.scatter(t[0][stim], t[1][stim], t[2][stim], color='salmon', marker='^')
-    #     # ax.scatter(t[0][-1], t[1][-1], t[2][-1], s=10, color='salmon', marker='o')
-
-    # plt.show()
 
 def pca_rsg(args, A_uncut, trials, n_reps):
 
@@ -135,7 +94,7 @@ def pca_rsg(args, A_uncut, trials, n_reps):
 
 def pca_dmpa(args, A_uncut, trials, n_reps):
 
-    setting = 'preparation'
+    setting = 'nofix'
 
     As = []
     for idx in range(n_reps):
@@ -144,16 +103,20 @@ def pca_dmpa(args, A_uncut, trials, n_reps):
         stim = trials[idx].stim    
         if t_type is MemoryProAnti:
             memory = trials[idx].memory
-        if setting == 'preparation':
+        if setting == 'all':
+            As.append(A_uncut[idx])
+        elif setting == 'nofix':
+            As.append(A_uncut[idx][fix:])
+        elif setting == 'preparation':
             if t_type is DelayProAnti:
                 As.append(A_uncut[idx,fix:stim])
             else:
                 As.append(A_uncut[idx,fix:memory])
         elif setting == 'movement':
             if t_type is DelayProAnti:
-                As.append(A_uncut[stim:])
+                As.append(A_uncut[idx,stim:])
             else:
-                As.append(A_uncut[memory:])
+                As.append(A_uncut[idx,memory:])
 
     A_proj = pca(As, 3)
 
