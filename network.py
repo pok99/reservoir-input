@@ -178,11 +178,11 @@ class BasicNetwork(nn.Module):
     def _init_vars(self):
         rng_pt = torch.get_rng_state()
         torch.manual_seed(self.args.network_seed)
-        self.W_f = nn.Linear(self.args.L + self.args.T, self.args.D, bias=self.args.bias)
+        self.W_f = nn.Linear(self.args.L + self.args.T, self.args.D, bias=False)
         if self.args.use_reservoir:
             self.reservoir = M1Reservoir(self.args)
         else:
-            self.W_ro = nn.Linear(self.args.D, self.args.Z, bias=self.args.bias)
+            self.W_ro = nn.Linear(self.args.D, self.args.Z, bias=False)
         torch.set_rng_state(rng_pt)
 
     def forward(self, o, extras=False):

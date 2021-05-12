@@ -35,6 +35,20 @@ network_params = [
     'seed', 'res_seed', 'res_x_seed', 'res_burn_steps', 'res_x_init'
 ]
 
+DEFAULTS = {
+    'D1': 50,
+    'D2': 50,
+    'N': 300,
+    'net': 'M2',
+    'train_parts': ['M_u', 'M_ro'],
+    'res_init_g': 1.5,
+    'res_noise': 0,
+    'x_noise': 0,
+    'm_noise': 0,
+    'm1_act': 'none',
+    'm2_act': 'none'
+}
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description='')
@@ -70,8 +84,10 @@ def parse_args():
     parser.add_argument('-d', '--dataset', type=str, nargs='+', help='dataset(s) to use. >1 means different contexts')
     # parser.add_argument('-a', '--add_tasks', type=str, nargs='+', help='add tasks to previously trained reservoir')
     parser.add_argument('-s', '--sequential', action='store_true', help='sequential training')
+    parser.add_argument('--owm', action='store_true', help='use orthogonal weight modification')
     parser.add_argument('-o', '--train_order', type=int, nargs='+', default=[], help='ids of tasks to train on, in order if sequential flag is enabled. empty for all')
     parser.add_argument('--seq_threshold', type=float, default=2, help='threshold for having solved a task before moving on to next one')
+
     # high-level arguments that control dataset manipulations
     parser.add_argument('--same_test', action='store_true', help='use entire dataset for both training and testing')
     

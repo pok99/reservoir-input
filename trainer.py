@@ -126,7 +126,8 @@ class Trainer:
         trial_loss = 0.
         k_loss = 0.
         outs = []
-        reps = []
+        us = []
+        vs = []
         # setting up k for t-BPTT
         if training and self.args.k != 0:
             k = self.args.k
@@ -136,8 +137,9 @@ class Trainer:
         for j in range(x.shape[2]):
             net_in = x[:,:,j]
             net_out, etc = self.net(net_in, extras=True)
-            reps.append(etc['u'])
             outs.append(net_out)
+            us.append(etc['u'])
+            vs.append(etc['v'])
             # t-BPTT with parameter k
             if (j+1) % k == 0:
                 # the first timestep with which to do BPTT
@@ -149,18 +151,24 @@ class Trainer:
                 if training:
                     k_loss.backward()
                     # multiply gradients by P
-                    self.net.M_u.weight.grad = self.P @ self.net.M_u.weight.grad
+                    if self.args.sequential and self.args.owm and self.train_idx > 0:
+                        self.net.M_u.weight.grad = self.P_u @ self.net.M_u.weight.grad
+                        # self.net.M_u.bias.grad = self.P_u @ self.net.M_u.bias.grad
+                        self.net.M_ro.weight.grad = self.P_z @ self.net.M_ro.weight.grad @ self.P_v
+                        # self.net.M_ro.bias.grad = self.P_z @ self.net.M_ro.bias.grad @ self.P_v
                 k_loss = 0.
                 self.net.reservoir.x = self.net.reservoir.x.detach()
 
         trial_loss /= x.shape[0]
 
         if extras:
-            net_reps = torch.stack(reps, dim=2)
+            net_us = torch.stack(us, dim=2)
+            net_vs = torch.stack(vs, dim=2)
             net_outs = torch.stack(outs, dim=2)
             etc = {
                 'outs': net_outs,
-                'reps': net_reps
+                'us': net_us,
+                'vs': net_vs
             }
             return trial_loss, etc
         return trial_loss
@@ -176,7 +184,8 @@ class Trainer:
         etc = {
             'ins': x,
             'goals': y,
-            'reps': etc['reps'].detach(),
+            'us': etc['us'].detach(),
+            'vs': etc['vs'].detach(),
             'outs': etc['outs'].detach()
         }
         return trial_loss, etc
@@ -190,11 +199,24 @@ class Trainer:
         etc = {
             'ins': x,
             'goals': y,
-            'reps': etc['reps'].detach(),
+            'us': etc['us'].detach(),
+            'vs': etc['vs'].detach(),
             'outs': etc['outs'].detach()
         }
 
         return loss, etc
+
+    # helper function for sequential training, for testing performance on all tasks
+    def test_tasks(self, ids):
+        losses = []
+        for i in ids:
+            self.test_loader = self.test_loaders[self.args.train_order[i]]
+            loss, _ = self.test()
+            losses.append((i, loss))
+
+        self.test_loader = self.test_loaders[self.train_idx]
+
+        return losses
 
     def train(self, ix_callback=None):
         ix = 0
@@ -206,8 +228,13 @@ class Trainer:
         ending = False
 
         # for OWM
-        self.P = 1
-        S_update = 0
+        if self.args.owm:
+            self.P_u = 0
+            self.P_v = 0
+            self.P_z = 0
+            S_u = 0
+            S_v = 0
+            S_z = 0
 
         for e in range(self.args.n_epochs):
             for epoch_idx, (x, y, info) in enumerate(self.train_loader):
@@ -227,11 +254,21 @@ class Trainer:
                     z = etc['outs'].cpu().numpy().squeeze()
                     train_loss = running_loss / self.log_interval
                     test_loss, test_etc = self.test()
-                    log_arr = [
-                        f'iteration {ix}',
-                        f'loss {train_loss:.3f}',
-                        f'test loss {test_loss:.3f}',
-                    ]
+                    if self.args.sequential:
+                        losses = self.test_tasks(ids=range(self.train_idx))
+                        log_arr = [
+                            f'it {ix}',
+                            f'train {train_loss:.3f}',
+                            f'test {test_loss:.3f}'
+                        ]
+                        for i, loss in losses:
+                            log_arr.append(f't{i}: {loss:.3f}')
+                    else:
+                        log_arr = [
+                            f'iteration {ix}',
+                            f'train loss {train_loss:.3f}',
+                            f'test loss {test_loss:.3f}',
+                        ]
                     log_str = '\t| '.join(log_arr)
                     logging.info(log_str)
 
@@ -244,19 +281,29 @@ class Trainer:
                     if self.args.sequential and test_loss < self.args.seq_threshold:
                         logging.info(f'Successfully trained task {self.train_idx}...')
                         self.train_idx += 1
-                        reps = test_etc['reps']
-                        # 0th dimension is test batch size, 2nd dimension is number of timesteps
-                        # 1st dimension is the actual vector representation
-                        S_avg = torch.einsum('ijk,ilk->jl',reps,reps) / reps.shape[0] / reps.shape[2]
-                        S_update = (S_update * (self.train_idx - 1) + S_avg) / self.train_idx
-
-                        alpha = 1e-3
-                        self.P = torch.linalg.inverse(1/alpha * S_update + torch.eye(S_update.shape[0]))
                         
-                        for i in range(self.train_idx):
-                            self.test_loader = self.test_loaders[self.args.train_order[i]]
-                            test_loss, test_etc = self.test()
-                            logging.info(f'Loss on task {i}: {test_loss:.3f}')
+                        losses = self.test_tasks(ids=range(self.train_idx))
+                        for i, loss in losses:
+                            logging.info(f'...loss on task {i}: {loss:.3f}')
+
+                        if self.args.owm:
+                            # 0th dimension is test batch size, 2nd dimension is number of timesteps
+                            # 1st dimension is the actual vector representation
+                            us = test_etc['us']
+                            vs = test_etc['vs']
+                            zs = test_etc['outs']
+                            S_new = torch.einsum('ijk,ilk->jl',us,us) / us.shape[0] / us.shape[2]
+                            S_u = (S_u * (self.train_idx - 1) + S_new) / self.train_idx
+                            S_new = torch.einsum('ijk,ilk->jl',vs,vs) / vs.shape[0] / vs.shape[2]
+                            S_v = (S_v * (self.train_idx - 1) + S_new) / self.train_idx
+                            S_new = torch.einsum('ijk,ilk->jl',zs,zs) / zs.shape[0] / zs.shape[2]
+                            S_z = (S_z * (self.train_idx - 1) + S_new) / self.train_idx
+
+                            alpha = 1e-3
+                            self.P_u = torch.inverse(1/alpha * S_u + torch.eye(S_u.shape[0]))
+                            self.P_v = torch.inverse(1/alpha * S_v + torch.eye(S_v.shape[0]))
+                            self.P_z = torch.inverse(1/alpha * S_z + torch.eye(S_z.shape[0]))
+                            logging.info(f'...updated projection matrix for OWM')
                         if self.train_idx == len(self.args.train_order):
                             ending = True
                             logging.info(f'...done training all tasks! ending')
