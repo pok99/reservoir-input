@@ -126,6 +126,7 @@ class Trainer:
         trial_loss = 0.
         k_loss = 0.
         outs = []
+        reps = []
         # setting up k for t-BPTT
         if training and self.args.k != 0:
             k = self.args.k
@@ -135,6 +136,7 @@ class Trainer:
         for j in range(x.shape[2]):
             net_in = x[:,:,j]
             net_out, etc = self.net(net_in, extras=True)
+            reps.append(etc['u'])
             outs.append(net_out)
             # t-BPTT with parameter k
             if (j+1) % k == 0:
@@ -146,15 +148,20 @@ class Trainer:
                 trial_loss += k_loss.detach().item()
                 if training:
                     k_loss.backward()
+                    # multiply gradients by P
+                    self.net.M_u.weight.grad = self.P @ self.net.M_u.weight.grad
                 k_loss = 0.
                 self.net.reservoir.x = self.net.reservoir.x.detach()
-
-        net_outs = torch.stack(outs, dim=2)
 
         trial_loss /= x.shape[0]
 
         if extras:
-            etc = {'outs': net_outs,}
+            net_reps = torch.stack(reps, dim=2)
+            net_outs = torch.stack(outs, dim=2)
+            etc = {
+                'outs': net_outs,
+                'reps': net_reps
+            }
             return trial_loss, etc
         return trial_loss
 
@@ -169,6 +176,7 @@ class Trainer:
         etc = {
             'ins': x,
             'goals': y,
+            'reps': etc['reps'].detach(),
             'outs': etc['outs'].detach()
         }
         return trial_loss, etc
@@ -182,6 +190,7 @@ class Trainer:
         etc = {
             'ins': x,
             'goals': y,
+            'reps': etc['reps'].detach(),
             'outs': etc['outs'].detach()
         }
 
@@ -195,6 +204,11 @@ class Trainer:
 
         running_loss = 0.0
         ending = False
+
+        # for OWM
+        self.P = 1
+        S_update = 0
+
         for e in range(self.args.n_epochs):
             for epoch_idx, (x, y, info) in enumerate(self.train_loader):
                 ix += 1
@@ -225,12 +239,23 @@ class Trainer:
                         self.log_checkpoint(ix, etc['ins'].cpu().numpy(), etc['goals'].cpu().numpy(), z, train_loss, test_loss)
                     running_loss = 0.0
 
+                    # if training sequentially, move on to the next task
+                    # if doing OWM-like updates, do them here
                     if self.args.sequential and test_loss < self.args.seq_threshold:
                         logging.info(f'Successfully trained task {self.train_idx}...')
                         self.train_idx += 1
+                        reps = test_etc['reps']
+                        # 0th dimension is test batch size, 2nd dimension is number of timesteps
+                        # 1st dimension is the actual vector representation
+                        S_avg = torch.einsum('ijk,ilk->jl',reps,reps) / reps.shape[0] / reps.shape[2]
+                        S_update = (S_update * (self.train_idx - 1) + S_avg) / self.train_idx
+
+                        alpha = 1e-3
+                        self.P = torch.linalg.inverse(1/alpha * S_update + torch.eye(S_update.shape[0]))
+                        
                         for i in range(self.train_idx):
                             self.test_loader = self.test_loaders[self.args.train_order[i]]
-                            test_loss, _ = self.test()
+                            test_loss, test_etc = self.test()
                             logging.info(f'Loss on task {i}: {test_loss:.3f}')
                         if self.train_idx == len(self.args.train_order):
                             ending = True

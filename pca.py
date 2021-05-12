@@ -25,7 +25,7 @@ def main(args):
     if len(args.dataset) == 0:
         args.dataset = config.dataset
 
-    n_reps = 50
+    n_reps = 1500
     _, loader = create_loaders(args.dataset, config, split_test=False, test_size=n_reps)
     x, y, trials = next(iter(loader))
     A = get_states(net, x)
