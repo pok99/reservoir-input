@@ -225,8 +225,8 @@ class M2Net(nn.Module):
         with TorchSeed(self.args.network_seed):
             D1 = self.args.D1 if self.args.D1 != 0 else self.args.N
             D2 = self.args.D2 if self.args.D2 != 0 else self.args.N
-            self.M_u = nn.Linear(self.args.L + self.args.T, D1, bias=self.args.bias)
-            self.M_ro = nn.Linear(D2, self.args.Z, bias=self.args.bias)
+            self.M_u = nn.Linear(self.args.L + self.args.T, D1, bias=self.args.ff_bias)
+            self.M_ro = nn.Linear(D2, self.args.Z, bias=self.args.ff_bias)
         self.reservoir = M2Reservoir(self.args)
         if self.args.M_path is not None:
             M_params = torch.load(self.args.M_path)
@@ -287,7 +287,7 @@ class M2Reservoir(nn.Module):
                     self.W_u = nn.Identity()
                 else:
                     # use representation layer in between as division bw trained / untrained parts
-                    self.W_u = nn.Linear(self.args.D1, self.args.N, bias=False)
+                    self.W_u = nn.Linear(self.args.D1, self.args.N, bias=self.args.bias)
                     torch.nn.init.normal_(self.W_u.weight.data, std=self.args.res_init_g / np.sqrt(self.args.D1))
                 # recurrent weights
                 self.J = nn.Linear(self.args.N, self.args.N, bias=self.args.bias)

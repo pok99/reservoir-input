@@ -152,10 +152,12 @@ class Trainer:
                     k_loss.backward()
                     # multiply gradients by P
                     if self.args.sequential and self.args.owm and self.train_idx > 0:
-                        self.net.M_u.weight.grad = self.P_u @ self.net.M_u.weight.grad
-                        # self.net.M_u.bias.grad = self.P_u @ self.net.M_u.bias.grad
+                        self.net.M_u.weight.grad = self.P_u @ self.net.M_u.weight.grad @ self.P_s
                         self.net.M_ro.weight.grad = self.P_z @ self.net.M_ro.weight.grad @ self.P_v
-                        # self.net.M_ro.bias.grad = self.P_z @ self.net.M_ro.bias.grad @ self.P_v
+                        if self.args.ff_bias:
+                            self.net.M_u.bias.grad = self.P_u @ self.net.M_u.bias.grad
+                            self.net.M_ro.bias.grad = self.P_z @ self.net.M_ro.bias.grad
+                            
                 k_loss = 0.
                 self.net.reservoir.x = self.net.reservoir.x.detach()
 
@@ -213,10 +215,15 @@ class Trainer:
             self.test_loader = self.test_loaders[self.args.train_order[i]]
             loss, _ = self.test()
             losses.append((i, loss))
-
         self.test_loader = self.test_loaders[self.train_idx]
-
         return losses
+
+    def calc_P(self, S, states):
+        S_new = torch.einsum('ijk,ilk->jl',states,states) / states.shape[0] / states.shape[2]
+        S_avg = (S * self.train_idx + S_new) / (self.train_idx + 1)
+        alpha = 1e-3
+        P = torch.inverse(S_avg / alpha + torch.eye(S_avg.shape[0]))
+        return S_avg, P
 
     def train(self, ix_callback=None):
         ix = 0
@@ -229,9 +236,7 @@ class Trainer:
 
         # for OWM
         if self.args.owm:
-            self.P_u = 0
-            self.P_v = 0
-            self.P_z = 0
+            S_s = 0
             S_u = 0
             S_v = 0
             S_z = 0
@@ -254,21 +259,15 @@ class Trainer:
                     z = etc['outs'].cpu().numpy().squeeze()
                     train_loss = running_loss / self.log_interval
                     test_loss, test_etc = self.test()
+                    log_arr = [
+                        f'*{ix}',
+                        f'train {train_loss:.3f}',
+                        f'test {test_loss:.3f}'
+                    ]
                     if self.args.sequential:
                         losses = self.test_tasks(ids=range(self.train_idx))
-                        log_arr = [
-                            f'it {ix}',
-                            f'train {train_loss:.3f}',
-                            f'test {test_loss:.3f}'
-                        ]
                         for i, loss in losses:
                             log_arr.append(f't{i}: {loss:.3f}')
-                    else:
-                        log_arr = [
-                            f'iteration {ix}',
-                            f'train loss {train_loss:.3f}',
-                            f'test loss {test_loss:.3f}',
-                        ]
                     log_str = '\t| '.join(log_arr)
                     logging.info(log_str)
 
@@ -280,30 +279,23 @@ class Trainer:
                     # if doing OWM-like updates, do them here
                     if self.args.sequential and test_loss < self.args.seq_threshold:
                         logging.info(f'Successfully trained task {self.train_idx}...')
-                        self.train_idx += 1
                         
-                        losses = self.test_tasks(ids=range(self.train_idx))
+                        losses = self.test_tasks(ids=range(self.train_idx + 1))
                         for i, loss in losses:
                             logging.info(f'...loss on task {i}: {loss:.3f}')
 
+                        # orthogonal weight modification of M_u and M_ro
                         if self.args.owm:
                             # 0th dimension is test batch size, 2nd dimension is number of timesteps
                             # 1st dimension is the actual vector representation
-                            us = test_etc['us']
-                            vs = test_etc['vs']
-                            zs = test_etc['outs']
-                            S_new = torch.einsum('ijk,ilk->jl',us,us) / us.shape[0] / us.shape[2]
-                            S_u = (S_u * (self.train_idx - 1) + S_new) / self.train_idx
-                            S_new = torch.einsum('ijk,ilk->jl',vs,vs) / vs.shape[0] / vs.shape[2]
-                            S_v = (S_v * (self.train_idx - 1) + S_new) / self.train_idx
-                            S_new = torch.einsum('ijk,ilk->jl',zs,zs) / zs.shape[0] / zs.shape[2]
-                            S_z = (S_z * (self.train_idx - 1) + S_new) / self.train_idx
+                            self.P_s, S_s = self.calc_P(S_s, test_etc['ins'])
+                            self.P_u, S_u = self.calc_P(S_u, test_etc['us'])
+                            self.P_v, S_v = self.calc_P(S_v, test_etc['vs'])
+                            self.P_z, S_z = self.calc_P(S_z, test_etc['outs'])
+                            logging.info(f'...updated projection matrices for OWM')
 
-                            alpha = 1e-3
-                            self.P_u = torch.inverse(1/alpha * S_u + torch.eye(S_u.shape[0]))
-                            self.P_v = torch.inverse(1/alpha * S_v + torch.eye(S_v.shape[0]))
-                            self.P_z = torch.inverse(1/alpha * S_z + torch.eye(S_z.shape[0]))
-                            logging.info(f'...updated projection matrix for OWM')
+                        # done processing prior task, move on to the next one or quit
+                        self.train_idx += 1
                         if self.train_idx == len(self.args.train_order):
                             ending = True
                             logging.info(f'...done training all tasks! ending')

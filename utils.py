@@ -47,13 +47,13 @@ def update_args(args, new_args, to_bunch=True):
     return dic
 
 # fills args with keys from default args, not overwriting unless *maybe* the Nones
-def fill_args(args, default_args, overwrite_None=False, to_bunch=True):
+def fill_args(args, default_args, overwrite_none=False, to_bunch=True):
     dic = args if type(args) is dict else vars(args)
     new_dic = default_args if type(default_args) is dict else vars(default_args)
     for k in new_dic.keys():
         if k not in dic:
             dic[k] = new_dic[k]
-        elif overwrite_None and dic[k] is None:
+        elif overwrite_none and dic[k] is None:
             dic[k] = new_dic[k]
     if to_bunch:
         return Bunch(dic)

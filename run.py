@@ -77,6 +77,7 @@ def parse_args():
     parser.add_argument('--x_noise', type=float, default=0)
     parser.add_argument('--m_noise', type=float, default=0)
     parser.add_argument('--no_bias', action='store_true')
+    parser.add_argument('--ff_bias', action='store_true')
     parser.add_argument('--m1_act', type=str, default='none', help='act fn bw M_f and W_f')
     parser.add_argument('--m2_act', type=str, default='none', help='act fn bw W_ro and M_ro')
     parser.add_argument('--out_act', type=str, default=None, help='output activation')
