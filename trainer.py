@@ -223,7 +223,7 @@ class Trainer:
         S_avg = (S * self.train_idx + S_new) / (self.train_idx + 1)
         alpha = 1e-3
         P = torch.inverse(S_avg / alpha + torch.eye(S_avg.shape[0]))
-        return S_avg, P
+        return P, S_avg
 
     def train(self, ix_callback=None):
         ix = 0

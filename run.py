@@ -76,7 +76,7 @@ def parse_args():
     parser.add_argument('--res_noise', type=float, default=0)
     parser.add_argument('--x_noise', type=float, default=0)
     parser.add_argument('--m_noise', type=float, default=0)
-    parser.add_argument('--no_bias', action='store_true')
+    parser.add_argument('--res_bias', action='store_true')
     parser.add_argument('--ff_bias', action='store_true')
     parser.add_argument('--m1_act', type=str, default='none', help='act fn bw M_f and W_f')
     parser.add_argument('--m2_act', type=str, default='none', help='act fn bw W_ro and M_ro')
@@ -167,8 +167,8 @@ def adjust_args(args):
     # uses a new seed
     if args.model_path is not None:
         config = get_config(args.model_path)
-        args = fill_args(args, config, overwrite_none=True)
-        enforce_same = ['N', 'D1', 'D2', 'net', 'bias', 'use_reservoir']
+        args = fill_args(args, config, overwrite_None=True)
+        enforce_same = ['N', 'D1', 'D2', 'net', 'res_bias', 'use_reservoir']
         for v in enforce_same:
             if v in config and args.__dict__[v] != config[v]:
                 print(f'Warning: based on config, changed {v} from {args.__dict__[v]} -> {config[v]}')
@@ -183,7 +183,6 @@ def adjust_args(args):
         args.train_order = list(range(len(args.dataset)))
 
     # TODO
-    args.bias = not args.no_bias
     if 'rsg' in args.dataset[0]:
         args.out_act = 'exp'
     else:

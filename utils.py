@@ -47,13 +47,13 @@ def update_args(args, new_args, to_bunch=True):
     return dic
 
 # fills args with keys from default args, not overwriting unless *maybe* the Nones
-def fill_args(args, default_args, overwrite_none=False, to_bunch=True):
+def fill_args(args, default_args, overwrite_None=False, to_bunch=True):
     dic = args if type(args) is dict else vars(args)
     new_dic = default_args if type(default_args) is dict else vars(default_args)
     for k in new_dic.keys():
         if k not in dic:
             dic[k] = new_dic[k]
-        elif overwrite_none and dic[k] is None:
+        elif overwrite_None and dic[k] is None:
             dic[k] = new_dic[k]
     if to_bunch:
         return Bunch(dic)
@@ -80,7 +80,7 @@ def get_file_args(config_file, to_bunch=True):
 
 
 # also works with dicts now
-# def fill_undefined_args(args, default_args, overwrite_none=False, to_bunch=False):
+# def fill_undefined_args(args, default_args, overwrite_None=False, to_bunch=False):
 #     # so we don't overwrite the original args
 #     args = copy.deepcopy(args)
 #     # takes care of default args not being a dict
@@ -94,7 +94,7 @@ def get_file_args(config_file, to_bunch=True):
 #     for k in default_args.keys():
 #         if k not in args_dict:
 #             args_dict[k] = default_args[k]
-#         elif overwrite_none and args_dict[k] is None:
+#         elif overwrite_None and args_dict[k] is None:
 #             args_dict[k] = default_args[k]
 
 #     if to_bunch:
