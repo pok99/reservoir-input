@@ -150,13 +150,22 @@ class Trainer:
                 trial_loss += k_loss.detach().item()
                 if training:
                     k_loss.backward()
-                    # multiply gradients by P
-                    if self.args.sequential and self.args.owm and self.train_idx > 0:
-                        self.net.M_u.weight.grad = self.P_u @ self.net.M_u.weight.grad @ self.P_s
-                        self.net.M_ro.weight.grad = self.P_z @ self.net.M_ro.weight.grad @ self.P_v
-                        if self.args.ff_bias:
-                            self.net.M_u.bias.grad = self.P_u @ self.net.M_u.bias.grad
-                            self.net.M_ro.bias.grad = self.P_z @ self.net.M_ro.bias.grad
+                    # strategies for continual learning that involve modifying gradients
+                    if self.args.sequential and self.train_idx > 0:
+                        if self.args.owm:
+                            # orthogonal weight modification
+                            self.net.M_u.weight.grad = self.P_u @ self.net.M_u.weight.grad @ self.P_s
+                            self.net.M_ro.weight.grad = self.P_z @ self.net.M_ro.weight.grad @ self.P_v
+                            if self.args.ff_bias:
+                                self.net.M_u.bias.grad = self.P_u @ self.net.M_u.bias.grad
+                                self.net.M_ro.bias.grad = self.P_z @ self.net.M_ro.bias.grad
+                        elif self.args.swt:
+                            # keeping sensory and output weights constant after learning first task
+                            self.net.M_u.weight.grad[:,:self.args.L] = 0
+                            self.net.M_ro.weight.grad[:] = 0
+                            if self.args.ff_bias:
+                                self.net.M_u.bias.grad[:] = 0
+                                self.net.M_ro.bias.grad[:] = 0
                             
                 k_loss = 0.
                 self.net.reservoir.x = self.net.reservoir.x.detach()
@@ -218,7 +227,7 @@ class Trainer:
         self.test_loader = self.test_loaders[self.train_idx]
         return losses
 
-    def calc_P(self, S, states):
+    def update_P(self, S, states):
         S_new = torch.einsum('ijk,ilk->jl',states,states) / states.shape[0] / states.shape[2]
         S_avg = (S * self.train_idx + S_new) / (self.train_idx + 1)
         alpha = 1e-3
@@ -289,9 +298,9 @@ class Trainer:
                             # 0th dimension is test batch size, 2nd dimension is number of timesteps
                             # 1st dimension is the actual vector representation
                             self.P_s, S_s = self.calc_P(S_s, test_etc['ins'])
-                            self.P_u, S_u = self.calc_P(S_u, test_etc['us'])
-                            self.P_v, S_v = self.calc_P(S_v, test_etc['vs'])
-                            self.P_z, S_z = self.calc_P(S_z, test_etc['outs'])
+                            self.P_u, S_u = self.update_P(S_u, test_etc['us'])
+                            self.P_v, S_v = self.update_P(S_v, test_etc['vs'])
+                            self.P_z, S_z = self.update_P(S_z, test_etc['outs'])
                             logging.info(f'...updated projection matrices for OWM')
 
                         # done processing prior task, move on to the next one or quit

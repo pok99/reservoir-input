@@ -78,7 +78,7 @@ def parse_args():
     parser.add_argument('--m_noise', type=float, default=0)
     parser.add_argument('--res_bias', action='store_true')
     parser.add_argument('--ff_bias', action='store_true')
-    parser.add_argument('--m1_act', type=str, default='none', help='act fn bw M_f and W_f')
+    parser.add_argument('--m1_act', type=str, default='none', help='act fn bw M_u and W_u')
     parser.add_argument('--m2_act', type=str, default='none', help='act fn bw W_ro and M_ro')
     parser.add_argument('--out_act', type=str, default=None, help='output activation')
 
@@ -86,8 +86,9 @@ def parse_args():
     # parser.add_argument('-a', '--add_tasks', type=str, nargs='+', help='add tasks to previously trained reservoir')
     parser.add_argument('-s', '--sequential', action='store_true', help='sequential training')
     parser.add_argument('--owm', action='store_true', help='use orthogonal weight modification')
+    parser.add_argument('--swt', action='store_true', help='use stimuli weight transfer')
     parser.add_argument('-o', '--train_order', type=int, nargs='+', default=[], help='ids of tasks to train on, in order if sequential flag is enabled. empty for all')
-    parser.add_argument('--seq_threshold', type=float, default=2, help='threshold for having solved a task before moving on to next one')
+    parser.add_argument('--seq_threshold', type=float, default=5, help='threshold for having solved a task before moving on to next one')
 
     # high-level arguments that control dataset manipulations
     parser.add_argument('--same_test', action='store_true', help='use entire dataset for both training and testing')
@@ -98,7 +99,7 @@ def parse_args():
     # adam parameters
     parser.add_argument('--batch_size', type=int, default=1, help='size of minibatch used')
     parser.add_argument('--lr', type=float, default=1e-4, help='learning rate. adam only')
-    parser.add_argument('--n_epochs', type=int, default=20, help='number of epochs to train for. adam only')
+    parser.add_argument('--n_epochs', type=int, default=40, help='number of epochs to train for. adam only')
     parser.add_argument('--conv_type', type=str, choices=['patience', 'grad'], default='patience', help='how to determine convergence. adam only')
     parser.add_argument('--patience', type=int, default=4000, help='stop training if loss doesn\'t decrease. adam only')
     parser.add_argument('--l2_reg', type=float, default=0, help='amount of l2 regularization')

@@ -136,7 +136,10 @@ class CSG(Task):
 class DelayProAnti(Task):
     def __init__(self, args, dset_id=None, n=None):
         super().__init__(args.t_len, dset_id, n)
-        theta = np.random.random() * 2 * np.pi
+        if args.angles is None:
+            theta = np.random.random() * 2 * np.pi
+        else:
+            theta = np.random.choice(args.angles) * np.pi / 180
         stimulus = [np.cos(theta), np.sin(theta)]
 
         self.t_type = args.t_type
@@ -168,7 +171,10 @@ class DelayProAnti(Task):
 class MemoryProAnti(Task):
     def __init__(self, args, dset_id=None, n=None):
         super().__init__(args.t_len, dset_id, n)
-        theta = np.random.random() * 2 * np.pi
+        if args.angles is None:
+            theta = np.random.random() * 2 * np.pi
+        else:
+            theta = np.random.choice(args.angles) * np.pi / 180
         stimulus = [np.cos(theta), np.sin(theta)]
 
         self.t_type = args.t_type
@@ -462,6 +468,9 @@ if __name__ == '__main__':
 
     # rsg arguments
     parser.add_argument('-i', '--intervals', nargs='*', type=int, default=None, help='select from rsg intervals')
+
+    # delay memory pro anti preset angles
+    parser.add_argument('--angles', nargs='*', type=float, default=None, help='angles in degrees for dmpa tasks')
 
     parser.add_argument('--motifs', type=str, help='path to motifs')
     parser.add_argument('-a', '--task_args', nargs='*', default=[], help='terms to specify parameters of trial type')

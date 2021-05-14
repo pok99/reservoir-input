@@ -97,7 +97,7 @@ def collater(samples):
     return xs, ys, trials
 
 # creates datasets and dataloaders
-def create_loaders(datasets, args, split_test=True, test_size=1):
+def create_loaders(datasets, args, split_test=True, test_size=1, context_filter=[]):
     dsets_train = []
     dsets_test = []
     for i, dpath in enumerate(datasets):
@@ -116,6 +116,7 @@ def create_loaders(datasets, args, split_test=True, test_size=1):
     if split_test:
         train_set = TrialDataset(dsets_train, args)
 
+    # TODO: make all this code better
     if args.sequential:
         # helper function for sequential loaders
         def create_subset_loaders(dset, batch_size, drop_last):
@@ -135,6 +136,28 @@ def create_loaders(datasets, args, split_test=True, test_size=1):
             train_loaders = create_subset_loaders(train_set, args.batch_size, True)
             return (train_set, train_loaders), (test_set, test_loaders)
         return (test_set, test_loaders)
+    # filter out some contexts
+    elif len(context_filter) != 0:
+        def create_context_loaders(dset, batch_size, drop_last):
+            max_idxs = dset.max_idxs
+            c_range = []
+            for i in range(len(datasets)):
+                if i in context_filter:
+                    continue
+                if i == 0:
+                    c_range += list(range(max_idxs[0]))
+                else:
+                    c_range += list(range(max_idxs[i-1], max_idxs[i]))
+            subset = Subset(dset, c_range)
+            loader = DataLoader(subset, batch_size=batch_size, shuffle=True, collate_fn=collater, drop_last=drop_last)
+            return loader
+        # create the loaders themselves
+        test_loaders = create_context_loaders(test_set, test_size, False)
+        if split_test:
+            train_loaders = create_context_loaders(train_set, args.batch_size, True)
+            return (train_set, train_loaders), (test_set, test_loaders)
+        return (test_set, test_loaders)
+        
     else:
         # otherwise it's quite simple, create a single dataset and loader
         test_loader = DataLoader(test_set, batch_size=test_size, shuffle=True, collate_fn=collater, drop_last=False)

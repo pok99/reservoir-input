@@ -25,8 +25,11 @@ def main(args):
     if len(args.dataset) == 0:
         args.dataset = config.dataset
 
-    n_reps = 1500
-    _, loader = create_loaders(args.dataset, config, split_test=False, test_size=n_reps)
+    n_reps = 1000
+    # don't show these contexts
+    context_filter = [1,3]
+
+    _, loader = create_loaders(args.dataset, config, split_test=False, test_size=n_reps, context_filter=context_filter)
     x, y, trials = next(iter(loader))
     A = get_states(net, x)
 
