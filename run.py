@@ -74,6 +74,8 @@ def parse_args():
     # parser.add_argument('--res_init_type', type=str, default='gaussian', help='')
     parser.add_argument('--res_init_g', type=float, default=1.5)
     parser.add_argument('--res_noise', type=float, default=0)
+    parser.add_argument('--fixed_pts', type=int, default=0, help='number of fixed pts to include as hopfield')
+    parser.add_argument('--hopfield_beta', type=float, default=2, help='beta to make patterns stronger')
     parser.add_argument('--x_noise', type=float, default=0)
     parser.add_argument('--m_noise', type=float, default=0)
     parser.add_argument('--res_bias', action='store_true')
@@ -87,7 +89,7 @@ def parse_args():
     parser.add_argument('-s', '--sequential', action='store_true', help='sequential training')
     parser.add_argument('--owm', action='store_true', help='use orthogonal weight modification')
     parser.add_argument('--swt', action='store_true', help='use stimuli weight transfer')
-    parser.add_argument('-o', '--train_order', type=int, nargs='+', default=[], help='ids of tasks to train on, in order if sequential flag is enabled. empty for all')
+    # parser.add_argument('-o', '--train_order', type=int, nargs='+', default=[], help='ids of tasks to train on, in order if sequential flag is enabled. empty for all')
     parser.add_argument('--seq_threshold', type=float, default=5, help='threshold for having solved a task before moving on to next one')
 
     # high-level arguments that control dataset manipulations

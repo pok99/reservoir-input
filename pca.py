@@ -27,7 +27,7 @@ def main(args):
 
     n_reps = 1000
     # don't show these contexts
-    context_filter = [1,3]
+    context_filter = []
 
     _, loader = create_loaders(args.dataset, config, split_test=False, test_size=n_reps, context_filter=context_filter)
     x, y, trials = next(iter(loader))

@@ -531,8 +531,8 @@ if __name__ == '__main__':
 
             elif t_type is FlipFlop:
                 for j in range(trial.dim):
-                    ax.plot(xr, trial_x[j], color=cols[j], lw=.5)
-                    ax.plot(xr, trial_y[j], color=cols[j], lw=1, ls='--', alpha=.9)
+                    ax.plot(xr, trial_x[j], color=cols[j], lw=.5, ls='--', alpha=.9)
+                    ax.plot(xr, trial_y[j], color=cols[j], lw=1)
 
             elif t_type in [DelayProAnti, MemoryProAnti]:
                 ax.plot(xr, trial_x[0], color='grey', lw=1, ls='--', alpha=.6)

@@ -175,9 +175,20 @@ class M2Reservoir(nn.Module):
                     # use representation layer in between as division bw trained / untrained parts
                     self.W_u = nn.Linear(self.args.D1, self.args.N, bias=False)
                     torch.nn.init.normal_(self.W_u.weight.data, std=self.args.res_init_g / np.sqrt(self.args.D1))
+
                 # recurrent weights
                 self.J = nn.Linear(self.args.N, self.args.N, bias=self.args.res_bias)
-                torch.nn.init.normal_(self.J.weight.data, std=self.args.res_init_g / np.sqrt(self.args.N))
+
+                if hasattr(self.args, 'fixed_pts') and self.args.fixed_pts > 0:
+                    # use hopfield network
+                    patterns = []
+                    for i in range(self.args.fixed_pts):
+                        patterns.append(np.random.randint(0, 2, self.args.N) * 2 - 1)
+                    W = hopfield_reservoir(self.args.N, self.args.res_init_g, patterns, self.args.hopfield_beta)
+                    self.J.weight.data = W
+                else:
+                    # regular reservoir
+                    torch.nn.init.normal_(self.J.weight.data, std=self.args.res_init_g / np.sqrt(self.args.N))
 
                 if self.args.D2 == 0:
                     # go straight to output
@@ -263,3 +274,15 @@ class M2Reservoir(nn.Module):
 
         if burn_in:
             self.burn_in(self.args.res_burn_steps)
+
+# creates reservoir with embedded hopfield patterns
+def hopfield_reservoir(N, g, patterns, beta):
+    W = torch.zeros((N, N))
+    W_rand = torch.normal(torch.zeros_like(W), g / np.sqrt(N))
+    W += W_rand
+    for p in patterns:
+        p_tensor = torch.as_tensor(p)
+        W_patt = torch.outer(p_tensor, p_tensor) / N
+        W += beta * W_patt
+
+    return W
