@@ -21,7 +21,7 @@ import pandas as pd
 # from network import BasicNetwork, Reservoir
 from network import M2Net
 
-from utils import log_this, load_rb, get_config, fill_args, update_args
+from utils import log_this, load_rb, get_config, update_args
 from helpers import get_optimizer, get_scheduler, get_criteria, create_loaders
 
 class Trainer:

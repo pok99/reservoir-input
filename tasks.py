@@ -17,7 +17,7 @@ from matplotlib import collections as matcoll
 import argparse
 
 # from motifs import gen_fn_motifs
-from utils import update_args, get_file_args, load_rb, Bunch
+from utils import update_args, load_args, load_rb, Bunch
 
 eps = 1e-6
 
@@ -433,14 +433,16 @@ def get_task_args(args):
 # get particular value(s) given name and casting type
 def get_tval(targs, name, default, dtype, n_vals=1):
     if name in targs:
+        # set parameter(s) if set in command line
         idx = targs.index(name)
-        if n_vals == 1:
+        if n_vals == 1: # one value to set
             val = dtype(targs[idx + 1])
-        else:
+        else: # multiple values to set
             vals = []
             for i in range(1, n_vals+1):
                 vals.append(dtype(targs[idx + i]))
     else:
+        # if parameter is not set in command line, set it to default
         val = default
     return val
 
@@ -463,31 +465,36 @@ if __name__ == '__main__':
 
     # general dataset arguments
     parser.add_argument('-t', '--t_type', default='rsg', help='type of trial to create')
-    # parser.add_argument('-l', '--t_len', type=int, default=500)
     parser.add_argument('-n', '--n_trials', type=int, default=2000)
 
-    # rsg arguments
+    # task-specific arguments
+    parser.add_argument('-a', '--task_args', nargs='*', default=[], help='terms to specify parameters of trial type')
+    # rsg intervals
     parser.add_argument('-i', '--intervals', nargs='*', type=int, default=None, help='select from rsg intervals')
-
     # delay memory pro anti preset angles
     parser.add_argument('--angles', nargs='*', type=float, default=None, help='angles in degrees for dmpa tasks')
-
-    parser.add_argument('--motifs', type=str, help='path to motifs')
-    parser.add_argument('-a', '--task_args', nargs='*', default=[], help='terms to specify parameters of trial type')
-
     
+
     args = parser.parse_args()
-    config_args = get_file_args(args.config)
-    task_args = get_task_args(args)
-    args = update_args(args, config_args)
-    args = update_args(args, task_args)
+    if args.config is not None:
+        # if using config file, load args from config, ignore everything else
+        config_args = load_args(args.config)
+        del config_args.name
+        del config_args.config
+        args = update_args(args, config_args)
+    else:
+        # add task-specific arguments. shouldn't need to do this if loading from config file
+        task_args = get_task_args(args)
+        args = update_args(args, task_args)
 
     args.argv = ' '.join(sys.argv)
 
     if args.mode == 'create':
+        # create and save a dataset
         dset, config = create_dataset(args)
         save_dataset(dset, args.name, config=config)
     elif args.mode == 'load':
+        # visualize a dataset
         dset = load_rb(args.name)
         t_type = type(dset[0])
         xr = np.arange(dset[0].t_len)

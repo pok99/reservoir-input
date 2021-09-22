@@ -19,7 +19,7 @@ import copy
 import pandas as pd
 
 
-from utils import log_this, load_rb, get_config, fill_args, update_args, get_file_args
+from utils import log_this, load_rb, get_config, update_args, load_args
 from helpers import get_optimizer, get_scheduler, get_criteria, create_loaders
 
 from tasks import *
@@ -78,17 +78,16 @@ def parse_args():
     parser.add_argument('--hopfield_beta', type=float, default=2, help='beta to make patterns stronger')
     parser.add_argument('--x_noise', type=float, default=0)
     parser.add_argument('--m_noise', type=float, default=0)
-    parser.add_argument('--res_bias', action='store_true')
-    parser.add_argument('--ff_bias', action='store_true')
+    parser.add_argument('--res_bias', action='store_true', help='bias term as part of recurrent connections, with J')
+    parser.add_argument('--ff_bias', action='store_true', help='bias in feedforward part of the network, with M_u and M_ro')
     parser.add_argument('--m1_act', type=str, default='none', help='act fn bw M_u and W_u')
     parser.add_argument('--m2_act', type=str, default='none', help='act fn bw W_ro and M_ro')
-    parser.add_argument('--out_act', type=str, default=None, help='output activation')
+    parser.add_argument('--out_act', type=str, default=None, help='output activation at the very end of the network')
 
     parser.add_argument('-d', '--dataset', type=str, nargs='+', help='dataset(s) to use. >1 means different contexts')
     # parser.add_argument('-a', '--add_tasks', type=str, nargs='+', help='add tasks to previously trained reservoir')
     parser.add_argument('-s', '--sequential', action='store_true', help='sequential training')
     parser.add_argument('--owm', action='store_true', help='use orthogonal weight modification')
-    parser.add_argument('--swt', action='store_true', help='use stimuli weight transfer')
     # parser.add_argument('-o', '--train_order', type=int, nargs='+', default=[], help='ids of tasks to train on, in order if sequential flag is enabled. empty for all')
     parser.add_argument('--seq_threshold', type=float, default=5, help='threshold for having solved a task before moving on to next one')
 
@@ -111,9 +110,6 @@ def parse_args():
     # adam lambdas
     parser.add_argument('--l1', type=float, default=1, help='weight of normal loss')
     parser.add_argument('--l2', type=float, default=1, help='weight of exponential loss')
-
-    # lbfgs-scipy parameters
-    parser.add_argument('--maxiter', type=int, default=10000, help='limit to # iterations. lbfgs-scipy only')
 
     # seeds
     parser.add_argument('--seed', type=int, help='general purpose seed')
@@ -149,7 +145,7 @@ def adjust_args(args):
 
     # loading from a config file
     if args.config is not None:
-        config = get_file_args(args.config)
+        config = load_args(args.config)
         args = update_args(args, config)
 
     # setting seeds
@@ -170,7 +166,7 @@ def adjust_args(args):
     # uses a new seed
     if args.model_path is not None:
         config = get_config(args.model_path)
-        args = fill_args(args, config, overwrite_None=True)
+        args = update_args(args, config, overwrite=None) # overwrite Nones only
         enforce_same = ['N', 'D1', 'D2', 'net', 'res_bias', 'use_reservoir']
         for v in enforce_same:
             if v in config and args.__dict__[v] != config[v]:

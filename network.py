@@ -10,7 +10,7 @@ import random
 import copy
 import sys
 
-from utils import Bunch, load_rb, fill_args
+from utils import Bunch, load_rb, update_args
 from helpers import get_activation, get_output_activation
 
 DEFAULT_ARGS = {
@@ -44,57 +44,10 @@ class TorchSeed:
         torch.set_rng_state(self.rng_pt)
 
 
-class BasicNetwork(nn.Module):
-    def __init__(self, args=DEFAULT_ARGS):
-        super().__init__()
-        args = fill_args(args, DEFAULT_ARGS, to_bunch=True)
-        self.args = args
-       
-        if not hasattr(self.args, 'network_seed'):
-            self.args.network_seed = random.randrange(1e6)
-
-        self._init_vars()
-        if self.args.model_path is not None:
-            self.load_state_dict(torch.load(self.args.model_path))
-        
-        self.out_act = get_output_activation(self.args)
-
-        self.reset()
-
-    def _init_vars(self):
-        rng_pt = torch.get_rng_state()
-        torch.manual_seed(self.args.network_seed)
-        self.W_f = nn.Linear(self.args.L + self.args.T, self.args.D, bias=False)
-        if self.args.use_reservoir:
-            self.reservoir = M1Reservoir(self.args)
-        else:
-            self.W_ro = nn.Linear(self.args.D, self.args.Z, bias=False)
-        torch.set_rng_state(rng_pt)
-
-    def forward(self, o, extras=False):
-        # pass through the forward part
-        u = self.W_f(o)
-        if self.args.use_reservoir:
-            z, etc = self.reservoir(u, extras=True)
-        else:
-            z = self.W_ro(u)
-        z = self.out_act(z)
-
-        if not extras:
-            return z
-        elif self.args.use_reservoir:
-            return z, {'x': etc['x'], 'u': u}
-        else:
-            return z, {'u': u}
-
-    def reset(self, res_state=None, device=None):
-        if self.args.use_reservoir:
-            self.reservoir.reset(res_state=res_state, device=device)
-
 class M2Net(nn.Module):
     def __init__(self, args=DEFAULT_ARGS):
         super().__init__()
-        args = fill_args(args, DEFAULT_ARGS, to_bunch=True)
+        args = update_args(DEFAULT_ARGS, args)
         self.args = args
        
         if not hasattr(self.args, 'network_seed'):
@@ -114,6 +67,8 @@ class M2Net(nn.Module):
             self.M_u = nn.Linear(self.args.L + self.args.T, D1, bias=self.args.ff_bias)
             self.M_ro = nn.Linear(D2, self.args.Z, bias=self.args.ff_bias)
         self.reservoir = M2Reservoir(self.args)
+
+        # load params for reservoir if they exist
         if self.args.M_path is not None:
             M_params = torch.load(self.args.M_path)
             # TODO load M_params
@@ -147,7 +102,7 @@ class M2Net(nn.Module):
 class M2Reservoir(nn.Module):
     def __init__(self, args=DEFAULT_ARGS):
         super().__init__()
-        self.args = fill_args(args, DEFAULT_ARGS, to_bunch=True)
+        self.args = update_args(DEFAULT_ARGS, args)
 
         if not hasattr(self.args, 'res_seed'):
             self.args.res_seed = random.randrange(1e6)

@@ -14,60 +14,18 @@ import pdb
 import re
 # import pandas as pd
 
-
-# tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
-# os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-
 class LogObject(object):
     pass
 
-# use yaml config files; note what is actually set via the config file
-def add_yaml_args(args, config_file):
-    if config_file:
-        config = yaml.safe_load(open(config_file))
-        dic = vars(args)
-        # all(map(dic.pop, config))
-        for c, v in config.items():
-            dic[c] = v
-            # if c in dic.keys():
-            #     logging.info(f'{c} is set via config: {v}')
-            # else:
-            #     logging.warning(f'{c} is not set to begin with: {v}')
-    return args
-
-# merge these two functions at some point
-
-# combine two args, overwriting with the second
-def update_args(args, new_args, to_bunch=True):
-    dic = args if type(args) is dict else vars(args)
-    new_dic = new_args if type(new_args) is dict else vars(new_args)
-    dic.update(new_dic)
-    if to_bunch:
-        return Bunch(dic)
-    return dic
-
-# fills args with keys from default args, not overwriting unless *maybe* the Nones
-def fill_args(args, default_args, overwrite_None=False, to_bunch=True):
-    dic = args if type(args) is dict else vars(args)
-    new_dic = default_args if type(default_args) is dict else vars(default_args)
-    for k in new_dic.keys():
-        if k not in dic:
-            dic[k] = new_dic[k]
-        elif overwrite_None and dic[k] is None:
-            dic[k] = new_dic[k]
-    if to_bunch:
-        return Bunch(dic)
-    return dic
-
 # turn arbitrary file into args to be used
-def get_file_args(config_file, to_bunch=True):
-    if config_file:
+def load_args(path=None, to_bunch=True):
+    if path:
         try:
             # maybe it's yaml
-            config = yaml.safe_load(open(config_file))
+            config = yaml.safe_load(open(path))
         except:
             # maybe it's json
-            config = json.load(open(config_file, 'r'))
+            config = json.load(open(path, 'r'))
     else:
         config = {}
     if to_bunch:
@@ -78,28 +36,16 @@ def get_file_args(config_file, to_bunch=True):
     else:
         return config
 
-
-# also works with dicts now
-# def fill_undefined_args(args, default_args, overwrite_None=False, to_bunch=False):
-#     # so we don't overwrite the original args
-#     args = copy.deepcopy(args)
-#     # takes care of default args not being a dict
-#     if type(default_args) is not dict:
-#         default_args = default_args.__dict__
-#     # only change the args dictionary
-#     if type(args) is dict:
-#         args_dict = args
-#     else:
-#         args_dict = args.__dict__
-#     for k in default_args.keys():
-#         if k not in args_dict:
-#             args_dict[k] = default_args[k]
-#         elif overwrite_None and args_dict[k] is None:
-#             args_dict[k] = default_args[k]
-
-#     if to_bunch:
-#         args = Bunch(**args_dict)
-#     return args
+# combine two args, overwriting with the second
+def update_args(args, new_args, overwrite=True, to_bunch=True):
+    dic = args if type(args) is dict else vars(args)
+    new_dic = new_args if type(new_args) is dict else vars(new_args)
+    for k in new_dic.keys():
+        if overwrite is True or k not in dic or (dic[k] is None and overwrite is None) :
+            dic[k] = new_dic[k]
+    if to_bunch:
+        return Bunch(dic)
+    return dic
 
 
 # produce run id and create log directory
