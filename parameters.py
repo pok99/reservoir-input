@@ -16,21 +16,22 @@ def create_parameters(debug):
     lr = 1e-4
     n_epochs = 20
     patience = 5000
-    batch_size = 2
+    batch_size = 3
 
     # usually have this off but if we wanna check models, set it on
     log_checkpoint_models = False
 
     n_seeds = 2
-    n_rseeds = 9
+    n_rseeds = 2
 
-    m_noises = [0, 2, 5]
+    m_noises = [0, 2]
     r_noises = [0.01]
-    train_parts = [['all'], ['M_u', 'M_ro']]
+    train_parts = [['M_u', 'M_ro']]
+    # train_parts = [['all'], ['M_u', 'M_ro']]
 
     datasets = [
         # ['datasets/rsg-100-150.pkl', 'datasets/rsg-150-200.pkl'],
-        []
+        ['datasets/delaypro.pkl', 'datasets/delayanti.pkl', 'datasets/memorypro.pkl', 'datasets/memoryanti.pkl']
     ]
     losses = [
         # ['mse-e'],
@@ -38,7 +39,7 @@ def create_parameters(debug):
     ]
 
     if debug:
-        datasets = [['datasets/rsg-100-150.pkl']]
+        datasets = [['datasets/delaypro.pkl']]
         Ns = [80]
         D1s = [20]
         D2s = [10]

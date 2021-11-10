@@ -217,10 +217,10 @@ if __name__ == '__main__':
         csv_exists = os.path.exists(csv_path)
         with open(csv_path, 'a') as f:
             writer = csv.writer(f, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
-            labels_csv = ['slurm_id', 'N', 'D1', 'D2', 'seed', 'rseed', 'mnoise', 'rnoise', 'dset', 'niter', 'tparts', 'loss']
+            labels_csv = ['slurm_id', 'N', 'D1', 'D2', 'seed', 'rseed', 'fp', 'fb', 'mnoise', 'rnoise', 'dset', 'niter', 'tparts', 'loss']
             vals_csv = [
                 args.slurm_id, args.N, args.D1, args.D2, args.seed,
-                args.res_seed, args.m_noise, args.res_noise,
+                args.res_seed, args.fixed_pts, args.fixed_beta, args.m_noise, args.res_noise,
                 args.dataset, n_iters, '-'.join(args.train_parts), best_loss
             ]
             if args.optimizer != 'lbfgs':
