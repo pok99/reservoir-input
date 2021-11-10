@@ -11,7 +11,18 @@ import copy
 import sys
 
 from utils import Bunch, load_rb, update_args
-from helpers import get_activation, get_output_activation
+from helpers import get_activation
+
+# for easy rng manipulation
+class TorchSeed:
+    def __init__(self, seed):
+        self.seed = seed
+    def __enter__(self):
+        self.rng_pt = torch.get_rng_state()
+        torch.manual_seed(self.seed)
+    def __exit__(self, type, value, traceback):
+        torch.set_rng_state(self.rng_pt)
+
 
 DEFAULT_ARGS = {
     'L': 2,
@@ -27,30 +38,19 @@ DEFAULT_ARGS = {
     'bias': True,
     'network_delay': 0,
     'out_act': 'none',
-    # 'stride': 1,
     'model_path': None,
+    'res_path': None,
 
-    'res_path': None
+    'res_seed': None,
+    'res_x_seed': None
 }
-
-# for easy rng manipulation
-class TorchSeed:
-    def __init__(self, seed):
-        self.seed = seed
-    def __enter__(self):
-        self.rng_pt = torch.get_rng_state()
-        torch.manual_seed(self.seed)
-    def __exit__(self, type, value, traceback):
-        torch.set_rng_state(self.rng_pt)
-
 
 class M2Net(nn.Module):
     def __init__(self, args=DEFAULT_ARGS):
         super().__init__()
-        args = update_args(DEFAULT_ARGS, args)
-        self.args = args
+        self.args = update_args(DEFAULT_ARGS, args)
        
-        if not hasattr(self.args, 'network_seed'):
+        if self.args.network_seed is None:
             self.args.network_seed = random.randrange(1e6)
 
         self.out_act = get_activation(self.args.out_act)
@@ -104,9 +104,9 @@ class M2Reservoir(nn.Module):
         super().__init__()
         self.args = update_args(DEFAULT_ARGS, args)
 
-        if not hasattr(self.args, 'res_seed'):
+        if self.args.res_seed is None:
             self.args.res_seed = random.randrange(1e6)
-        if not hasattr(self.args, 'res_x_seed'):
+        if self.args.res_x_seed is None:
             self.args.res_x_seed = np.random.randint(1e6)
 
         self.tau_x = 10
@@ -152,7 +152,13 @@ class M2Reservoir(nn.Module):
                     # use low-D representation layer bw output
                     self.W_ro = nn.Linear(self.args.N, self.args.D2, bias=self.args.res_bias)
                     torch.nn.init.normal_(self.W_ro.weight.data, std=self.args.res_init_g / np.sqrt(self.args.D2))
-                    
+
+    def add_fixed_points(self, patterns, beta):
+        # use hopfield network
+        for p in patterns:
+            p_tensor = torch.as_tensor(p)
+            W_patt = torch.outer(p_tensor, p_tensor) / self.args.N
+            self.J.weight.data += beta * W_patt
 
     def burn_in(self, steps):
         for i in range(steps):

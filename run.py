@@ -26,30 +26,6 @@ from tasks import *
 
 from trainer import Trainer
 
-# TODO
-network_params = [
-    'L', 'D1', 'D2', 'N', 'Z', 'net', 'x_noise', 'm_noise', 'res_noise', 'res_init_g',
-    'train_parts', 'model_path', 'model_config_path', 
-    'separate_signal', 'same_test',
-    'optimizer', 'k', 'batch_size', 'lr', 'n_epochs', 'conv_type', 'patience', 'l2_reg', 's_rate', 'loss', 'l1', 'l2',
-    'seed', 'res_seed', 'res_x_seed', 'res_burn_steps', 'res_x_init'
-]
-
-DEFAULTS = {
-    'D1': 50,
-    'D2': 50,
-    'N': 300,
-    'net': 'M2',
-    'train_parts': ['M_u', 'M_ro'],
-    'res_init_g': 1.5,
-    'res_noise': 0,
-    'x_noise': 0,
-    'm_noise': 0,
-    'm1_act': 'none',
-    'm2_act': 'none'
-}
-
-
 def parse_args():
     parser = argparse.ArgumentParser(description='')
     # parser.add_argument('-L', type=int, default=5, help='latent input dimension')
@@ -59,9 +35,7 @@ def parse_args():
     # parser.add_argument('-Z', type=int, default=5, help='output dimension')
 
     parser.add_argument('--net', type=str, default='M2', choices=['basic', 'M2'])
-
     parser.add_argument('--train_parts', type=str, nargs='+', default=['M_u', 'M_ro'])
-
     parser.add_argument('-c', '--config', type=str, default=None, help='use args from config file')
     
     # make sure model_config path is specified if you use any paths! it ensures correct dimensions, bias, etc.
@@ -70,30 +44,30 @@ def parse_args():
     parser.add_argument('--M_path', type=str, default=None, help='start training from certain in/out representations')
     parser.add_argument('--res_path', type=str, default=None, help='start training from certain reservoir representation')
     
-    # network manipulation
+    # network arguments
     # parser.add_argument('--res_init_type', type=str, default='gaussian', help='')
     parser.add_argument('--res_init_g', type=float, default=1.5)
     parser.add_argument('--res_noise', type=float, default=0)
-    parser.add_argument('--fixed_pts', type=int, default=0, help='number of fixed pts to include as hopfield')
-    parser.add_argument('--hopfield_beta', type=float, default=2, help='beta to make patterns stronger')
+    # parser.add_argument('--fixed_pts', type=int, default=0, help='number of fixed pts to include as hopfield')
+    # parser.add_argument('--hopfield_beta', type=float, default=2, help='beta to make patterns stronger')
     parser.add_argument('--x_noise', type=float, default=0)
     parser.add_argument('--m_noise', type=float, default=0)
     parser.add_argument('--res_bias', action='store_true', help='bias term as part of recurrent connections, with J')
     parser.add_argument('--ff_bias', action='store_true', help='bias in feedforward part of the network, with M_u and M_ro')
     parser.add_argument('--m1_act', type=str, default='none', help='act fn bw M_u and W_u')
     parser.add_argument('--m2_act', type=str, default='none', help='act fn bw W_ro and M_ro')
-    parser.add_argument('--out_act', type=str, default=None, help='output activation at the very end of the network')
+    parser.add_argument('--out_act', type=str, default='none', help='output activation at the very end of the network')
 
+    # dataset arguments
     parser.add_argument('-d', '--dataset', type=str, nargs='+', help='dataset(s) to use. >1 means different contexts')
     # parser.add_argument('-a', '--add_tasks', type=str, nargs='+', help='add tasks to previously trained reservoir')
     parser.add_argument('-s', '--sequential', action='store_true', help='sequential training')
     parser.add_argument('--owm', action='store_true', help='use orthogonal weight modification')
     # parser.add_argument('-o', '--train_order', type=int, nargs='+', default=[], help='ids of tasks to train on, in order if sequential flag is enabled. empty for all')
-    parser.add_argument('--seq_threshold', type=float, default=5, help='threshold for having solved a task before moving on to next one')
-
-    # high-level arguments that control dataset manipulations
+    # parser.add_argument('--seq_threshold', type=float, default=5, help='threshold for having solved a task before moving on to next one')
     parser.add_argument('--same_test', action='store_true', help='use entire dataset for both training and testing')
     
+    # training arguments
     parser.add_argument('--optimizer', choices=['adam', 'sgd', 'rmsprop', 'lbfgs'], default='adam')
     parser.add_argument('--k', type=int, default=0, help='k for t-bptt. use 0 for full bptt')
 

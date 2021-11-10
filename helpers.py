@@ -248,9 +248,6 @@ def get_activation(name):
         fn = lambda x: x
     return fn
 
-def get_output_activation(args):
-    return get_activation(args.out_act)
-
 def get_dim(a):
     if hasattr(a, '__iter__'):
         return len(a)

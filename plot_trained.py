@@ -11,7 +11,7 @@ import pdb
 import json
 
 from helpers import sigmoid
-from utils import load_rb, get_config, fill_args
+from utils import load_rb, get_config, update_args
 from testers import load_model_path, test_model
 
 from tasks import *
@@ -36,7 +36,7 @@ if args.config is None:
     config = get_config(args.model, ctype='model')
 else:
     config = json.load(open(args.config, 'r'))
-config = fill_args(args, config, overwrite_None=True)
+config = update_args(args, config)
 dsets = config.dataset
 
 net = load_model_path(args.model, config=config)

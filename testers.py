@@ -8,7 +8,7 @@ import pdb
 import json
 import sys
 
-from network import BasicNetwork, M2Net
+from network import M2Net
 from utils import Bunch, load_rb, get_config
 
 from helpers import get_criteria, create_loaders

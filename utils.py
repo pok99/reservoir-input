@@ -37,6 +37,7 @@ def load_args(path=None, to_bunch=True):
         return config
 
 # combine two args, overwriting with the second
+# overwrite can take three possible values: True, False, or None (in which case overwrite Nones only)
 def update_args(args, new_args, overwrite=True, to_bunch=True):
     dic = args if type(args) is dict else vars(args)
     new_dic = new_args if type(new_args) is dict else vars(new_args)
