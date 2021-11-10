@@ -2,13 +2,16 @@ import numpy as np
 import torch
 import torch.nn as nn
 
+import matplotlib.pyplot as plt
+import fig_format
+
 import random
 import os
 import pdb
 import json
 import sys
 
-from network import M2Net
+from network import M2Net, M2Reservoir
 from utils import Bunch, load_rb, get_config
 
 from helpers import get_criteria, create_loaders
@@ -85,3 +88,62 @@ def get_states(net, x):
 
     A = torch.stack(states, dim=1)
     return A
+
+def test_fixed_pts():
+    torch.manual_seed(4)
+    np.random.seed(3)
+    random.seed(0)
+
+    D2 = 3
+    D1 = 50
+    fixed_pts = 2
+    t_len = 1000
+    args = Bunch(
+        N=500,
+        D1=D1,
+        D2=D2,
+        # fixed_pts=fixed_pts,
+        fixed_beta=1.6,
+        res_x_seed=0,
+        res_seed=0,
+        res_init_g=1.5
+    )
+    reservoir = M2Reservoir(args)
+
+    if fixed_pts > 0:
+        # patterns = (2 * np.eye(args.N)-1)[:fixed_pts, :]
+        reservoir.add_fixed_points(fixed_pts)
+        # print(len(patterns))
+
+    # pdb.set_trace()
+    us = np.random.normal(0, 1, (16, D1))
+    # us = np.zeros((16, D1))
+    # us = np.random.normal(0, 1, (1, D1)) + np.random.normal(0, 0.1, (16, D1))
+    us = torch.as_tensor(us, dtype=torch.float)
+    vs = []
+    for i, u in enumerate(us):
+        reservoir.reset()
+        trial_vs = []
+        for t in range(t_len):
+            if t < 200:
+                v = reservoir(u)
+            else:
+                v = reservoir(None)
+            trial_vs.append(v.detach())
+        print(reservoir.x.detach().numpy()[0,:5])
+        trial_vs = torch.cat(trial_vs)
+        vs.append(trial_vs.numpy())
+
+    fig, axes = plt.subplots(nrows=4, ncols=4, sharex=True, sharey=True, figsize=(16,12))
+    cools = plt.cm.cool(np.linspace(0,1,D2))
+    xaxis = range(t_len)
+    for i, ax in enumerate(axes.ravel()):
+        for j in range(D2):
+            ax.plot(xaxis, vs[i][:,j], color=cools[j])
+
+    fig_format.hide_frame(*axes.ravel())
+
+    plt.show()
+
+if __name__ == '__main__':
+    test_fixed_pts()

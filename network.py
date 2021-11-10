@@ -35,12 +35,17 @@ DEFAULT_ARGS = {
     'res_init_g': 1.5,
     'res_burn_steps': 200,
     'res_noise': 0,
-    'bias': True,
-    'network_delay': 0,
+
+    'ff_bias': True,
+    'res_bias': False,
+
+    'm1_act': 'none',
+    'm2_act': 'none',
     'out_act': 'none',
     'model_path': None,
     'res_path': None,
 
+    'network_seed': None,
     'res_seed': None,
     'res_x_seed': None
 }
@@ -133,17 +138,7 @@ class M2Reservoir(nn.Module):
 
                 # recurrent weights
                 self.J = nn.Linear(self.args.N, self.args.N, bias=self.args.res_bias)
-
-                if hasattr(self.args, 'fixed_pts') and self.args.fixed_pts > 0:
-                    # use hopfield network
-                    patterns = []
-                    for i in range(self.args.fixed_pts):
-                        patterns.append(np.random.randint(0, 2, self.args.N) * 2 - 1)
-                    W = hopfield_reservoir(self.args.N, self.args.res_init_g, patterns, self.args.hopfield_beta)
-                    self.J.weight.data = W
-                else:
-                    # regular reservoir
-                    torch.nn.init.normal_(self.J.weight.data, std=self.args.res_init_g / np.sqrt(self.args.N))
+                torch.nn.init.normal_(self.J.weight.data, std=self.args.res_init_g / np.sqrt(self.args.N))
 
                 if self.args.D2 == 0:
                     # go straight to output
@@ -153,12 +148,16 @@ class M2Reservoir(nn.Module):
                     self.W_ro = nn.Linear(self.args.N, self.args.D2, bias=self.args.res_bias)
                     torch.nn.init.normal_(self.W_ro.weight.data, std=self.args.res_init_g / np.sqrt(self.args.D2))
 
-    def add_fixed_points(self, patterns, beta):
-        # use hopfield network
+    # add designated fixed points using hopfield network
+    def add_fixed_points(self, n_patterns):
+        patterns = (2 * torch.eye(self.args.N)-1)[:n_patterns, :]
+        W_patt = torch.zeros((self.args.N, self.args.N))
         for p in patterns:
             p_tensor = torch.as_tensor(p)
-            W_patt = torch.outer(p_tensor, p_tensor) / self.args.N
-            self.J.weight.data += beta * W_patt
+            W_patt += torch.outer(p_tensor, p_tensor)
+        self.J.weight.data += self.args.fixed_beta * W_patt / self.args.N / n_patterns
+
+        # pdb.set_trace()
 
     def burn_in(self, steps):
         for i in range(steps):

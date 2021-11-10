@@ -49,6 +49,9 @@ class Trainer:
 
         # self.net = BasicNetwork(self.args)
         self.net = M2Net(self.args)
+        # add hopfield net patterns
+        if hasattr(self.args, 'fixed_pts') and self.args.fixed_pts > 0:
+            self.net.reservoir.add_fixed_points(self.args.fixed_pts)
         self.net.to(self.device)
         
         # print('resetting network')
