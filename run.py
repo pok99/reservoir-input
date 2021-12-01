@@ -57,6 +57,7 @@ def parse_args():
     parser.add_argument('--m1_act', type=str, default='none', help='act fn bw M_u and W_u')
     parser.add_argument('--m2_act', type=str, default='none', help='act fn bw W_ro and M_ro')
     parser.add_argument('--out_act', type=str, default='none', help='output activation at the very end of the network')
+    parser.add_argument('--net_fb', action='store_true', help='feedback from network output to input')
 
     # dataset arguments
     parser.add_argument('-d', '--dataset', type=str, nargs='+', help='dataset(s) to use. >1 means different contexts')
@@ -84,6 +85,9 @@ def parse_args():
     # adam lambdas
     parser.add_argument('--l1', type=float, default=1, help='weight of normal loss')
     parser.add_argument('--l2', type=float, default=1, help='weight of exponential loss')
+
+    # lbfgs parameters
+    parser.add_argument('--maxiter', type=int, default=50, help='lbfgs max iterations')
 
     # seeds
     parser.add_argument('--seed', type=int, help='general purpose seed')
