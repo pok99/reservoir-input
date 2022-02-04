@@ -60,7 +60,7 @@ def parse_args():
     parser.add_argument('--net_fb', action='store_true', help='feedback from network output to input')
 
     # dataset arguments
-    parser.add_argument('-d', '--dataset', type=str, nargs='+', help='dataset(s) to use. >1 means different contexts')
+    parser.add_argument('-d', '--dataset', type=str, default=['datasets/rsg-100-150.pkl'], nargs='+', help='dataset(s) to use. >1 means different contexts')
     # parser.add_argument('-a', '--add_tasks', type=str, nargs='+', help='add tasks to previously trained reservoir')
     parser.add_argument('-s', '--sequential', action='store_true', help='sequential training')
     parser.add_argument('--owm', action='store_true', help='use orthogonal weight modification')
