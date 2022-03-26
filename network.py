@@ -67,11 +67,16 @@ class M2Net(nn.Module):
 
     def _init_vars(self):
         with TorchSeed(self.args.network_seed):
+            # D1 = 0 means no intermediate input layer. implemented by setting weights to Identity
+            # D2 = 0 means no intermediate output layer
             D1 = self.args.D1 if self.args.D1 != 0 else self.args.N
             D2 = self.args.D2 if self.args.D2 != 0 else self.args.N
             # net feedback into input layer
             if hasattr(self.args, 'net_fb') and self.args.net_fb:
-                self.M_u = nn.Linear(self.args.L + self.args.T + self.args.Z, D1, bias=self.args.ff_bias)
+                # "feedforward" feedback layer
+                self.M_fb = nn.Linear(self.args.Z, self.args.Y, bias=False)
+                # feed feedback layer into the input
+                self.M_u = nn.Linear(self.args.L + self.args.T + self.args.Y, D1, bias=self.args.ff_bias)
             else:
                 self.M_u = nn.Linear(self.args.L + self.args.T, D1, bias=self.args.ff_bias)
             self.M_ro = nn.Linear(D2, self.args.Z, bias=self.args.ff_bias)
