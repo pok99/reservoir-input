@@ -340,11 +340,11 @@ class DMProAnti(Task):
             theta_1 = np.random.choice(args.angles)*np.pi/180
             #randomly sammple a value from 0 to arg.angles and convert from degrees to radians
         
-        stimulus_1=[np.cos(theta_1),np.sin(theta_1)]
+        self.stimulus_1=[np.cos(theta_1),np.sin(theta_1)]
 
         #stimulus 2
-        theta_2= np.random.uniform(low=theta_1 + pi * 0.5,high= theta_1 + pi*1.5)
-        stimulus_2= [np.cos(theta_2),np.sin(theta_2)]
+        theta_2= np.random.uniform(low=theta_1 + np.pi * 0.5,high= theta_1 + np.pi*1.5)
+        self.stimulus_2= [np.cos(theta_2),np.sin(theta_2)]
         #check 1(delete once checked): angles are what they're supposed to be
 
         self.t_type = args.t_type
@@ -352,10 +352,13 @@ class DMProAnti(Task):
 
 
         gamma_mean = np.random.uniform(.8, 1.2)
-        coherence = random.choice([−0.08, −0.04, −0.02, −0.01, 0.01, 0.02, 0.04, 0.08])
+        coherence_arr= [-0.08, -0.04, -0.02, -0.01, 0.01, 0.02, 0.04, 0.08]
         
-        g1 = gamma_mean + coherence
-        g2 = gamma_mean - coherence
+        coherence=np.random.choice(coherence_arr)
+        coherence=np.random.choice(coherence_arr)
+        
+        self.g1 = gamma_mean + coherence
+        self.g2 = gamma_mean - coherence
 
         #duration of stimulus 1
         self.fix = args.fix_t # fixaton duration and self.fix can also be point when self.fix ends
@@ -364,7 +367,7 @@ class DMProAnti(Task):
         self.stim = self.fix + stim_t
         #point where
 
-        self.t_len= self.fix + stim_t
+        self.t_len= self.stim+ 400
 
 
 
@@ -372,35 +375,35 @@ class DMProAnti(Task):
         self.Z = 3
     
     def get_x(self,args=None):
-        x=np.zeros(5,self.t_len)
+        x=np.zeros((5,self.t_len))
         
         x[0,:self.stim]=1
         
         #stimulus 1
-        x[1, self.fix:]=g1*self.stimulus_1[0]
-        x[2,self.fix:] = g1*self_stimulus_1[1]
+        x[1, self.fix:]=self.g1*self.stimulus_1[0]
+        x[2,self.fix:] = self.g1*self.stimulus_1[1]
         
         #stimulus 2
-        x[3, self.fix:]=g2*self.stimulus_2[0]
-        x[4,self.fix:] = g2*self_stimulus_2[1]
+        x[3, self.fix:]=self.g2*self.stimulus_2[0]
+        x[4,self.fix:] = self.g2*self.stimulus_2[1]
 
 
         return x 
 
 
     def get_y(self,args=None):
-        y=np.zeros(3,self.t_len)
+        y=np.zeros((3,self.t_len))
         
         y[0,:self.stim]= 1
         #fixate until stim period ends (i.e until when go period begins)
 
-        if g1 > g2:
-            y[1,self.stim:] = stimulus_1[0]
-            y[2,self.stim:] =stimulus_1[1]
+        if self.g1 > self.g2:
+            y[1,self.stim:] = self.stimulus_1[0]
+            y[2,self.stim:] =self.stimulus_1[1]
         
-        elif g1 < g2:
-            y[1,self.stim:] = stimulus_2[0]
-            y[2,self.stim:] =stimulus_2[1]
+        elif self.g1 < self.g2:
+            y[1,self.stim:] = self.stimulus_2[0]
+            y[2,self.stim:] =self.stimulus_2[1]
 
 
 
@@ -562,7 +565,7 @@ def get_task_args(args):
         targs.stim_t = get_tval(tarr, 'stim', 100, int)
         targs.memory_t = get_tval(tarr, 'memory', 50, int)
 
-    elif t_type == 'dm-pro' or t_type == 'dm-anti':
+    elif args.t_type == 'dm-pro' or args.t_type == 'dm-anti':
         targs.t_len = get_tval(tarr, 'l', 300, int)
         #default value of t_len is 300 according to this but doesn't do anything atm
         #bc for now t_len in dm is determined by stimulus duration
@@ -652,6 +655,7 @@ if __name__ == '__main__':
         dset = load_rb(args.name)
         t_type = type(dset[0])
         xr = np.arange(dset[0].t_len)
+        
 
         samples = random.sample(dset, 12)
         fig, ax = plt.subplots(3,4,sharex=True, sharey=True, figsize=(10,6))
@@ -702,6 +706,35 @@ if __name__ == '__main__':
                 ax.plot(xr, trial_y[0], color='grey', lw=1.5)
                 ax.plot(xr, trial_y[1], color='salmon', lw=1.5)
                 ax.plot(xr, trial_y[2], color='dodgerblue', lw=1.5)
+
+            elif t_type is DMProAnti:
+                xr=np.arange(trial.t_len)
+                ax.plot(xr, trial_x[0], color='grey', lw=1, ls='--', alpha=.6)
+                #stimulus 1
+
+                ax.plot(xr, trial_x[1], color='salmon', lw=1*trial.g1, ls='--', alpha=.6)
+                ax.plot(xr, trial_x[2], color='dodgerblue', lw=1*trial.g1, ls='--', alpha=.6)
+                
+                #stimulus 2
+                ax.plot(xr, trial_x[3], color='magenta', lw=1*trial.g2, ls='--', alpha=.6)
+                ax.plot(xr, trial_x[4], color='lime', lw=1*trial.g2, ls='--', alpha=.6)
+
+                if trial.g1>trial.g2:
+                    ax.plot(xr, trial_y[0], color='grey', lw=1.5)
+                    ax.plot(xr, trial_y[1], color='salmon', lw=1.5)
+                    ax.plot(xr, trial_y[2], color='dodgerblue', lw=1.5)
+
+                elif trial.g1 < trial.g2:
+                    ax.plot(xr, trial_y[0], color='grey', lw=1.5)
+                    ax.plot(xr, trial_y[1], color='magenta', lw=1.5)
+                    ax.plot(xr, trial_y[2], color='lime', lw=1.5)
+
+
+            
+
+                
+
+
 
             elif t_type is DurationDisc:
                 ax.plot(xr, trial_x[0], color='grey', lw=1, ls='--')
