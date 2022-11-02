@@ -146,7 +146,10 @@ class DelayProAnti(Task):
         assert self.t_type in ['delay-pro', 'delay-anti']
         self.stimulus = stimulus
         self.fix = args.fix_t
+        
         self.stim = self.fix + args.stim_t
+        #stim_t is duration of stimulus period after fixation period
+         #when the stimulus period ends and fixation drops to zero and go period begins
 
         self.L = 3
         self.Z = 3
@@ -155,17 +158,22 @@ class DelayProAnti(Task):
         x = np.zeros((3, self.t_len))
         # 0 is fixation, the remainder are stimulus
         x[0,:self.stim] = 1
+        #up to but not including self.stim, fixate
         x[1,self.fix:] = self.stimulus[0]
+        #from and including self.fix time show stimulus until end
         x[2,self.fix:] = self.stimulus[1]
+        #from
         return x
 
     def get_y(self, args=None):
         y = np.zeros((3, self.t_len))
         y[0,:self.stim] = 1
+        #when stimulus period ends (at t=self.stim), input stimulus on the output channels
         y[1,self.stim:] = self.stimulus[0]
         y[2,self.stim:] = self.stimulus[1]
         if self.t_type.endswith('anti'):
-            y[1:,] = -y[1:,]
+            y[1:,] = -y[1:,] 
+            
         return y
 
 class MemoryProAnti(Task):
@@ -322,29 +330,131 @@ class DurationDisc(Task):
         return y
 
 
-class DM(Task):
+class DMProAnti(Task):
     def __init__(self, args, dset_id=None, n=None):
         super().__init__(args.t_len, dset_id, n)
+        #stimulus_1
+        if args.angles is None:
+            theta_1=np.random.random()*2*np.pi
+        else:
+            theta_1 = np.random.choice(args.angles)*np.pi/180
+            #randomly sammple a value from 0 to arg.angles and convert from degrees to radians
+        
+        stimulus_1=[np.cos(theta_1),np.sin(theta_1)]
+
+        #stimulus 2
+        theta_2= np.random.uniform(low=theta_1 + pi * 0.5,high= theta_1 + pi*1.5)
+        stimulus_2= [np.cos(theta_2),np.sin(theta_2)]
+        #check 1(delete once checked): angles are what they're supposed to be
 
         self.t_type = args.t_type
-        assert self.t_type in ['dm1', 'dm2', 'dm1-ctx', 'dm2-ctx', 'dm-multi']
+        assert self.t_type in ['dm-pro', 'dm-anti']
 
-        # hexagonal ring for dm
-        c1s1, c2s1 = np.random.randint(0, 6, 2)
-        d_c1s2, d_c2s2 = np.random.randint(1, 6, 2)
-        c1s2, c2s2 = (c1s1 + d_c1s2) % 6, (c2s1 + d_c2s2) % 6
+
         gamma_mean = np.random.uniform(.8, 1.2)
-        c = np.random.choice([-.08, -.04, -.02, -.01, .01, .02, .04, .08])
+        coherence = random.choice([−0.08, −0.04, −0.02, −0.01, 0.01, 0.02, 0.04, 0.08])
+        
+        g1 = gamma_mean + coherence
+        g2 = gamma_mean - coherence
 
-        self.L = 12
-        self.Z = 6
+        #duration of stimulus 1
+        self.fix = args.fix_t # fixaton duration and self.fix can also be point when self.fix ends
+    
+        stim_t= random.choice([400, 800, 1600])
+        self.stim = self.fix + stim_t
+        #point where
 
-    def get_x(self, args=None):
-        x = np.zeros((12, self.t_len))
-        x[c1s1, :] = gamma_mean + c
-        x[c1s2, :] = gamma_mean - c
-        x[6 + c2s1, :] = gamma_mean + c
-        x[6 + c2s2, :] = gamma_mean - c
+        self.t_len= self.fix + stim_t
+
+
+
+        self.L = 5
+        self.Z = 3
+    
+    def get_x(self,args=None):
+        x=np.zeros(5,self.t_len)
+        
+        x[0,:self.stim]=1
+        
+        #stimulus 1
+        x[1, self.fix:]=g1*self.stimulus_1[0]
+        x[2,self.fix:] = g1*self_stimulus_1[1]
+        
+        #stimulus 2
+        x[3, self.fix:]=g2*self.stimulus_2[0]
+        x[4,self.fix:] = g2*self_stimulus_2[1]
+
+
+        return x 
+
+
+    def get_y(self,args=None):
+        y=np.zeros(3,self.t_len)
+        
+        y[0,:self.stim]= 1
+        #fixate until stim period ends (i.e until when go period begins)
+
+        if g1 > g2:
+            y[1,self.stim:] = stimulus_1[0]
+            y[2,self.stim:] =stimulus_1[1]
+        
+        elif g1 < g2:
+            y[1,self.stim:] = stimulus_2[0]
+            y[2,self.stim:] =stimulus_2[1]
+
+
+
+        
+        if self.t_type.endswith('anti'):
+            y[1:,] = -y[1:,] 
+            
+        return y
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    #commented out as this is the old version of dm
+    # def __init__(self, args, dset_id=None, n=None):
+    #     super().__init__(args.t_len, dset_id, n)
+
+    #     self.t_type = args.t_type
+    #     assert self.t_type in ['dm1', 'dm2', 'dm1-ctx', 'dm2-ctx', 'dm-multi']
+
+    #     # hexagonal ring for dm
+    #     c1s1, c2s1 = np.random.randint(0, 6, 2)
+    #     d_c1s2, d_c2s2 = np.random.randint(1, 6, 2)
+    #     c1s2, c2s2 = (c1s1 + d_c1s2) % 6, (c2s1 + d_c2s2) % 6
+    #     gamma_mean = np.random.uniform(.8, 1.2)
+    #     c = np.random.choice([-.08, -.04, -.02, -.01, .01, .02, .04, .08])
+
+    #     self.L = 12
+    #     self.Z = 6
+
+    # def get_x(self, args=None):
+    #     x = np.zeros((12, self.t_len))
+    #     x[c1s1, :] = gamma_mean + c
+    #     x[c1s2, :] = gamma_mean - c
+    #     x[6 + c2s1, :] = gamma_mean + c
+    #     x[6 + c2s2, :] = gamma_mean - c
 
 
 
@@ -381,6 +491,11 @@ def create_dataset(args):
     elif t_type == 'memory-pro' or t_type == 'memory-anti':
         assert args.fix_t + args.stim_t + args.memory_t < args.t_len
         TaskObj = MemoryProAnti
+    elif t_type == 'dm-pro' or t_type == 'dm-anti':
+        assert args.fix_t + args.stim_t < args.t_len
+        #make sure stim period ends before t_len so there's time for go period
+        TaskObj = DMProAnti
+
     elif t_type == 'dur-disc':
         assert args.tau + args.max_d <= args.sep_t
         assert args.sep_t + args.tau + args.max_d <= args.cue_t
@@ -446,6 +561,17 @@ def get_task_args(args):
         targs.fix_t = get_tval(tarr, 'fix', 50, int)
         targs.stim_t = get_tval(tarr, 'stim', 100, int)
         targs.memory_t = get_tval(tarr, 'memory', 50, int)
+
+    elif t_type == 'dm-pro' or t_type == 'dm-anti':
+        targs.t_len = get_tval(tarr, 'l', 300, int)
+        #default value of t_len is 300 according to this but doesn't do anything atm
+        #bc for now t_len in dm is determined by stimulus duration
+        targs.fix_t = get_tval(tarr, 'fix', 50, int)
+        targs.stim_t = get_tval(tarr, 'stim', 150, int)
+
+
+
+    
 
     elif args.t_type == 'dur-disc':
         targs.t_len = get_tval(tarr, 'l', 600, int)
